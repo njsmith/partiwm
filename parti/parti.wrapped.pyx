@@ -11,6 +11,7 @@ import gtk.gdk
 cdef extern from "Python.h":
     void Py_INCREF(object o)
     void Py_DECREF(object o)
+    object PyString_FromStringAndSize(char * s, int len)
 
 ###################################
 # GObject
@@ -52,6 +53,8 @@ cdef object wrap(cGObject * contents):
 
 cdef extern from "X11/Xlib.h":
     pass
+cdef extern from "X11/Xutil.h":
+    pass
 
 include "parti.wrapped.const.pxi"
 
@@ -62,6 +65,8 @@ cdef extern from *:
     ctypedef int Status
     ctypedef int Atom
     ctypedef int Window
+
+    int XFree(void * data)
 
     # Needed to find the secret window Gtk creates to own the selection, so we
     # can broadcast it:
@@ -123,12 +128,23 @@ cdef extern from *:
     int cXChangeProperty "XChangeProperty" \
         (Display *, Window w, Atom property,
          Atom type, int format, int mode, char * data, int nelements)
+    int cXGetWindowProperty "XGetWindowProperty" \
+        (Display * display, Window w, Atom property,
+         long offset, long length, Bool delete,
+         Atom req_type, Atom * actual_type,
+         int * actual_format,
+         unsigned long * nitems, unsigned long * bytes_after,
+         char ** prop);
+    int cXDeleteProperty "XDeleteProperty" \
+        (Display * display, Window w, Atom property)
+
 
     int cXAddToSaveSet "XAddToSaveSet" (Display * display, Window w)
 
     ctypedef struct XWindowAttributes:
         int x, y, width, height, border_width
         Bool override_redirect
+        int map_state
         long your_event_mask
     Status XGetWindowAttributes(Display * display, Window w,
                                 XWindowAttributes * attributes)
@@ -146,6 +162,10 @@ cdef extern from *:
                                int src_x, int src_y,
                                int * dest_x, int * dest_y,
                                Window * child)
+
+    Status XQueryTree(Display * display, Window w,
+                      Window * root, Window * parent,
+                      Window ** children, unsigned int * nchildren)
 
 ######
 # GDK primitives, and wrappers for Xlib
@@ -174,12 +194,12 @@ get_pywindow = gtk.gdk.window_foreign_new
 
 # Atom stuff:
 cdef extern from *:
-    ctypedef struct PyGdkAtom_Object:
-        pass
     ctypedef void * GdkAtom
     # FIXME: this should have stricter type checking
     GdkAtom PyGdkAtom_Get(object)
+    object PyGdkAtom_New(GdkAtom)
     Atom gdk_x11_atom_to_xatom(GdkAtom)
+    GdkAtom gdk_x11_xatom_to_atom(Atom)
 
 def get_xatom(gdkatom_or_str):
     """Returns the X atom corresponding to the given PyGdkAtom or Python
@@ -188,6 +208,9 @@ def get_xatom(gdkatom_or_str):
         gdkatom_or_str = gtk.gdk.atom_intern(gdkatom_or_str)
     # Assume it is a PyGdkAtom (since there's no easy way to check, sigh)
     return gdk_x11_atom_to_xatom(PyGdkAtom_Get(gdkatom_or_str))
+
+def get_pyatom(xatom):
+    return PyGdkAtom_New(gdk_x11_xatom_to_atom(xatom))
 
 # Property handling:
 def XChangeProperty(pywindow, property, value):
@@ -204,10 +227,70 @@ def XChangeProperty(pywindow, property, value):
                               data,
                               len(data) / (format / 8))
 
+class PropertyError(Exception):
+    pass
+class BadPropertyType(PropertyError):
+    pass
+class PropertyOverflow(PropertyError):
+    pass
+class NoSuchProperty(PropertyError):
+    pass
+def XGetWindowProperty(pywindow, property, req_type):
+    # "64k is enough for anybody"
+    buffer_size = 64 * 1024
+    cdef Atom actual_type
+    cdef int actual_format
+    cdef unsigned long nitems, bytes_after
+    cdef char * prop
+    cXGetWindowProperty(gdk_x11_get_default_xdisplay(),
+                        get_xwindow(pywindow),
+                        get_xatom(property),
+                        0, buffer_size / 4, False,
+                        get_xatom(req_type), &actual_type,
+                        &actual_format, &nitems, &bytes_after, &prop)
+    if actual_type == XNone:
+        raise NoSuchProperty, property
+    if bytes_after and not nitems:
+        raise BadPropertyType, actual_type
+    if bytes_after:
+        raise PropertyOverflow, 4 * nitems + bytes_after
+    data = PyString_FromStringAndSize(prop, nitems)
+    if prop:
+        XFree(prop)
+    return data
+
+def XDeleteProperty(pywindow, property):
+    cXDeleteProperty(gdk_x11_get_default_xdisplay(),
+                     get_xwindow(pywindow),
+                     get_xatom(property))
+
 # Save set handling
 def XAddToSaveSet(pywindow):
     cXAddToSaveSet(gdk_x11_get_default_xdisplay(),
                    get_xwindow(pywindow))
+
+# Children listing
+def get_children(pywindow):
+    cdef Window root, parent
+    cdef Window * children
+    cdef unsigned int nchildren
+    XQueryTree(gdk_x11_get_default_xdisplay(),
+               get_xwindow(pywindow),
+               &root, &parent, &children, &nchildren)
+    pychildren = []
+    for 0 <= i < nchildren:
+        pychildren.append(get_pywindow(children[i]))
+    if children != NULL:
+        XFree(children)
+    return pychildren
+
+# Mapped status
+def is_mapped(pywindow):
+    cdef XWindowAttributes attrs
+    XGetWindowAttributes(gdk_x11_get_default_xdisplay(),
+                         get_xwindow(pywindow),
+                         &attrs)
+    return attrs.map_state == IsMapped
 
 ###################################
 # Smarter convenience wrappers
@@ -240,16 +323,14 @@ def sendClientMessage(target, propagate, event_mask,
         raise ValueError, "failed to serialize ClientMessage"
 
 def sendConfigureNotify(pywindow):
-    Display * display
-    display = gdk_x11_get_default_xdisplay()
-    Window window
+    cdef Display * display
+    cdef display = gdk_x11_get_default_xdisplay()
+    cdef Window window
     window = get_xwindow(pywindow)
 
     # Get basic attributes
-    XWindowAttributes attrs
-    XGetWindowAttributes(gdk_x11_get_default_xdisplay(),
-                         get_xwindow(pywindow),
-                         &attrs)
+    cdef XWindowAttributes attrs
+    XGetWindowAttributes(display, window, &attrs)
 
     # Figure out where the window actually is in root coordinate space
     cdef int dest_x, dest_y
@@ -287,14 +368,14 @@ def configureAndNotify(pywindow, x, y, width, height):
     # Reconfigure the window.  We have to use XConfigureWindow directly
     # instead of GdkWindow.resize, because GDK does not give us any way to
     # squash the border.
-    XWindowChanges changes
+    cdef XWindowChanges changes
     changes.x = x
     changes.y = y
     changes.width = width
     changes.height = height
     changes.border_width = border_width
     fields = CWX | CWY | CWWdith | CWHeight | CWBorderWidth
-    cXConfigureWindow(display, window, &changes)
+    cXConfigureWindow(display, window, fields, &changes)
     # Tell the client.
     sendConfigureNotify(pywindow)
 
@@ -353,7 +434,7 @@ cdef GdkFilterReturn substructureRedirectFilter(XEvent * e,
         return GDK_FILTER_CONTINUE
 
 def addXSelectInput(pywindow, add_mask):
-    XWindowAttributes curr
+    cdef XWindowAttributes curr
     XGetWindowAttributes(gdk_x11_get_default_xdisplay(),
                          get_xwindow(pywindow),
                          &curr)

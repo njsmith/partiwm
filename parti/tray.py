@@ -1,8 +1,10 @@
 class Tray(object):
-    def __init__(self, trayset, tag, config):
+    def __init__(self, trayset, tag):
         self.trayset = trayset
         self.tag = tag
-        self.config = config
+
+    def add(self, window):
+        raise NotImplementedError
 
     def windows(self):
         raise NotImplementedError
@@ -58,9 +60,9 @@ class TraySet(object):
         tray = self.trays.pop(oldidx)
         self.trays.insert(newidx, tray)
 
-    def new(self, tag, type, config):
+    def new(self, tag, type):
         assert tag not in self
-        tray = type(self, tag, config)
+        tray = type(self, tag)
         self.trays.append(tray)
         return tray
 

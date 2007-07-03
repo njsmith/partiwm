@@ -1,10 +1,67 @@
 import struct
 import gtk.gdk
-from parti.wrapped import XChangeProperty, get_xatom, get_xwindow
+from parti.wrapped import \
+     XGetWindowProperty, XChangeProperty, PropertyError, \
+     get_xatom, get_pyatom, get_xwindow, get_pywindow, const
 from parti.error import trap
 
 def unsupported(*args):
     raise UnsupportedException
+
+def force_length(data, length):
+    data += "\0" * length
+    return data[:length]
+
+class WMSizeHints(object):
+    def __init__(self, data):
+        data = force_length(data, 13 * 4)
+        (flags,
+         pad1, pad2, pad3, pad4,
+         max_width, max_height,
+         width_inc, height_inc,
+         max_aspect1, max_aspect2,
+         base_width, base_height,
+         win_gravity) = struct.unpack("@" + "i" * 13, data[:(13*4)])
+        # Only extract the things we care about, i.e., max, min, base,
+        # increments.
+        if flags & const["PMaxSize"]:
+            self.max_size = (max_width, max_height)
+        else:
+            self.max_size = None
+        if flags & const["PMMinSize"]:
+            self.min_size = (min_size, max_size)
+        else:
+            self.min_size = None
+        if flags & const["PBaseSize"]:
+            self.base_size = (base_width, base_height)
+        else:
+            self.base_size = None
+        if flags & PResizeInc:
+            self.resize_inc = (width_inc, height_inc)
+        else:
+            self.resize_inc = None
+
+class WMHints(object):
+    def __init__(self, data):
+        data = force_length(data, 9 * 4)
+        (flags, input, initial_state,
+         icon_pixmap, icon_window, icon_x, icon_y, icon_mask,
+         window_group) = struct.unpack("@" + "i" * 9, data)
+        # NB the last field is missing from at least some ICCCM 2.0's (typo).
+        # FIXME: extract icon stuff too
+        self.urgency = bool(flags & const["XUrgencyHint"])
+        if flags & const["WindowGroupHint"]:
+            self.group_leader = window_group
+        else:
+            self.group_leader = None
+        if flags & const["StateHint"]:
+            self.start_iconic = (initial_state == const["IconicState"])
+        else:
+            self.start_iconic = None
+        if flags & const["InputHint"]:
+            self.input = input
+        else:
+            self.input = None
 
 prop_types = {
     # Python type, X type Atom, format, serializer, deserializer, list
@@ -13,13 +70,16 @@ prop_types = {
              lambda u: u.encode("UTF-8"),
              lambda d: d.decode("UTF-8"),
              "\0"),
+    # In theory, there should be something clever about COMPOUND_TEXT here.  I
+    # am not sufficiently clever, even knowing that
+    # Xutf8TextPropertyToTextList exists.
     "latin1": (unicode, "STRING", 8,
                lambda u: u.encode("latin1"),
                lambda d: d.decode("latin1"),
                "\0"),
     "atom": (str, "ATOM", 32,
              lambda a: struct.pack("@i", get_xatom(a)),
-             unsupported,
+             lambda d: str(get_pyatom(struct.unpack("@i", d)[0]))
              ""),
     "u32": (int, "CARDINAL", 32,
             lambda c: struct.pack("@i", c),
@@ -27,9 +87,16 @@ prop_types = {
             ""),
     "window": (gtk.gdk.Window, "WINDOW", 32,
                lambda c: struct.pack("@i", get_xwindow(c)),
-               #lambda d: struct.unpack("@i", d)[0],
-               unsupported,
+               lambda d: get_pywindow(struct.unpack("@i", d)[0]),
                ""),
+    "wm-size-hints": (WMSizeHints, "WM_SIZE_HINTS", 32,
+                      unsupported,
+                      WMSizeHints,
+                      None),
+    "wm-hints": (WMHints, "WM_HINTS", 32,
+                 unsupported,
+                 WMHints,
+                 None),
     }
 
 def prop_encode(type, value):
@@ -55,3 +122,34 @@ def _prop_encode_list(type, value):
 def prop_set(target, key, type, value):
     trap.call_unsynced(XChangeProperty, target, key,
                        prop_encode(type, value))
+
+
+def prop_decode(type, data):
+    if isinstance(type, list):
+        return _prop_decode_list(type[0], data)
+    else:
+        return _prop_decode_scalar(type, data)
+
+def _prop_decode_scalar(type, data):
+    (pytype, atom, format, serialize, deserialize, terminator) = prop_types[type]
+    value = deserialize(data)
+    assert isinstance(value, pytype)
+    return value
+
+def _prop_decode_list(type, data):
+    (pytype, atom, format, serialize, deserialize, terminator) = prop_types[type]
+    datums = data.split(terminator)
+    return [_prop_decode_scalar(type, datum) for datum in datums]
+
+# May return None.
+def prop_get(target, key, type):
+    if isinstance(type, list):
+        scalar_type = type[0]
+    else:
+        scalar_type = type
+    (pytype, atom, format, serialize, deserialize, terminator) = prop_types[scalar_type]
+    try:
+        data = trap.call_synced(XGetWindowProperty(target, key, atom))
+    except XError, PropertyError:
+        return None
+    return prop_decode(type, data)

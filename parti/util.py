@@ -1,9 +1,13 @@
 import gobject
 
-class MyGObject(gobject.GObject):
-    "GObject with automagic property support."
+class AutoPropGObject(gobject.GObject):
+    """GObject with automagic property support.
+
+    Can also be used as a mixin if inheriting from an existing GObject
+    subclass.  If so, put this one first in the parent list, so
+    super().__init__ will work right."""
     def __init__(self):
-        gobject.GObject.__init__(self)
+        super(MyGObject, self).__init__()
         self._gproperties = {}
 
     def do_get_property(self, pspec):

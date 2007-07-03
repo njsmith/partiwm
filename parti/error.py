@@ -27,6 +27,18 @@ import parti.wrapped as _wrapped
 class XError(Exception):
     pass
 
+# Define its more precise subclasses, XBadRequest, XBadValue, etc.
+_all_errors = ["BadRequest", "BadValue", "BadWindow", "BadPixmap", "BadAtom",
+               "BadCursor", "BadFont", "BadMatch", "BadDrawable", "BadAccess",
+               "BadAlloc", "BadColor", "BadGC", "BadIDChoice", "BadName",
+               "BadLength", "BadImplementation"]
+_exc_for_error = {}
+for error in _all_errors:
+    exc_name = "X%s" % error
+    exc_class = type(exc_name, (XError,), {})
+    locals()[exc_name] = exc_class
+    _exc_for_error[_wrapped.consts[error]] = exc_class
+
 # gdk has its own depth tracking stuff, but we have to duplicate it here to
 # minimize calls to XSync.
 class _ErrorManager(object):
@@ -46,7 +58,10 @@ class _ErrorManager(object):
         # This is a Xlib error constant (Success == 0)
         error = _gdk.error_trap_pop()
         if error != _wrapped.const["Success"]:
-            raise XError, error
+            if error in _exc_for_error:
+                raise _exc_for_error[error](error)
+            else:
+                XError, error
 
     def exit_unsynced(self):
         self._exit(False)
