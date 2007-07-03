@@ -1,0 +1,86 @@
+## This file is processed by make-constants-pxi.py to create a .pxi
+## file for inclusion in parti.wrapped.pyx, like so:
+##   python make-constants-pxi.py parti/parti.wrapped.const.txt parti/parti.wrapped.const.pxi
+## ATM, this must be done by hand, because distutils is so annoying to
+## hack on.
+##
+## The resulting .pxi file will make all the constants available to
+## Pyrex code under their own names, and also create a python-exposed
+## dictionary through which the constants can be accessed like
+## const["CurrentTime"].
+
+# General-purpose X constants
+XNone "None"
+PointerWindow
+InputFocus
+PointerRoot
+CurrentTime
+
+# Event mask flags
+NoEventMask
+KeyPressMask
+KeyReleaseMask
+ButtonPressMask
+ButtonReleaseMask
+EnterWindowMask
+LeaveWindowMask
+PointerMotionMask
+PointerMotionHintMask
+Button1MotionMask
+Button2MotionMask
+Button3MotionMask
+Button4MotionMask
+Button5MotionMask
+ButtonMotionMask
+KeymapStateMask
+ExposureMask
+VisibilityChangeMask
+StructureNotifyMask
+ResizeRedirectMask
+SubstructureNotifyMask
+SubstructureRedirectMask
+FocusChangeMask
+PropertyChangeMask
+ColormapChangeMask
+OwnerGrabButtonMask
+
+# Event types
+KeyPress
+KeyRelease
+ButtonPress
+ButtonRelease
+MotionNotify
+EnterNotify
+LeaveNotify
+FocusIn
+FocusOut
+KeymapNotify
+Expose
+GraphicsExpose
+NoExpose
+VisibilityNotify
+CreateNotify
+DestroyNotify
+UnmapNotify
+MapNotify
+MapRequest
+ReparentNotify
+ConfigureNotify
+ConfigureRequest
+GravityNotify
+ResizeRequest
+CirculateNotify
+CirculateRequest
+PropertyNotify
+SelectionClear
+SelectionRequest
+SelectionNotify
+ColormapNotify
+ClientMessage
+MappingNotify
+LASTEvent
+
+# Property modification types
+PropModeReplace
+PropModePrepend
+PropModeAppend

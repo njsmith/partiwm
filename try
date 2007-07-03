@@ -1,0 +1,5 @@
+#!/bin/sh
+
+rm -rf build install
+python setup.py install --home=install
+DISPLAY=:1.0 PYTHONPATH=install/lib/python:$PYTHONPATH python install/bin/partiwm -sync
