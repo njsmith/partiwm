@@ -27,35 +27,35 @@ _NET_SUPPORTED = [
 
 class Wm(object):
     def __init__(self):
-        self.wm_selection = parti.selection.ManagerSelection("WM_S0")
-        self.wm_selection.connect("selection-lost", self._lost_wm_selection)
-        if self.wm_selection.owned():
+        # Become the Official Window Manager of the games:
+        self._wm_selection = parti.selection.ManagerSelection("WM_S0")
+        self._wm_selection.connect("selection-lost", self._lost_wm_selection)
+        if self._wm_selection.owned():
             print "A window manager is already running; exiting"
             sys.exit()
-        self.wm_selection.acquire()
-                                               
-        # If we become a compositing manager, then we will want to do the same
-        # thing with the _NET_WM_CM_S0 selection (says EWMH).
+        self._wm_selection.acquire()
+        # (If we become a compositing manager, then we will want to do the
+        # same thing with the _NET_WM_CM_S0 selection (says EWMH).)
 
-        self.ewmh_window = self._utility_window()
-        
-        root = gtk.gdk.get_default_root_window()
+        self._real_root = gtk.gdk.get_default_root_window()
+        self._ewmh_window = self._utility_window()
 
-        # EWMH:_NET_SUPPORTING_WM_CHECK
-        parti.wrapped.XChangeProperty(self.ewmh_window,
+        # Basic EWMH setup:
+        parti.wrapped.XChangeProperty(self._ewmh_window,
                                       "_NET_SUPPORTING_WM_CHECK",
                                       parti.prop.prop_encode("window",
                                                              self.ewmh_window))
-        parti.wrapped.XChangeProperty(root,
+        parti.wrapped.XChangeProperty(self._real_root,
                                       "_NET_SUPPORTING_WM_CHECK",
                                       parti.prop.prop_encode("window",
                                                              self.ewmh_window))
-
-        parti.wrapped.XChangeProperty(root,
+        parti.wrapped.XChangeProperty(self._real_root,
                                       "_NET_SUPPORTED",
                                       parti.prop.prop_encode(["atom"],
                                                              _NET_SUPPORTED))
         
+        # Okay, ready to select for SubstructureRedirect and 
+
     def _lost_wm_selection(self, data):
         print "Lost WM selection, exiting"
         self.quit()

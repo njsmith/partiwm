@@ -7,6 +7,14 @@ basic window managing:
 decorated, track their hints and modify their properties
 manage world properties (like desktop geometries)
 
+for basic usability, need:
+  gnome-panel, epiphany, gnome-terminal, emacs, ideally amarok,
+  xephyr
+    -> arbitrarily resizeable windows, "arithmetic progression"
+    windows (emacs and terminals), STRUT support, fixed-size windows
+    (Xephyr)
+
+
 eventual architecture: viewport/tray split
   each tray has a layout manager, which is stateful
 
@@ -38,3 +46,13 @@ widgets:
   "go to window": find-as-type, show live previews underneath of the
     options -- ido-mode with pictures?  (why only windows, for that
     matter -- make it desktop switcher too, or even app launcher...)
+    perhaps set operations too -- "make workspace from visible"
+  fast switching to highlighted apps
+  ipython-inna-window
+
+
+inspirations:
+  ion, wmii
+  tabbed browser modes
+  emacs (esp. iswitchb, ido, minibuffer?)
+  expose'

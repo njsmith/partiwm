@@ -1,0 +1,10 @@
+Some undocumented functions in gtk.gdk:
+  flush
+  x11_get_default_screen
+  x11_get_server_time
+  x11_grab_server
+  x11_register_standard_event_type
+  x11_ungrab_server
+  window_foreign_new
+  error_trap_push
+  error_trap_pop

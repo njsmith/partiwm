@@ -7,7 +7,6 @@
 import gobject
 import gtk
 import gtk.gdk
-import struct
 
 ###################################
 # GObject
@@ -17,6 +16,7 @@ cdef extern from "pygobject.h":
     ctypedef struct cGObject "GObject":
         pass
     cGObject * pygobject_get(object box)
+    object pygobject_new(cGObject * contents)
 
 cdef cGObject * unwrap(box, pyclass) except? NULL:
     # Extract a raw GObject* from a PyGObject wrapper.
@@ -33,6 +33,10 @@ def print_unwrapped(box):
         print "contents is NULL!"
     else:
         print "contents is %s" % (<long long>unwrapped)
+
+cdef object wrap(cGObject * contents):
+    # Put a raw GObject* into a PyGObject wrapper.
+    return pygobject_new(contents)
 
 ###################################
 # Raw Xlib and GDK
@@ -105,11 +109,9 @@ cdef extern from *:
     ctypedef struct cGdkWindow "GdkWindow":
         pass
     Window GDK_WINDOW_XID(cGdkWindow *)
+    cGdkWindow * gdk_window_foreign_new(Window w)
 
     Display * gdk_x11_get_default_xdisplay()
-
-    void gdk_error_trap_push()
-    int gdk_error_trap_pop()
 
 def get_xwindow(pywindow):
     return GDK_WINDOW_XID(<cGdkWindow*>unwrap(pywindow, gtk.gdk.Window))
@@ -137,7 +139,6 @@ def XChangeProperty(pywindow, property, value):
     (type, format, data) = value
     assert format in (8, 16, 32)
     assert (len(data) % (format / 8)) == 0
-    gdk_error_trap_push()
     result = cXChangeProperty(gdk_x11_get_default_xdisplay(),
                               get_xwindow(pywindow),
                               get_xatom(property),
@@ -146,7 +147,6 @@ def XChangeProperty(pywindow, property, value):
                               PropModeReplace,
                               data,
                               len(data) / (format / 8))
-    return gdk_error_trap_pop()
 
 ###################################
 # Smarter convenience wrappers
@@ -177,3 +177,29 @@ def sendClientMessage(target, propagate, event_mask,
     s = XSendEvent(display, w, propagate, event_mask, &e)
     if s == 0:
         raise ValueError, "failed to serialize ClientMessage"
+
+
+###################################
+# Raw event handling
+###################################
+
+cdef extern from *:
+    enum GdkFilterReturn:
+        GDK_FILTER_CONTINUE   # If we ignore the event
+        GDK_FILTER_TRANSLATE  # If we converted the event to a GdkEvent
+        GDK_FILTER_REMOVE     # If we handled the event and GDK should ignore it
+
+    ctypedef GdkFilterReturn (*GdkFilterFunc)(XEvent *, void *, void *)
+    void gdk_window_add_filter(cGdkWindow * w,
+                               GdkFilterFunc filter,
+                               void * userdata)
+
+cdef GdkFilterReturn rootRawEventFilter(XEvent * e,
+                                        void * gdk_event,
+                                        void * userdata):
+    return GDK_FILTER_CONTINUE
+
+def registerRawFilter(pywindow):
+    gdk_window_add_filter(get_xwindow(pywindow),
+                          rootRawEventFilter,
+                          NULL)
