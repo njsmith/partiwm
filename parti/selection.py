@@ -21,11 +21,9 @@ import parti.wrapped
 class ManagerSelection(gobject.GObject):
     __gsignals__ = {
         # FIXME: no clue why I'm setting SIGNAL_RUN_LAST here, but
-        # the examples all do.  Also, I have no clue why, when I give an empty
-        # tuple for the "arguments" bit, and pass no extra argument to emit(),
-        # slots still receive an extra argument from somewhere.
+        # the examples all do.
         'selection-lost': (gobject.SIGNAL_RUN_LAST,
-                           gobject.TYPE_NONE, ())
+                           gobject.TYPE_NONE, ()),
         }
 
     def __init__(self, selection):
@@ -83,3 +81,5 @@ class ManagerSelection(gobject.GObject):
 
     def _clear(self, clipboard, userdata):
         self.emit("selection-lost")
+
+gobject.type_register(ManagerSelection)

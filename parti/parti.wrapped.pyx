@@ -8,6 +8,10 @@ import gobject
 import gtk
 import gtk.gdk
 
+cdef extern from "Python.h":
+    void Py_INCREF(object o)
+    void Py_DECREF(object o)
+
 ###################################
 # GObject
 ###################################
@@ -59,6 +63,10 @@ cdef extern from *:
     ctypedef int Atom
     ctypedef int Window
 
+    # Needed to find the secret window Gtk creates to own the selection, so we
+    # can broadcast it:
+    Window XGetSelectionOwner(Display * display, Atom selection)
+
     # There are way more event types than this; add them as needed.
     ctypedef struct XAnyEvent:
         int type
@@ -75,13 +83,42 @@ cdef extern from *:
         Atom message_type
         int format
         payload_for_XClientMessageEvent data
+    # SubstructureRedirect-related events:
+    ctypedef struct XMapRequestEvent:
+        Window parent  # Same as xany.window, confusingly.
+        Window window  
+    ctypedef struct XConfigureRequestEvent:
+        Window parent  # Same as xany.window, confusingly.
+        Window window  
+        int x, y, width, height, border_width
+        Window above
+        int detail
+        unsigned long value_mask
+    ctypedef struct XCirculateRequestEvent:
+        Window parent  # Same as xany.window, confusingly.
+        Window window  
+        int place
+    # We have to generate synthetic ConfigureNotify's:
+    ctypedef struct XConfigureEvent:
+        Window event   # Same as xany.window, confusingly.  The selected-on
+                       # window.
+        Window window  # The effected window.
+        int x, y, width, height, border_width
+        Window above
+        Bool override_redirect
     ctypedef union XEvent:
         int type
         XAnyEvent xany
+        XMapRequestEvent xmaprequest
+        XConfigureRequestEvent xconfigurerequest
+        XCirculateRequestEvent xcirculaterequest
+        XConfigureEvent xconfigure
         XClientMessageEvent xclient
         
     Status XSendEvent(Display *, Window target, Bool propagate,
                       long event_mask, XEvent * event)
+
+    int XSelectInput(Display * display, Window w, long event_mask)
 
     int cXChangeProperty "XChangeProperty" \
         (Display *, Window w, Atom property,
@@ -89,9 +126,26 @@ cdef extern from *:
 
     int cXAddToSaveSet "XAddToSaveSet" (Display * display, Window w)
 
-    # Needed to find the secret window Gtk creates to own the selection, so we
-    # can broadcast it:
-    Window XGetSelectionOwner(Display * display, Atom selection)
+    ctypedef struct XWindowAttributes:
+        int x, y, width, height, border_width
+        Bool override_redirect
+        long your_event_mask
+    Status XGetWindowAttributes(Display * display, Window w,
+                                XWindowAttributes * attributes)
+    
+    ctypedef struct XWindowChanges:
+        int x, y, width, height, border_width
+        Window sibling
+        int stack_mode
+    int cXConfigureWindow "XConfigureWindow" \
+        (Display * display, Window w,
+         unsigned int value_mask, XWindowChanges * changes)
+
+    Bool XTranslateCoordinates(Display * display,
+                               Window src_w, Window dest_w,
+                               int src_x, int src_y,
+                               int * dest_x, int * dest_y,
+                               Window * child)
 
 ######
 # GDK primitives, and wrappers for Xlib
@@ -115,6 +169,8 @@ cdef extern from *:
 
 def get_xwindow(pywindow):
     return GDK_WINDOW_XID(<cGdkWindow*>unwrap(pywindow, gtk.gdk.Window))
+
+get_pywindow = gtk.gdk.window_foreign_new
 
 # Atom stuff:
 cdef extern from *:
@@ -183,6 +239,64 @@ def sendClientMessage(target, propagate, event_mask,
     if s == 0:
         raise ValueError, "failed to serialize ClientMessage"
 
+def sendConfigureNotify(pywindow):
+    Display * display
+    display = gdk_x11_get_default_xdisplay()
+    Window window
+    window = get_xwindow(pywindow)
+
+    # Get basic attributes
+    XWindowAttributes attrs
+    XGetWindowAttributes(gdk_x11_get_default_xdisplay(),
+                         get_xwindow(pywindow),
+                         &attrs)
+
+    # Figure out where the window actually is in root coordinate space
+    cdef int dest_x, dest_y
+    cdef Window child
+    if not XTranslateCoordinates(display, window,
+                                 get_xwindow(gtk.gdk.get_default_root_window()),
+                                 0, 0,
+                                 &dest_x, &dest_y, &child):
+        raise "can't happen"
+
+    # Send synthetic ConfigureNotify (ICCCM 4.2.3, for example)
+    cdef XEvent e
+    e.type = ConfigureNotify
+    e.xconfigure.event = window
+    e.xconfigure.window = window
+    e.xconfigure.x = dest_x
+    e.xconfigure.y = dest_y
+    e.xconfigure.width = attrs.width
+    e.xconfigure.height = attrs.height
+    e.xconfigure.border_width = attrs.border_width
+    e.xconfigure.above = XNone
+    e.xconfigure.override_redirect = attrs.override_redirect
+    
+    cdef Status s
+    s = XSendEvent(display, window, False, StructureNotifyMask, &e)
+    if s == 0:
+        raise ValueError, "failed to serialize ConfigureNotify"
+
+def configureAndNotify(pywindow, x, y, width, height):
+    cdef Display * display
+    display = gdk_x11_get_default_xdisplay()
+    cdef Window window
+    window = get_xwindow(pywindow)
+
+    # Reconfigure the window.  We have to use XConfigureWindow directly
+    # instead of GdkWindow.resize, because GDK does not give us any way to
+    # squash the border.
+    XWindowChanges changes
+    changes.x = x
+    changes.y = y
+    changes.width = width
+    changes.height = height
+    changes.border_width = border_width
+    fields = CWX | CWY | CWWdith | CWHeight | CWBorderWidth
+    cXConfigureWindow(display, window, &changes)
+    # Tell the client.
+    sendConfigureNotify(pywindow)
 
 ###################################
 # Raw event handling
@@ -199,12 +313,72 @@ cdef extern from *:
                                GdkFilterFunc filter,
                                void * userdata)
 
-cdef GdkFilterReturn rootRawEventFilter(XEvent * e,
-                                        void * gdk_event,
-                                        void * userdata):
-    return GDK_FILTER_CONTINUE
+# Catch the events that are generated by selecting for SubstructureRedirect,
+# and send them back out to Python.
+cdef GdkFilterReturn substructureRedirectFilter(XEvent * e,
+                                                void * gdk_event,
+                                                void * userdata):
+    (map_callback, configure_callback, circulate_callback) = <object>userdata
+    if e.type == MapRequest:
+        if map_callback is not None:
+            pyev = object()
+            pyev.parent = get_pywindow(e.xmaprequest.parent)
+            pyev.window = get_pywindow(e.xmaprequest.window)
+            map_callback(pyev)
+        return GDK_FILTER_REMOVE
+    elif e.type == ConfigureRequest:
+        if configure_callback is not None:
+            pyev = object()
+            pyev.parent = get_pywindow(e.xconfigurerequest.parent)
+            pyev.window = get_pywindow(wrap(e.xconfigurerequest.window))
+            pyev.x = e.xconfigurerequest.x
+            pyev.y = e.xconfigurerequest.y
+            pyev.width = e.xconfigurerequest.width
+            pyev.height = e.xconfigurerequest.height
+            pyev.border_width = e.xconfigurerequest.border_width
+            pyev.above = get_pywindow(e.xconfigurerequest.above)
+            pyev.detail = e.xconfigurerequest.detail
+            pyev.value_mask = e.xconfigurerequest.value_mask
+            configure_callback(pyev)
+        return GDK_FILTER_REMOVE
+    elif e.type == CirculateRequest:
+        if circulate_callback is not None:
+            pyev = object()
+            pyev.parent = get_pywindow(e.xcirculaterequest.parent)
+            pyev.window = get_pywindow(e.xcirculaterequest.window)
+            pyev.place = e.xcirculaterequest.place
+            circulate_callback(pyev)
+        return GDK_FILTER_REMOVE
+    else:
+        return GDK_FILTER_CONTINUE
 
-def registerRawFilter(pywindow):
-    gdk_window_add_filter(get_xwindow(pywindow),
-                          rootRawEventFilter,
-                          NULL)
+def addXSelectInput(pywindow, add_mask):
+    XWindowAttributes curr
+    XGetWindowAttributes(gdk_x11_get_default_xdisplay(),
+                         get_xwindow(pywindow),
+                         &curr)
+    mask = curr.mask
+    mask = mask | add_mask
+    XSelectInput(gdk_x11_get_default_xdisplay(),
+                 get_xwindow(pywindow),
+                 mask)
+
+def substructureRedirect(pywindow,
+                         map_callback,
+                         configure_callback,
+                         circulate_callback):
+    """Enable SubstructureRedirect on the given window, and call given
+    callbacks when relevant events occur.  Callbacks may be None to ignore
+    some event types.  Unfortunately, any exceptions thrown by callbacks will
+    be swallowed."""
+
+    addXSelectInput(pywindow, SubstructureRedirectMask)
+    callback_tuple = (map_callback, configure_callback, circulate_callback)
+    # This tuple will be leaving Python-space.
+    # FIXME: LEAK: how can we get notified when the GdkWindow eventually is
+    # destructed, so we can DECREF?  (For that matter, are we sure that the
+    # GdkWindow actually will be destructed?)
+    Py_INCREF(callback_tuple)
+    gdk_window_add_filter(<cGdkWindow*>unwrap(pywindow, gtk.gdk.Window),
+                          substructureRedirectFilter,
+                          <void*>callback_tuple)

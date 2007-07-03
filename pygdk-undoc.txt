@@ -8,3 +8,6 @@ Some undocumented functions in gtk.gdk:
   window_foreign_new
   error_trap_push
   error_trap_pop
+
+  event_send_client_message_for_display
+    ^^ doesn't seem to let you set the mask, though :-(

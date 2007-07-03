@@ -84,3 +84,35 @@ LASTEvent
 PropModeReplace
 PropModePrepend
 PropModeAppend
+
+# XWindowChanges/XConfigureWindow field flags
+CWX
+CWY
+CWWidth
+CWHeight
+CWBorderWidth
+CWSibling
+CWStackMode
+
+# Protocol error codes
+Success
+BadRequest
+BadValue
+BadWindow
+BadPixmap
+BadAtom
+BadCursor
+BadFont
+BadMatch
+BadDrawable
+BadAccess
+BadAlloc
+BadColor
+BadGC
+BadIDChoice
+BadName
+BadLength
+BadImplementation
+
+FirstExtensionError
+LastExtensionError

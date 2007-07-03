@@ -22,6 +22,7 @@
 # computers... does being this careful to avoid sync's actually matter?)
 
 import gtk.gdk as _gdk
+import parti.wrapped as _wrapped
 
 class XError(Exception):
     pass
@@ -42,8 +43,10 @@ class _ErrorManager(object):
         self.depth -= 1
         if self.depth == 0 and need_sync:
             _gdk.flush()
-        if _gdk.error_trap_pop():
-            raise XError
+        # This is a Xlib error constant (Success == 0)
+        error = _gdk.error_trap_pop()
+        if error != _wrapped.const["Success"]:
+            raise XError, error
 
     def exit_unsynced(self):
         self._exit(False)

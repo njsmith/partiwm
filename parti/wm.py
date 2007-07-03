@@ -72,7 +72,7 @@ class Wm(object):
         #   _NET_WM_DESKTOP
         #   _NET_WM_STATE
 
-    def _lost_wm_selection(self, data):
+    def _lost_wm_selection(self, selection):
         print "Lost WM selection, exiting"
         self.quit()
 

@@ -1,3 +1,4 @@
 ^build
 ^install
 ^parti/parti.wrapped.c$
+^parti/parti.wrapped.const.pxi$
