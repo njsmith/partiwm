@@ -1,5 +1,6 @@
 basic window managing:
   substructureredirect
+  save set handling
   detect clients on startup
   manage clients as they arrive
   
@@ -13,6 +14,7 @@ for basic usability, need:
     -> arbitrarily resizeable windows, "arithmetic progression"
     windows (emacs and terminals), STRUT support, fixed-size windows
     (Xephyr)
+
 
 
 eventual architecture: viewport/tray split

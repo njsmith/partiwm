@@ -1,6 +1,7 @@
 import struct
 import gtk.gdk
-from parti.wrapped import get_xatom, get_xwindow
+from parti.wrapped import XChangeProperty, get_xatom, get_xwindow
+from parti.error import trap
 
 def unsupported(*args):
     raise UnsupportedException
@@ -33,17 +34,24 @@ prop_types = {
 
 def prop_encode(type, value):
     if isinstance(type, list):
-        return prop_encode_list(type[0], value)
+        return _prop_encode_list(type[0], value)
     else:
-        return prop_encode_scalar(type, value)
+        return _prop_encode_scalar(type, value)
 
-def prop_encode_scalar(type, value):
+def _prop_encode_scalar(type, value):
     (pytype, atom, format, serialize, deserialize, terminator) = prop_types[type]
     assert isinstance(value, pytype)
     return (atom, format, serialize(value))
 
-def prop_encode_list(type, value):
+def _prop_encode_list(type, value):
     (pytype, atom, format, serialize, deserialize, terminator) = prop_types[type]
     value = list(value)
     serialized = [prop_encode_scalar(type, v)[2] for v in value]
-    return (atom, format, terminator.join(serialized) + terminator)
+    # Strings in X really are null-separated, not null-terminated (ICCCM
+    # 2.7.1, see also note in 4.1.2.5)
+    return (atom, format, terminator.join(serialized))
+
+
+def prop_set(target, key, type, value):
+    trap.call_unsynced(XChangeProperty, target, key,
+                       prop_encode(type, value))

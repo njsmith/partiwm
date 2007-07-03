@@ -20,7 +20,7 @@ Places where the specs do not fully apply in the way they want to:
   -- pretty much all the gravity stuff, because we control position
      absolutely
   -- similarly, all the stuff about which sort of position requests
-     should be honored or not (UPosition vs. PPosition, EWMH source
+     should be honored or not (USPosition vs. PPosition, EWMH source
      indication, etc.), because we're not going to honor any of them.
   -- We might want to honor some stacking requests (raise/lower stuff)
   -- We do not support any form of iconified state

@@ -9,7 +9,7 @@ import gtk.gdk
 
 import parti.selection
 import parti.wrapped
-import parti.prop
+from parti.prop import prop_set
 
 _NET_SUPPORTED = [
     "_NET_SUPPORTING_WM_CHECK",
@@ -41,20 +41,36 @@ class Wm(object):
         self._ewmh_window = self._utility_window()
 
         # Basic EWMH setup:
-        parti.wrapped.XChangeProperty(self._ewmh_window,
-                                      "_NET_SUPPORTING_WM_CHECK",
-                                      parti.prop.prop_encode("window",
-                                                             self.ewmh_window))
-        parti.wrapped.XChangeProperty(self._real_root,
-                                      "_NET_SUPPORTING_WM_CHECK",
-                                      parti.prop.prop_encode("window",
-                                                             self.ewmh_window))
-        parti.wrapped.XChangeProperty(self._real_root,
-                                      "_NET_SUPPORTED",
-                                      parti.prop.prop_encode(["atom"],
-                                                             _NET_SUPPORTED))
+        prop_set(self._ewmh_window, "_NET_SUPPORTING_WM_CHECK",
+                 "window", self.ewmh_window)
+        prop_set(self._real_root, "_NET_SUPPORTING_WM_CHECK",
+                 "window", self.ewmh_window)
+        prop_set(self._real_root, "_NET_SUPPORTED",
+                 ["atom"], _NET_SUPPORTED)
         
+        prop_set(self._real_root, "_NET_DESKTOP_VIEWPORT",
+                 ["u32"], [0, 0])
+        # Should set _NET_DESKTOP_GEOMETRY
+
         # Okay, ready to select for SubstructureRedirect and 
+
+
+        # Need to watch TraySet to update _NET_NUMBER_OF_DESKTOPS,
+        #   _NET_DESKTOP_NAMES
+        # Need to watch window set to update _NET_CLIENT_LIST,
+        #   _NET_CLIENT_LIST_STACKING
+        # Need viewport abstraction for _NET_CURRENT_DESKTOP...
+        # Tray's need to provide info for _NET_ACTIVE_WINDOW and _NET_WORKAREA
+        #
+        # Need to listen for:
+        #   _NET_CLOSE_WINDOW
+        #   _NET_ACTIVE_WINDOW
+        #   _NET_CURRENT_DESKTOP
+        #   _NET_REQUEST_FRAME_EXTENTS
+        # Maybe:
+        #   _NET_RESTACK_WINDOW
+        #   _NET_WM_DESKTOP
+        #   _NET_WM_STATE
 
     def _lost_wm_selection(self, data):
         print "Lost WM selection, exiting"
@@ -67,8 +83,8 @@ class Wm(object):
         gtk.main()
 
     def _utility_window(self):
-        # Returns a 1x1, unmapped, top-level override-redirect window with all
-        # events masked on
+        # Returns a 1x1, unmapped, top-level window with all GDK events masked
+        # on
         return gtk.gdk.Window(gtk.gdk.get_default_root_window(),
                               1, 1, gtk.gdk.WINDOW_TOPLEVEL,
                               gtk.gdk.ALL_EVENTS_MASK,
@@ -77,9 +93,5 @@ class Wm(object):
                               0, 0,
                               gtk.gdk.visual_get_system(),
                               gtk.gdk.colormap_get_system(),
-                              gtk.gdk.Cursor(gtk.gdk.X_CURSOR),
-                              # FIXME: the docs for these next two args say
-                              # "don't use".  How?
-                              "", "",
-                              True)
+                              gtk.gdk.Cursor(gtk.gdk.X_CURSOR))
 

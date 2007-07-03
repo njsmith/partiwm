@@ -58,9 +58,10 @@ class _ErrorManager(object):
         # on the way out.  However, if we are exiting because of an exception,
         # then probably that exception is more informative than any XError
         # that might also be raised, so suppress the XError in that case.
+        value = None
         try:
             self.enter()
-            fun(*args, **kwargs)
+            value = fun(*args, **kwargs)
         except:
             try:
                 self._exit(need_sync)
@@ -68,12 +69,13 @@ class _ErrorManager(object):
                 print "XError detected while already in unwind; discarding"
             raise
         self._exit(need_sync)
+        return value
 
     def call_unsynced(self, fun, *args, **kwargs):
-        self._call(False, fun, args, kwargs)
+        return self._call(False, fun, args, kwargs)
 
     def call_synced(self, fun, *args, **kwargs):
-        self._call(True, fun, args, kwargs)
+        return self._call(True, fun, args, kwargs)
 
     call = call_unsynced
 

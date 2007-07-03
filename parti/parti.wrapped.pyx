@@ -87,7 +87,7 @@ cdef extern from *:
         (Display *, Window w, Atom property,
          Atom type, int format, int mode, char * data, int nelements)
 
-    int XSync(Display *, Bool discard)
+    int cXAddToSaveSet "XAddToSaveSet" (Display * display, Window w)
 
     # Needed to find the secret window Gtk creates to own the selection, so we
     # can broadcast it:
@@ -147,6 +147,11 @@ def XChangeProperty(pywindow, property, value):
                               PropModeReplace,
                               data,
                               len(data) / (format / 8))
+
+# Save set handling
+def XAddToSaveSet(pywindow):
+    cXAddToSaveSet(gdk_x11_get_default_xdisplay(),
+                   get_xwindow(pywindow))
 
 ###################################
 # Smarter convenience wrappers
