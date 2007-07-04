@@ -1,3 +1,5 @@
+import gobject
+
 class Tray(object):
     def __init__(self, trayset, tag):
         self.trayset = trayset
@@ -14,8 +16,14 @@ class Tray(object):
 
 # An arbitrarily ordered set, with key-based access.  (Currently just backed
 # by an array.)
-class TraySet(object):
+class TraySet(gobject.GObject):
+    __gsignals__ = {
+        "tray-set-changed": (gobject.SIGNAL_RUN_LAST,
+                             gobject.TYPE_NONE, ()),
+        }
+
     def __init__(self):
+        super(TraySet, self).__init__()
         self.trays = []
 
     def tags(self):
@@ -25,8 +33,8 @@ class TraySet(object):
         for tray in self.trays:
             if tray.tag == tag:
                 return true
-        return false
-    __contains__ = exists
+        return False
+    __contains__ = has_tag
 
     def __getitem__(self, tag):
         tray = self.get(tag)
@@ -44,6 +52,7 @@ class TraySet(object):
         for i in range(len(self.trays)):
             if self.trays[i] == tag:
                 del self.trays[i]
+                self.emit("tray-set-changed")
 
     def index(self, tag):
         for i in range(len(self.trays)):
@@ -59,12 +68,18 @@ class TraySet(object):
         oldidx = self.index(tag)
         tray = self.trays.pop(oldidx)
         self.trays.insert(newidx, tray)
+        self.emit("tray-set-changed")
 
     def new(self, tag, type):
         assert tag not in self
+        assert isinstance(tag, unicode)
         tray = type(self, tag)
         self.trays.append(tray)
+        self.emit("tray-set-changed")
         return tray
 
     def rename(self, tag, newtag):
         self[tag].tag = newtag
+        self.emit("tray-set-changed")
+
+gobject.type_register(TraySet)

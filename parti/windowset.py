@@ -13,12 +13,12 @@ class WindowSet(gobject.GObject):
         self.l = []
         self.d = {}
 
-    def maybe_manage(self, gdkwindow, tray_hint):
+    def manage(self, gdkwindow, tray_hint):
         try:
             window = Window(gdkwindow, tray_hint)
         except Unmanageable:
             return
-        window.connect("removed", self._handle_removed)
+        window.connect("unmanaged", self._handle_removed)
         self.d[window.client_window] = window
         self.l.append(window.client_window)
         self.emit("window-list-changed")
@@ -29,11 +29,11 @@ class WindowSet(gobject.GObject):
             self.remove(window.client_window)
 
     def remove(self, window):
-        del self.d[window.client_window]
-        self.l.remove(window.client_window)
+        del self.d[window]
+        self.l.remove(window)
         self.emit("window-list-changed")
         
-    def __get__(self, gdkwindow):
+    def __getitem__(self, gdkwindow):
         return self.d[gdkwindow]
 
     def __contains__(self, gdkwindow):

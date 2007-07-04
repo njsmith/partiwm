@@ -8,16 +8,40 @@ import gobject
 import gtk
 import gtk.gdk
 
+###################################
+# Headers, python magic
+###################################
+
+cdef extern from "X11/Xlib.h":
+    pass
+cdef extern from "X11/Xutil.h":
+    pass
+
+cdef extern from "gdk/gdk.h":
+    pass
+cdef extern from "gdk/gdkx.h":
+    pass
+
 cdef extern from "Python.h":
     void Py_INCREF(object o)
     void Py_DECREF(object o)
     object PyString_FromStringAndSize(char * s, int len)
 
+# Serious black magic (I owe these guys beers):
+cdef extern from "pygobject.h":
+    void init_pygobject()
+init_pygobject()
+    
+cdef extern from"pygtk/pygtk.h":
+    void init_pygtk()
+init_pygtk()
+# Now all the macros in those header files will work.
+
 ###################################
 # GObject
 ###################################
 
-cdef extern from "pygobject.h":
+cdef extern from *:
     ctypedef struct cGObject "GObject":
         pass
     cGObject * pygobject_get(object box)
@@ -30,18 +54,18 @@ cdef cGObject * unwrap(box, pyclass) except? NULL:
         raise TypeError, ("object %r is not a %r" % (box, pyclass))
     return pygobject_get(box)
 
-def print_unwrapped(box):
-    "For debugging the above."
-    cdef cGObject * unwrapped
-    unwrapped = unwrap(box, gobject.GObject)
-    if unwrapped == NULL:
-        print "contents is NULL!"
-    else:
-        print "contents is %s" % (<long long>unwrapped)
+# def print_unwrapped(box):
+#     "For debugging the above."
+#     cdef cGObject * unwrapped
+#     unwrapped = unwrap(box, gobject.GObject)
+#     if unwrapped == NULL:
+#         print "contents is NULL!"
+#     else:
+#         print "contents is %s" % (<long long>unwrapped)
 
-cdef object wrap(cGObject * contents):
-    # Put a raw GObject* into a PyGObject wrapper.
-    return pygobject_new(contents)
+# cdef object wrap(cGObject * contents):
+#     # Put a raw GObject* into a PyGObject wrapper.
+#     return pygobject_new(contents)
 
 ###################################
 # Raw Xlib and GDK
@@ -50,11 +74,6 @@ cdef object wrap(cGObject * contents):
 ######
 # Xlib primitives and constants
 ######
-
-cdef extern from "X11/Xlib.h":
-    pass
-cdef extern from "X11/Xutil.h":
-    pass
 
 include "parti.wrapped.const.pxi"
 
@@ -127,14 +146,14 @@ cdef extern from *:
 
     int cXChangeProperty "XChangeProperty" \
         (Display *, Window w, Atom property,
-         Atom type, int format, int mode, char * data, int nelements)
+         Atom type, int format, int mode, unsigned char * data, int nelements)
     int cXGetWindowProperty "XGetWindowProperty" \
         (Display * display, Window w, Atom property,
          long offset, long length, Bool delete,
          Atom req_type, Atom * actual_type,
          int * actual_format,
          unsigned long * nitems, unsigned long * bytes_after,
-         char ** prop);
+         unsigned char ** prop)
     int cXDeleteProperty "XDeleteProperty" \
         (Display * display, Window w, Atom property)
 
@@ -171,19 +190,11 @@ cdef extern from *:
 # GDK primitives, and wrappers for Xlib
 ######
 
-cdef extern from "gdk/gdk.h":
-    pass
-cdef extern from "gdk/gdkx.h":
-    pass
-cdef extern from "pygtk/pygtk.h":
-    pass
-
 # Basic utilities:
 cdef extern from *:
     ctypedef struct cGdkWindow "GdkWindow":
         pass
     Window GDK_WINDOW_XID(cGdkWindow *)
-    cGdkWindow * gdk_window_foreign_new(Window w)
 
     Display * gdk_x11_get_default_xdisplay()
 
@@ -216,6 +227,8 @@ def get_pyatom(xatom):
 def XChangeProperty(pywindow, property, value):
     "Set a property on a window.  Returns a true value on failure."
     (type, format, data) = value
+    cdef char * data_str
+    data_str = data
     assert format in (8, 16, 32)
     assert (len(data) % (format / 8)) == 0
     result = cXChangeProperty(gdk_x11_get_default_xdisplay(),
@@ -224,7 +237,7 @@ def XChangeProperty(pywindow, property, value):
                               get_xatom(type),
                               format,
                               PropModeReplace,
-                              data,
+                              <unsigned char *>data_str,
                               len(data) / (format / 8))
 
 class PropertyError(Exception):
@@ -241,7 +254,7 @@ def XGetWindowProperty(pywindow, property, req_type):
     cdef Atom actual_type
     cdef int actual_format
     cdef unsigned long nitems, bytes_after
-    cdef char * prop
+    cdef unsigned char * prop
     cXGetWindowProperty(gdk_x11_get_default_xdisplay(),
                         get_xwindow(pywindow),
                         get_xatom(property),
@@ -252,11 +265,12 @@ def XGetWindowProperty(pywindow, property, req_type):
         raise NoSuchProperty, property
     if bytes_after and not nitems:
         raise BadPropertyType, actual_type
+    assert actual_format > 0
+    nbytes = (actual_format / 8) * nitems
     if bytes_after:
-        raise PropertyOverflow, 4 * nitems + bytes_after
-    data = PyString_FromStringAndSize(prop, nitems)
-    if prop:
-        XFree(prop)
+        raise PropertyOverflow, nbytes + bytes_after
+    data = PyString_FromStringAndSize(<char *>prop, nbytes)
+    XFree(prop)
     return data
 
 def XDeleteProperty(pywindow, property):
@@ -278,7 +292,7 @@ def get_children(pywindow):
                get_xwindow(pywindow),
                &root, &parent, &children, &nchildren)
     pychildren = []
-    for 0 <= i < nchildren:
+    for i from 0 <= i < nchildren:
         pychildren.append(get_pywindow(children[i]))
     if children != NULL:
         XFree(children)
@@ -290,7 +304,7 @@ def is_mapped(pywindow):
     XGetWindowAttributes(gdk_x11_get_default_xdisplay(),
                          get_xwindow(pywindow),
                          &attrs)
-    return attrs.map_state == IsMapped
+    return attrs.map_state != IsUnmapped
 
 ###################################
 # Smarter convenience wrappers
@@ -324,7 +338,7 @@ def sendClientMessage(target, propagate, event_mask,
 
 def sendConfigureNotify(pywindow):
     cdef Display * display
-    cdef display = gdk_x11_get_default_xdisplay()
+    display = gdk_x11_get_default_xdisplay()
     cdef Window window
     window = get_xwindow(pywindow)
 
@@ -373,8 +387,8 @@ def configureAndNotify(pywindow, x, y, width, height):
     changes.y = y
     changes.width = width
     changes.height = height
-    changes.border_width = border_width
-    fields = CWX | CWY | CWWdith | CWHeight | CWBorderWidth
+    changes.border_width = 0
+    fields = CWX | CWY | CWWidth | CWHeight | CWBorderWidth
     cXConfigureWindow(display, window, fields, &changes)
     # Tell the client.
     sendConfigureNotify(pywindow)
@@ -384,34 +398,45 @@ def configureAndNotify(pywindow, x, y, width, height):
 ###################################
 
 cdef extern from *:
-    enum GdkFilterReturn:
+    ctypedef enum GdkFilterReturn:
         GDK_FILTER_CONTINUE   # If we ignore the event
         GDK_FILTER_TRANSLATE  # If we converted the event to a GdkEvent
         GDK_FILTER_REMOVE     # If we handled the event and GDK should ignore it
 
-    ctypedef GdkFilterReturn (*GdkFilterFunc)(XEvent *, void *, void *)
+    ctypedef struct GdkXEvent:
+        pass
+    ctypedef struct GdkEvent:
+        pass
+
+    ctypedef GdkFilterReturn (*GdkFilterFunc)(GdkXEvent *, GdkEvent *, void *)
     void gdk_window_add_filter(cGdkWindow * w,
                                GdkFilterFunc filter,
                                void * userdata)
 
 # Catch the events that are generated by selecting for SubstructureRedirect,
 # and send them back out to Python.
-cdef GdkFilterReturn substructureRedirectFilter(XEvent * e,
-                                                void * gdk_event,
+class LameStruct(object):
+    # Can't set random attrs on an object() instance directly.
+    pass
+cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
+                                                GdkEvent * gdk_event,
                                                 void * userdata):
+    print "SubstructureRedirect event"
+    cdef XEvent * e
+    e = <XEvent*>e_gdk
     (map_callback, configure_callback, circulate_callback) = <object>userdata
     if e.type == MapRequest:
         if map_callback is not None:
-            pyev = object()
+            pyev = LameStruct()
             pyev.parent = get_pywindow(e.xmaprequest.parent)
             pyev.window = get_pywindow(e.xmaprequest.window)
             map_callback(pyev)
         return GDK_FILTER_REMOVE
     elif e.type == ConfigureRequest:
         if configure_callback is not None:
-            pyev = object()
+            pyev = LameStruct()
             pyev.parent = get_pywindow(e.xconfigurerequest.parent)
-            pyev.window = get_pywindow(wrap(e.xconfigurerequest.window))
+            pyev.window = get_pywindow(e.xconfigurerequest.window)
             pyev.x = e.xconfigurerequest.x
             pyev.y = e.xconfigurerequest.y
             pyev.width = e.xconfigurerequest.width
@@ -424,21 +449,20 @@ cdef GdkFilterReturn substructureRedirectFilter(XEvent * e,
         return GDK_FILTER_REMOVE
     elif e.type == CirculateRequest:
         if circulate_callback is not None:
-            pyev = object()
+            pyev = LameStruct()
             pyev.parent = get_pywindow(e.xcirculaterequest.parent)
             pyev.window = get_pywindow(e.xcirculaterequest.window)
             pyev.place = e.xcirculaterequest.place
             circulate_callback(pyev)
         return GDK_FILTER_REMOVE
-    else:
-        return GDK_FILTER_CONTINUE
+    return GDK_FILTER_CONTINUE
 
 def addXSelectInput(pywindow, add_mask):
     cdef XWindowAttributes curr
     XGetWindowAttributes(gdk_x11_get_default_xdisplay(),
                          get_xwindow(pywindow),
                          &curr)
-    mask = curr.mask
+    mask = curr.your_event_mask
     mask = mask | add_mask
     XSelectInput(gdk_x11_get_default_xdisplay(),
                  get_xwindow(pywindow),

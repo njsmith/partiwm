@@ -27,17 +27,18 @@ import parti.wrapped as _wrapped
 class XError(Exception):
     pass
 
-# Define its more precise subclasses, XBadRequest, XBadValue, etc.
-_all_errors = ["BadRequest", "BadValue", "BadWindow", "BadPixmap", "BadAtom",
-               "BadCursor", "BadFont", "BadMatch", "BadDrawable", "BadAccess",
-               "BadAlloc", "BadColor", "BadGC", "BadIDChoice", "BadName",
-               "BadLength", "BadImplementation"]
+### Exceptions cannot be new-style classes.  Who came up with _that_ one?
+# # Define its more precise subclasses, XBadRequest, XBadValue, etc.
+# _all_errors = ["BadRequest", "BadValue", "BadWindow", "BadPixmap", "BadAtom",
+#                "BadCursor", "BadFont", "BadMatch", "BadDrawable", "BadAccess",
+#                "BadAlloc", "BadColor", "BadGC", "BadIDChoice", "BadName",
+#                "BadLength", "BadImplementation"]
 _exc_for_error = {}
-for error in _all_errors:
-    exc_name = "X%s" % error
-    exc_class = type(exc_name, (XError,), {})
-    locals()[exc_name] = exc_class
-    _exc_for_error[_wrapped.consts[error]] = exc_class
+# for error in _all_errors:
+#     exc_name = "X%s" % error
+#     exc_class = type(exc_name, (XError,), {})
+#     locals()[exc_name] = exc_class
+#     _exc_for_error[_wrapped.const[error]] = exc_class
 
 # gdk has its own depth tracking stuff, but we have to duplicate it here to
 # minimize calls to XSync.
@@ -61,13 +62,13 @@ class _ErrorManager(object):
             if error in _exc_for_error:
                 raise _exc_for_error[error](error)
             else:
-                XError, error
+                raise XError, error
 
     def exit_unsynced(self):
-        self._exit(False)
+        self._exit(True)
 
     def exit_synced(self):
-        self._exit(True)
+        self._exit(False)
 
     exit = exit_unsynced
 
@@ -90,12 +91,26 @@ class _ErrorManager(object):
         return value
 
     def call_unsynced(self, fun, *args, **kwargs):
-        return self._call(False, fun, args, kwargs)
-
-    def call_synced(self, fun, *args, **kwargs):
         return self._call(True, fun, args, kwargs)
 
+    def call_synced(self, fun, *args, **kwargs):
+        return self._call(False, fun, args, kwargs)
+
     call = call_unsynced
+
+    def swallow_unsynced(self, fun, *args, **kwargs):
+        try:
+            self.call_unsynced(fun, *args, **kwargs)
+        except XError:
+            pass
+
+    def swallow_synced(self, fun, *args, **kwargs):
+        try:
+            self.call_synced(fun, *args, **kwargs)
+        except XError:
+            pass
+
+    swallow = swallow_unsynced
 
     def assert_out(self):
         assert self.depth == 0

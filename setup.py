@@ -26,7 +26,7 @@ setup(
   author="Nathaniel Smith",
   author_email="njs@pobox.com",
   scripts=["partiwm"],
-  packages=["parti"],
+  packages=["parti", "parti.trays"],
   ext_modules=[ 
     Extension("parti.wrapped",
               ["parti/parti.wrapped.pyx"],

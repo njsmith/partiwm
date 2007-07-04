@@ -3,7 +3,7 @@ import gtk.gdk
 from parti.wrapped import \
      XGetWindowProperty, XChangeProperty, PropertyError, \
      get_xatom, get_pyatom, get_xwindow, get_pywindow, const
-from parti.error import trap
+from parti.error import trap, XError
 
 def unsupported(*args):
     raise UnsupportedException
@@ -14,29 +14,31 @@ def force_length(data, length):
 
 class WMSizeHints(object):
     def __init__(self, data):
-        data = force_length(data, 13 * 4)
+        data = force_length(data, 18 * 4)
         (flags,
          pad1, pad2, pad3, pad4,
+         min_width, min_height,
          max_width, max_height,
          width_inc, height_inc,
-         max_aspect1, max_aspect2,
+         min_aspect_num, min_aspect_den,
+         max_aspect_num, max_aspect_den,
          base_width, base_height,
-         win_gravity) = struct.unpack("@" + "i" * 13, data[:(13*4)])
+         win_gravity) = struct.unpack("@" + "i" * 18, data)
         # Only extract the things we care about, i.e., max, min, base,
         # increments.
         if flags & const["PMaxSize"]:
             self.max_size = (max_width, max_height)
         else:
             self.max_size = None
-        if flags & const["PMMinSize"]:
-            self.min_size = (min_size, max_size)
+        if flags & const["PMinSize"]:
+            self.min_size = (min_width, min_height)
         else:
             self.min_size = None
         if flags & const["PBaseSize"]:
             self.base_size = (base_width, base_height)
         else:
             self.base_size = None
-        if flags & PResizeInc:
+        if flags & const["PResizeInc"]:
             self.resize_inc = (width_inc, height_inc)
         else:
             self.resize_inc = None
@@ -79,9 +81,9 @@ prop_types = {
                "\0"),
     "atom": (str, "ATOM", 32,
              lambda a: struct.pack("@i", get_xatom(a)),
-             lambda d: str(get_pyatom(struct.unpack("@i", d)[0]))
+             lambda d: str(get_pyatom(struct.unpack("@i", d)[0])),
              ""),
-    "u32": (int, "CARDINAL", 32,
+    "u32": ((int, long), "CARDINAL", 32,
             lambda c: struct.pack("@i", c),
             lambda d: struct.unpack("@i", d)[0],
             ""),
@@ -113,7 +115,7 @@ def _prop_encode_scalar(type, value):
 def _prop_encode_list(type, value):
     (pytype, atom, format, serialize, deserialize, terminator) = prop_types[type]
     value = list(value)
-    serialized = [prop_encode_scalar(type, v)[2] for v in value]
+    serialized = [_prop_encode_scalar(type, v)[2] for v in value]
     # Strings in X really are null-separated, not null-terminated (ICCCM
     # 2.7.1, see also note in 4.1.2.5)
     return (atom, format, terminator.join(serialized))
@@ -138,7 +140,13 @@ def _prop_decode_scalar(type, data):
 
 def _prop_decode_list(type, data):
     (pytype, atom, format, serialize, deserialize, terminator) = prop_types[type]
-    datums = data.split(terminator)
+    if terminator:
+        datums = data.split(terminator)
+    else:
+        datums = []
+        while data:
+            datums.append(data[:(format // 8)])
+            data = data[(format // 8):]
     return [_prop_decode_scalar(type, datum) for datum in datums]
 
 # May return None.
@@ -149,7 +157,7 @@ def prop_get(target, key, type):
         scalar_type = type
     (pytype, atom, format, serialize, deserialize, terminator) = prop_types[scalar_type]
     try:
-        data = trap.call_synced(XGetWindowProperty(target, key, atom))
-    except XError, PropertyError:
+        data = trap.call_synced(XGetWindowProperty, target, key, atom)
+    except (XError, PropertyError):
         return None
     return prop_decode(type, data)

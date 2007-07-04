@@ -22,12 +22,19 @@ def main(progname, args):
             constants.append(data)
     out = open(pxi_path, "w")
     out.write("cdef extern from *:\n")
-    out.write("    enum MagicNumbers:\n")
+    ### Apparently you can't use | on enum's?!
+    # out.write("    enum MagicNumbers:\n")
+    # for const in constants:
+    #     if isinstance(const, tuple):
+    #         out.write('        %s %s\n' % const)
+    #     else:
+    #         out.write('        %s\n' % (const,))
     for const in constants:
         if isinstance(const, tuple):
-            out.write('        %s %s\n' % const)
+            out.write('    unsigned int %s %s\n' % const)
         else:
-            out.write('        %s\n' % (const,))
+            out.write('    unsigned int %s\n' % (const,))
+    
     out.write("const = {\n")
     for const in constants:
         if isinstance(const, tuple):

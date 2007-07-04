@@ -7,6 +7,7 @@ import gtk.gdk
 import parti.wrapped
 import parti.util
 from parti.error import *
+from parti.prop import prop_get, prop_set
 
 # Map
 # Withdraw
@@ -46,7 +47,7 @@ from parti.error import *
 class Unmanageable(Exception):
     pass
 
-class Window(parti.util.AutoPropGObject, gtk.Widget):
+class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     """This represents a managed client window.
 
     It can be used as a GTK Widget, whose contents are the client window's
@@ -74,29 +75,37 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
                      "",
                      gobject.PARAM_READWRITE),
         "transient-for": (gobject.TYPE_PYOBJECT,
-                          "Transient for", "",
+                          "Transient for (or None)", "",
                           gobject.PARAM_READWRITE),
         "protocols": (gobject.TYPE_PYOBJECT,
                       "Supported WM protocols", "",
                       gobject.PARAM_READWRITE),
-        "window-types": (gobject.TYPE_PYOBJECT,
-                         "Window type",
-                         "NB, most preferred comes first, then fallbacks",
-                         gobject.PARAM_READWRITE),
+        "window-type": (gobject.TYPE_PYOBJECT,
+                        "Window type",
+                        "NB, most preferred comes first, then fallbacks",
+                        gobject.PARAM_READWRITE),
         "pid": (gobject.TYPE_INT,
                 "PID of owning process", "",
-                -1,
+                -1, 65535, -1,
                 gobject.PARAM_READWRITE),
         "client-machine": (gobject.TYPE_PYOBJECT,
                            "Host where client process is running", "",
                            gobject.PARAM_READWRITE),
-        "window-group": (gobject.TYPE_PYOBJECT,
+        "group-leader": (gobject.TYPE_PYOBJECT,
                          "Window group leader", "",
                          gobject.PARAM_READWRITE),
-        "urgency": (gobject.TYPE_BOOLEAN,
-                    "Urgency hint", "",
-                    False,
-                    gobject.PARAM_READWRITE),
+        "urgency-requested": (gobject.TYPE_BOOLEAN,
+                              "Urgency hint from client", "",
+                              False,
+                              gobject.PARAM_READWRITE),
+        "omnipresent": (gobject.TYPE_BOOLEAN,
+                        "I want to be on every desktop", "",
+                        False,
+                        gobject.PARAM_READWRITE),
+        "iconic": (gobject.TYPE_BOOLEAN,
+                   "ICCCM 'iconic' state -- any sort of 'not on desktop'.", "",
+                   False,
+                   gobject.PARAM_READWRITE),
         "state": (gobject.TYPE_PYOBJECT,
                   "State, as per _NET_WM_STATE", "",
                   gobject.PARAM_READWRITE),
@@ -109,19 +118,17 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
                        gobject.PARAM_READWRITE),
         }
     __gsignals__ = {
-        "unmap-event": (gobject.SIGNAL_RUN_LAST,
-                        # Actually gets a GdkEventUnmap
-                        gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
-        "destroy-event": (gobject.SIGNAL_RUN_LAST,
-                          # Actually gets a GdkEventDestroy
-                          gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
-        "property-notify-event": (gobject.SIGNAL_RUN_LAST,
-                          # Actually gets a GdkEventProperty
-                          gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
+        "client-unmap-event": (gobject.SIGNAL_RUN_LAST,
+                               # Actually gets a GdkEventMumble
+                               gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
+        "client-destroy-event": (gobject.SIGNAL_RUN_LAST,
+                                 # Actually gets a GdkEventOwnerChange
+                                 gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
+        "client-property-notify-event": (gobject.SIGNAL_RUN_LAST,
+                                         # Actually gets a GdkEventProperty
+                                         gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
         "managed": (gobject.SIGNAL_RUN_LAST,
                    gobject.TYPE_NONE, ()),
-        # Either withdrawn or destroyed -- in either case, we're not managing
-        # it anymore.  Argument is True for destroyed windows.
         "unmanaged": (gobject.SIGNAL_RUN_LAST,
                     gobject.TYPE_NONE, ()),
         }
@@ -130,7 +137,8 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
         """Register a new client window with the WM.
 
         Raises an Unmanageable exception if this window should not be
-        managed, for whatever reason."""
+        managed, for whatever reason.  ATM, this mostly means that the window
+        died somehow before we could do anything with it."""
 
         super(Window, self).__init__()
         # The way Gtk.Widget works, we have to make our actual top-level
@@ -139,9 +147,7 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
         # SubstructureRedirect on it).  So that means we use self.window for
         # that buffer window, and self.client_window for the actual client
         # window.
-        self.window = None
         self.client_window = gdkwindow
-        self.allocation = None
 
         def setup_client():
             # Start listening for important property changes
@@ -152,6 +158,9 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
             # Process properties
             self._read_initial_properties()
             self._write_initial_properties_and_setup()
+            # Everything starts out at least temporarily in IconicState, until
+            # we get it settled.
+            self.set_property("iconic", True)
         try:
             trap.call_unsynced(setup_client)
         except XError, e:
@@ -161,21 +170,33 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
         for tray in start_trays:
             tray.add(self)
 
-    def do_unmap_event(self, event):
-        def doit():
-            self._scrub_withdrawn_window()
+    def do_client_unmap_event(self, event):
+        # The question is, did the window get unmapped because it was
+        # withdrawn/destroyed, or did it get unmapped because we unmapped it
+        # going into IconicState?
+        #
+        # We are careful to always set iconic=True before unmapping the window
+        # ourselves, so that is one clue.  However, if we receive a
+        # *synthetic* UnmapNotify event, that always means that the client has
+        # withdrawn it (even if it was not mapped in the first place) --
+        # ICCCM section 4.1.4.
+        if event.send_event or not self.get_property("iconic"):
             self.unmanage_window()
-        try:
-            trap.call_unsynced(doit)
-        except XError:
-            pass
 
-    def do_destroy_event(self, event):
+    def do_client_destroy_event(self, event):
+        # This is somewhat redundant with the unmap signal, because if you
+        # destroy a mapped window, then a UnmapNotify is always generated.
+        # However, this allows us to catch the destruction of unmapped
+        # ("iconified") windows, and also catch any mistakes we might have
+        # made with the annoying unmap heuristics we have to use above.  I
+        # love the smell of XDestroyWindow in the morning.  It makes for
+        # simple code:
         self.unmanage_window()
 
     def unmanage_window(self):
+        trap.swallow(self._scrub_withdrawn_window)
         self.emit("unmanaged")
-        self.client_window = None
+        print "destroying self"
         self.destroy()
 
     def calc_geometry(self, allocation):
@@ -183,37 +204,35 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
         # and centered, constrained sizes should be best-fitted)
         return (0, 0, allocation[2], allocation[3])
 
-    def _handle_ConfigureRequest(event):
+    def _handle_ConfigureRequest(self, event):
         # Ignore the request, but as per ICCCM 4.1.5, send back a synthetic
         # ConfigureNotify telling the client that nothing has happened.
-        parti.wrapped.sendConfigureNotify(event.window)
+        trap.swallow(parti.wrapped.sendConfigureNotify,
+                     event.window)
         # FIXME: consider handling attempts to change stacking order here.
 
     ################################
     # Property reading
     ################################
     
-    def do_property_notify_event(self, event):
+    def do_client_property_notify_event(self, event):
         self._handle_property_change(event.atom)
 
     _property_handlers = {}
 
-    def _handle_property_change(gdkatom):
+    def _handle_property_change(self, gdkatom):
         name = str(gdkatom)
         if name in self._property_handlers:
             self._property_handlers[name](self)
 
     def _handle_wm_hints(self):
-        try:
-            wm_hints = prop_get(self.client_window,
-                                "WM_HINTS", "wm-hints")
-            # GdkWindow or None
-            self.set_property("window-group") = wm_hints.window_group
-            # FIXME: extract state and input hint
-            if wm_hints.urgency:
-                self.set_property("urgency", True)
-        except:
-            print "Error processing WM_HINTS, ignoring"
+        wm_hints = prop_get(self.client_window,
+                            "WM_HINTS", "wm-hints")
+        # GdkWindow or None
+        self.set_property("group-leader", wm_hints.group_leader)
+        # FIXME: extract state and input hint
+        if wm_hints.urgency:
+            self.set_property("urgency-requested", True)
 
     _property_handlers["WM_HINTS"] = _handle_wm_hints
 
@@ -256,12 +275,8 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
 
     def _read_initial_properties(self):
         # Things that don't change:
-        try:
-            size_hints = prop_get(self.client_window,
-                                  "WM_NORMAL_HINTS", "wm-size-hints")
-        except:
-            print "Error processing WM_NORMAL_HINTS, ignoring"
-            size_hints = None
+        size_hints = prop_get(self.client_window,
+                              "WM_NORMAL_HINTS", "wm-size-hints")
         if size_hints and size_hints.max_size and size_hints.min_size \
            and size_hints.max_size == size_hints.min_size:
             self.set_property("fixed-size", True)
@@ -273,59 +288,59 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
         else:
             self.set_property("step-params", None)
 
+        class_instance = prop_get(self.client_window,
+                                  "WM_CLASS", "latin1")
         try:
-            class_instance = prop_get(self.client_window,
-                                      "WM_CLASS", "latin1")
             (c, i, fluff) = class_instance.split("\0")
+        except ValueError:
+            print "Malformed WM_CLASS, ignoring"
+        else:
             self.set_property("class", c)
             self.set_property("instance", i)
-        except:
-            print "Error processing WM_CLASS, ignoring"
 
-        try:
-            transient_for = prop_get(self.client_window,
-                                     "WM_TRANSIENT_FOR", "window")
-            self.set_property("transient-for", transient_for)
-        except:
-            print "Error processing WM_TRANSIENT_FOR, ignoring"
+        transient_for = prop_get(self.client_window,
+                                 "WM_TRANSIENT_FOR", "window")
+        # May be None
+        self.set_property("transient-for", transient_for)
 
-        try:
-            protocols = prop_get(self.client_window,
-                                 "WM_PROTOCOLS", "atom")
-            self.set_property("protocols", protocols)
-        except:
-            print "Error processing WM_PROTOCOLS, ignoring"
+        protocols = prop_get(self.client_window,
+                             "WM_PROTOCOLS", ["atom"])
+        #May be None
+        self.set_property("protocols", protocols)
 
-        try:
-            window_types = prop_get(self.client_window,
-                                    "_NET_WM_WINDOW_TYPE", ["atom"])
-            self.set_property("window-types", window_types)
-        except:
-            print "Error processing _NET_WM_WINDOW_TYPE, ignoring"
-            self.set_property("window-types",
-                              [gtk.gdk.atom_intern("_NET_WM_WINDOW_TYPE_NORMAL")])
+        window_types = prop_get(self.client_window,
+                                "_NET_WM_WINDOW_TYPE", ["atom"])
+        if window_types:
+            self.set_property("window-type", window_types)
+        else:
+            if self.get_property("transient-for"):
+                # EWMH says that even if it's transient-for, we MUST check to
+                # see if it's override-redirect (and if so treat as NORMAL).
+                # But we wouldn't be here if this was override-redirect.
+                assume_type = "_NET_WM_TYPE_DIALOG"
+            else:
+                assume_type = "_NET_WM_WINDOW_TYPE_NORMAL"
+            self.set_property("window-type",
+                              [gtk.gdk.atom_intern(assume_type)])
 
-        try:
-            pid = prop_get(self.client_window,
-                           "_NET_WM_PID", "u32")
+        pid = prop_get(self.client_window,
+                       "_NET_WM_PID", "u32")
+        if pid is not None:
             self.set_property("pid", pid)
-        except:
-            print "Error processing _NET_WM_PID, ignoring"
 
-        try:
-            client_machine = prop_get(self.client_window,
-                                      "WM_CLIENT_MACHINE", "latin1")
-            self.set_property("client-machine", client_machine)
-        except:
-            print "Error processing WM_CLIENT_MACHINE, ignoring"
+        client_machine = prop_get(self.client_window,
+                                  "WM_CLIENT_MACHINE", "latin1")
+        # May be None
+        self.set_property("client-machine", client_machine)
         
-        try:
-            net_wm_state = prop_get(self.client_window,
-                                    "_NET_WM_STATE", ["atom"])
-            if net_wm_state:
-                if gtk.gdk.atom_intern("_NET_WM_STATE_DEMANDS_ATTENTION"):
-                    self.set_property("urgency", True)
-                self.set_property("state", sets.ImmutableSet(net_wm_state))
+        net_wm_state = prop_get(self.client_window,
+                                "_NET_WM_STATE", ["atom"])
+        if net_wm_state:
+            if gtk.gdk.atom_intern("_NET_WM_STATE_DEMANDS_ATTENTION"):
+                self.set_property("urgency-requested", True)
+            self.set_property("state", sets.ImmutableSet(net_wm_state))
+        else:
+            self.set_property("state", sets.ImmutableSet())
 
         for mutable in ["WM_HINTS",
                         "WM_NAME", "_NET_WM_NAME",
@@ -347,25 +362,35 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
     def state_remove(self, state_name):
         atom = gtk.gdk.atom_intern(state_name)
         curr = set(self.get_property("state"))
-        curr.remove(atom)
+        curr.discard(atom)
         self.set_property("state", sets.ImmutableSet(curr))
 
     def state_isset(self, state_name):
         return gtk.gdk.atom_intern(state_name) in self.get_property("state")
 
-    def go_normal(self):
-        prop_set(self.client_window, "WM_STATE",
-                 "u32", parti.wrapped.const["NormalState"])
-
-    def go_iconic(self):
-        prop_set(self.client_window, "WM_STATE",
-                 "u32", parti.wrapped.const["IconicState"])
-
-    def _handle_urgency(self, *args):
-        if self.get_property("urgency"):
-            self.set_state("_NET_WM_STATE_DEMANDS_ATTENTION")
+    def _handle_iconic_update(self, property):
+        # FIXME: Need to think carefully about how this should be handled.
+        # ATM you cannot _put_ a client into iconic/non-iconic state by
+        # setting this property, only by showing/hiding the widget.  Perhaps
+        # that is as it should be.
+        if self.get_property("iconic"):
+            prop_set(self.client_window, "WM_STATE",
+                     "u32", parti.wrapped.const["IconicState"])
+            self.state_add("_NET_WM_STATE_HIDDEN")
         else:
-            self.unset_state("_NET_WM_STATE_DEMANDS_ATTENTION")
+            prop_set(self.client_window, "WM_STATE",
+                     "u32", parti.wrapped.const["NormalState"])
+            self.state_remove("_NET_WM_STATE_HIDDEN")
+
+    # There are three ways a window can get urgency = True:
+    #   1) _NET_WM_STATE_DEMANDS_ATTENTION in the _initial_ state hints
+    #   2) setting the bit WM_HINTS, at _any_ time
+    #   3) if we (the wm) decide they should be and set it
+    def _handle_urgency_requested(self, *args):
+        if self.get_property("urgency-requested"):
+            self.state_add("_NET_WM_STATE_DEMANDS_ATTENTION")
+        else:
+            self.state_remove("_NET_WM_STATE_DEMANDS_ATTENTION")
 
     def _handle_state(self, *args):
         prop_set(self.client_window, "_NET_WM_STATE",
@@ -379,11 +404,11 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
         #prop_set(self.client_window, "_NET_FRAME_EXTENTS",
         #         ["u32"], [0, 0, 0, 0])
 
-        self.connect("notify::urgency", self._handle_urgency)
-        self.connect("notify::state", self._handle_state)
+        self.connect("notify::urgency-requested",
+                     self._handle_urgency_requested)
         # Flush things:
-        self._handle_urgency()
         self._handle_state()
+        self._handle_urgency_requested()
 
     def _scrub_withdrawn_window(self):
         remove = ["WM_STATE",
@@ -394,22 +419,51 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
         def doit():
             for prop in remove:
                 parti.wrapped.XDeleteProperty(self.client_window, prop)
-        try:
-            trap.call_unsynced(doit)
-        except XError:
-            pass
+        trap.swallow(doit)
 
     ################################
     # Widget stuff:
     ################################
     
+    def _flag(self, flag):
+        self.set_flags(self.flags() | flag)
+
+    def _unflag(self, flag):
+        self.set_flags(self.flags() & ~flag)
+
+    def do_unmap(self):
+        # We have to toggle our iconic state *before* actually mapping or
+        # unmapping things, or else we will get confused and think that the
+        # client has withdrawn the window.  To do this early enough, we have
+        # to essentially reimplement the "unmap" signal handler.  (We could
+        # call the superclass one, but it's easier to just reimplement...
+        if not (self.flags() & gtk.MAPPED):
+            return
+        print "Unmapping"
+        self.set_property("iconic", True)
+        self.window.hide()
+        self.client_window.hide()
+            
+    def do_map(self):
+        # See notes on do_unmap.
+        assert self.flags() & gtk.REALIZED
+        if self.flags() & gtk.MAPPED:
+            return
+        print "Mapping"
+        self._flag(gtk.MAPPED)
+        self.set_property("iconic", False)
+        self.window.show()
+        self.client_window.show()
+
     def do_realize(self):
-        self.set_flags(self.flags() | gtk.REALIZED)
+        print "Realizing (allocation = %r)" % (tuple(self.allocation),)
+
+        self._flag(gtk.REALIZED)
         self.window = gtk.gdk.Window(self.get_parent_window(),
                                      width=self.allocation.width,
                                      height=self.allocation.height,
                                      window_type=gtk.gdk.WINDOW_CHILD,
-                                     wclass=gdk.INPUT_OUTPUT,
+                                     wclass=gtk.gdk.INPUT_OUTPUT,
                                      # FIXME: any reason not to just zero this
                                      # out?
                                      event_mask=self.get_events())
@@ -434,15 +488,10 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
             self.client_window.reparent(self.window, 0, 0)
             parti.wrapped.configureAndNotify(self.client_window,
                                              *self.calc_geometry(self.allocation))
-            self.go_normal()
-            self.client_window.show()
-        try:
-            trap.call_unsynced(setup_child)
-        except XError:
-            # FIXME: handle client disappearing
-            print "iewaroij"
+        trap.swallow(setup_child)
 
         self.emit("managed")
+        print "Realized"
 
     def do_size_request(self, requisition):
         # Just put something; we generally expect to have a fixed-size
@@ -451,36 +500,31 @@ class Window(parti.util.AutoPropGObject, gtk.Widget):
         requisition.height = 100
 
     def do_unrealize(self):
-        self.set_flags(self.flags() & ~gtk.REALIZED)
+        print "Unrealizing"
+        # Takes care of checking mapped status, issuing signals, calling
+        # do_unmap, etc.
+        self.unmap()
+        
+        self._unflag(gtk.REALIZED)
 
-        # The child may no longer exist at this point
-        if self.client_window is not None:
-            def cleanup_child():
-                self.go_iconic()
-                self.client_window.hide()
-                self.client_window.reparent(gtk.gdk.get_default_root_window(),
-                                            0, 0)
-            try:
-                trap.call_unsynced(cleanup_child)
-            except XError:
-                # FIXME: need to do anything here?
-                print "ewaroidsoij"
+        def reparent_away():
+            self.client_window.reparent(gtk.gdk.get_default_root_window(),
+                                        0, 0)
+            parti.wrapped.sendConfigureNotify(self.client_window)
+        trap.swallow(reparent_away)
                 
         # Break circular reference
         self.window.set_user_data(None)
-        self.window = None
+        print "Unrealized"
 
     def do_size_allocate(self, allocation):
         self.allocation = allocation
+        print "New allocation = %r" % (tuple(self.allocation),)
         if self.flags() & gtk.REALIZED:
             self.window.move_resize(*allocation)
-            try:
-                trap.call_unsynced(parti.wrapped.configureAndNotify,
-                                   self.client_window,
-                                   *self.calc_geometry(self.allocation))
-            except XError:
-                # FIXME: handle client disappearing
-                print "aewoirijewao"
+            trap.swallow(parti.wrapped.configureAndNotify,
+                         self.client_window,
+                         *self.calc_geometry(self.allocation))
 
 # This is necessary to inform GObject about the new subclass; if it doesn't
 # know about the subclass, then it thinks we are trying to instantiate

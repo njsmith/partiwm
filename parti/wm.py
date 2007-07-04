@@ -63,12 +63,13 @@ class Wm(object):
         self._windows.connect("window-list-changed", self._update_window_list)
 
         self._trays = TraySet()
+        self._trays.connect("tray-set-changed", self._update_desktop_list)
 
         self._real_root = gtk.gdk.get_default_root_window()
         self._ewmh_window = None
         
         # Start snooping on the raw GDK event stream
-        gtk.gdk.event_handler_set(self._dispatchgdk_event)
+        gtk.gdk.event_handler_set(self._dispatch_gdk_event)
 
         # Become the Official Window Manager of this year's game:
         self._wm_selection = parti.selection.ManagerSelection("WM_S0")
@@ -80,6 +81,10 @@ class Wm(object):
         # (If we become a compositing manager, then we will want to do the
         # same thing with the _NET_WM_CM_S0 selection (says EWMH).)
 
+        # Get this list now, before creating anything new, so that we won't
+        # see our own windows
+        inherited_windows = parti.wrapped.get_children(self._real_root)
+
         # Set up the necessary EWMH properties on the root window.
         self._setup_ewmh_window()
         prop_set(self._real_root, "_NET_SUPPORTED",
@@ -89,7 +94,7 @@ class Wm(object):
         self._update_window_list()
 
         # FIXME: be less stupid
-        self.trays.new("default", SimpleTabTray)
+        self._trays.new(u"default", SimpleTabTray)
 
         # Okay, ready to select for SubstructureRedirect and then load in all
         # the existing clients.
@@ -97,16 +102,18 @@ class Wm(object):
                                            self._handle_root_map_request,
                                            None,
                                            None)
-        for w in parti.wrapped.get_children(self._real_root):
+        for w in inherited_windows:
             if parti.wrapped.is_mapped(w):
-                self._maybe_manage_client(w)
+                # Make it start off unmapped, for consistency.  (In
+                # particular, figuring out what an UnmapNotify on a window
+                # means is delicate enough already.)
+                w.hide()
+                self._manage_client(w)
 
         # FIXME:
 
         # Need to watch for screen geometry changes to update
         #   _NET_DESKTOP_GEOMETRY, also _NET_WORKAREA
-        # Need to watch TraySet to update _NET_NUMBER_OF_DESKTOPS,
-        #   _NET_DESKTOP_NAMES
         # Need viewport abstraction for _NET_CURRENT_DESKTOP...
         # Tray's need to provide info for _NET_ACTIVE_WINDOW and _NET_WORKAREA
 
@@ -119,6 +126,20 @@ class Wm(object):
         #   _NET_RESTACK_WINDOW
         #   _NET_WM_DESKTOP
         #   _NET_WM_STATE
+
+    # This is the key function, where we have detected a new client window,
+    # and start managing it.
+    def _manage_client(self, gdkwindow):
+        # FIXME: totally lame tray setting
+        try:
+            self._windows.manage(gdkwindow, [self._trays.trays[0]])
+        except:
+            import pdb; import sys; pdb.post_mortem(sys.exc_traceback)
+            raise
+
+    def _handle_root_client_message(self, event):
+        # FIXME
+        pass
 
     def _lost_wm_selection(self, selection):
         print "Lost WM selection, exiting"
@@ -137,41 +158,54 @@ class Wm(object):
         prop_set(self._real_root, "_NET_CLIENT_LIST_STACKING",
                  ["window"], self._windows.window_list())
 
-    def _dispatch_gdk_event(self, event, user_data):
+    def _update_desktop_list(self, *args):
+        prop_set(self._real_root, "_NET_NUMBER_OF_DESKTOPS",
+                 "u32", len(self._trays))
+        prop_set(self._real_root, "_NET_DESKTOP_NAMES",
+                 ["utf8"], self._trays.tags())
+
+    def _dispatch_gdk_event(self, event):
         # This function is called for every event GDK sees.  Most of them we
         # want to just pass on to GTK, but some we are especially interested
         # in...
         handlers = {
-            gtk.gdk.PROPERTY_NOTIFY: self._dispatch_property_notify,
-            gtk.gdk.DESTROY: self._dispatch_destroy,
-            gtk.gdk.UNMAP: self._dispatch_unmap,
+            # Client events on root window, mostly
             gtk.gdk.CLIENT_EVENT: self._dispatch_client_event,
-            # I can get CONFIGURE and MAP, but actually I don't care...
-            # gtk.gdk.GDK_MAP: self._dispatch_map,
+            # These other events are on client windows, mostly
+            gtk.gdk.PROPERTY_NOTIFY: self._dispatch_property_notify,
+            gtk.gdk.UNMAP: self._dispatch_unmap,
+            gtk.gdk.DESTROY: self._dispatch_destroy,
+            # I can get CONFIGURE and MAP for client windows too,
+            # but actually I don't care ATM:
+            #gtk.gdk.GDK_MAP: self._dispatch_map,
             #gtk.gdk.GDK_CONFIGURE: self._dispatch_configure
             }
         if event.type in handlers:
             handlers[event.type](event)
         gtk.main_do_event(event)
 
-    def _maybe_manage_client(self, gdkwindow):
-        # FIXME: totally lame tray setting
-        self._windows.maybe_manage(gdkwindow, [self._trays.trays[0]])
-
     def _handle_root_map_request(self, event):
-        self._maybe_manage_client(event.window)
+        print "Found a potential client"
+        self._manage_client(event.window)
+
+    def _dispatch_client_event(self, event):
+        if event.window == self._real_root:
+            self._handle_root_client_message(event)
 
     def _dispatch_property_notify(self, event):
         if event.window in self._windows:
-            self._windows[event.window].emit("property-notify-event", event)
-
-    def _dispatch_destroy(self, event):
-        if event.window in self._windows:
-            self._windows[event.window].emit("destroy-event", event)
+            print "Property notify for window"
+            self._windows[event.window].emit("client-property-notify-event", event)
+        else:
+            print "Property notify for who?"
 
     def _dispatch_unmap(self, event):
         if event.window in self._windows:
-            self._windows[event.window].emit("unmap-event", event)
+            self._windows[event.window].emit("client-unmap-event", event)
+
+    def _dispatch_destroy(self, event):
+        if event.window in self._windows:
+            self._windows[event.window].emit("client-destroy-event", event)
 
     def _setup_ewmh_window(self):
         # Set up a 1x1 invisible unmapped window, with which to participate in
@@ -194,6 +228,6 @@ class Wm(object):
                                            wclass=gtk.gdk.INPUT_ONLY,
                                            title=self.NAME)
         prop_set(self._ewmh_window, "_NET_SUPPORTING_WM_CHECK",
-                 "window", self.ewmh_window)
+                 "window", self._ewmh_window)
         prop_set(self._real_root, "_NET_SUPPORTING_WM_CHECK",
-                 "window", self.ewmh_window)
+                 "window", self._ewmh_window)
