@@ -58,14 +58,17 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         ]
 
     __gproperties__ = {
-        "fixed-size": (gobject.TYPE_BOOLEAN,
-                       "Is this client window fixed-size?", "",
-                       False,
-                       gobject.PARAM_READWRITE),
-        "step-params": (gobject.TYPE_PYOBJECT,
-                        "Is this a incremental-sizing window?",
-                        "None if not, else ((base_width, base_height), (inc_width, inc_height))",
+        # Interesting properties of the client window, that will be
+        # automatically kept up to date:
+        "actual-size": (gobject.TYPE_PYOBJECT,
+                        "Size of client window (actual (width,height))", "",
                         gobject.PARAM_READWRITE),
+        "user-friendly-size": (gobject.TYPE_PYOBJECT,
+                               "Description of client window size for user", "",
+                               gobject.PARAM_READWRITE),
+        "requested-position": (gobject.TYPE_PYOBJECT,
+                               "Client-requested position on screen", "",
+                               gobject.PARAM_READWRITE),
         "class": (gobject.TYPE_STRING,
                   "Classic X 'class'", "",
                   "",
@@ -98,10 +101,6 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                               "Urgency hint from client", "",
                               False,
                               gobject.PARAM_READWRITE),
-        "omnipresent": (gobject.TYPE_BOOLEAN,
-                        "I want to be on every desktop", "",
-                        False,
-                        gobject.PARAM_READWRITE),
         "iconic": (gobject.TYPE_BOOLEAN,
                    "ICCCM 'iconic' state -- any sort of 'not on desktop'.", "",
                    False,
@@ -112,7 +111,6 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         "title": (gobject.TYPE_PYOBJECT,
                   "Window title (unicode or None)", "",
                   gobject.PARAM_READWRITE),
-
         "icon-title": (gobject.TYPE_PYOBJECT,
                        "Icon title (unicode or None)", "",
                        gobject.PARAM_READWRITE),
@@ -149,6 +147,24 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # window.
         self.client_window = gdkwindow
 
+        # We count how many times we have asked that the child be unmapped, so
+        # that when the server tells us that the child has been unmapped, we
+        # can make a reasonable guess as to whether we were the ones who did
+        # it or not.
+        # FIXME: It is possible to do better than this by using Xlib's
+        # NextRequest function to find out what sequence number is assigned to
+        # our UnmapWindow request, and then ignoring UnmapNotify events that
+        # have a matching sequence number.  However, this only really matters
+        # for supporting ICCCM-noncompliant clients that withdraw their
+        # windows without sending a synthetic UnmapNotify (4.1.4), and
+        # metacity gets away with doing things this way, so I'm not going to
+        # worry about it too much...
+        self.pending_unmaps = 0
+
+        self.geometry_constraint = GeometryFree((100, 100))
+
+        self.set_property("can-focus", True)
+
         def setup_client():
             # Start listening for important property changes
             self.client_window.set_events(self.client_window.get_events()
@@ -159,7 +175,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
             self._read_initial_properties()
             self._write_initial_properties_and_setup()
             # Everything starts out at least temporarily in IconicState, until
-            # we get it settled.
+            # we get it mapped etc.
             self.set_property("iconic", True)
         try:
             trap.call_unsynced(setup_client)
@@ -175,13 +191,17 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # withdrawn/destroyed, or did it get unmapped because we unmapped it
         # going into IconicState?
         #
-        # We are careful to always set iconic=True before unmapping the window
-        # ourselves, so that is one clue.  However, if we receive a
-        # *synthetic* UnmapNotify event, that always means that the client has
-        # withdrawn it (even if it was not mapped in the first place) --
-        # ICCCM section 4.1.4.
-        if event.send_event or not self.get_property("iconic"):
+        # We are careful to count how many outstanding unmap requests we have
+        # out, so that is one clue.  However, if we receive a *synthetic*
+        # UnmapNotify event, that always means that the client has withdrawn
+        # it (even if it was not mapped in the first place) -- ICCCM section
+        # 4.1.4.
+        print ("Client window unmapped: send_event=%s, pending_unmaps=%s"
+               % (event.send_event, self.pending_unmaps))
+        if event.send_event or self.pending_unmaps == 0:
             self.unmanage_window()
+        else:
+            self.pending_unmaps -= 1
 
     def do_client_destroy_event(self, event):
         # This is somewhat redundant with the unmap signal, because if you
@@ -199,16 +219,22 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         print "destroying self"
         self.destroy()
 
-    def calc_geometry(self, allocation):
-        # FIXME: respect sizing hints (fixed size should left at the same size
-        # and centered, constrained sizes should be best-fitted)
-        return (0, 0, allocation[2], allocation[3])
+    def _set_client_geometry(self, allocation):
+        (base_x, base_y, allocated_w, allocated_h) = allocation
+        (x, y, w, h, wvis, hvis) = self.geometry_constraint.fit(allocated_w,
+                                                                allocated_h)
+        self.set_property("actual-size", (w, h))
+        self.set_property("user-friendly-size", (wvis, hvis))
+        trap.swallow(parti.wrapped.configureAndNotify,
+                     self.client_window, x, y, w, h)
 
-    def _handle_ConfigureRequest(self, event):
+    def _handle_configure_request(self, event):
         # Ignore the request, but as per ICCCM 4.1.5, send back a synthetic
         # ConfigureNotify telling the client that nothing has happened.
         trap.swallow(parti.wrapped.sendConfigureNotify,
                      event.window)
+        self.set_property("requested-position", (event.x, event.y))
+        self.geometry_constraint.requested = (event.width, event.height)
         # FIXME: consider handling attempts to change stacking order here.
 
     ################################
@@ -231,6 +257,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # GdkWindow or None
         self.set_property("group-leader", wm_hints.group_leader)
         # FIXME: extract state and input hint
+        
         if wm_hints.urgency:
             self.set_property("urgency-requested", True)
 
@@ -275,18 +302,21 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
 
     def _read_initial_properties(self):
         # Things that don't change:
+        geometry = self.client_window.get_geometry()
+        self.set_property("requested-position", (geometry[0], geometry[1]))
+        requested_size = (geometry[2], geometry[3])
+
         size_hints = prop_get(self.client_window,
                               "WM_NORMAL_HINTS", "wm-size-hints")
-        if size_hints and size_hints.max_size and size_hints.min_size \
-           and size_hints.max_size == size_hints.min_size:
-            self.set_property("fixed-size", True)
-        if size_hints and size_hints.base_size and size_hints.resize_inc \
-           and not self.get_property("fixed-size"):
-            self.set_property("step-params",
-                              (size_hints.base_size,
-                              size_hints.resize_inc))
-        else:
-            self.set_property("step-params", None)
+        if not size_hints:
+            self.geometry_constraint = GeometryFree(requested_size)
+        elif (size_hints.max_size and size_hints.min_size
+              and size_hints.max_size == size_hints.min_size):
+            self.geometry_constraint = GeometryFixed(size_hints.max_size)
+        elif size_hints.base_size and size_hints.resize_inc:
+            self.geometry_constraint = GeometryInc(requested_size,
+                                                   *(size_hints.base_size
+                                                     + size_hints.resize_inc))
 
         class_instance = prop_get(self.client_window,
                                   "WM_CLASS", "latin1")
@@ -425,40 +455,32 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     # Widget stuff:
     ################################
     
-    def _flag(self, flag):
-        self.set_flags(self.flags() | flag)
-
-    def _unflag(self, flag):
-        self.set_flags(self.flags() & ~flag)
-
     def do_unmap(self):
-        # We have to toggle our iconic state *before* actually mapping or
-        # unmapping things, or else we will get confused and think that the
-        # client has withdrawn the window.  To do this early enough, we have
-        # to essentially reimplement the "unmap" signal handler.  (We could
-        # call the superclass one, but it's easier to just reimplement...
         if not (self.flags() & gtk.MAPPED):
             return
         print "Unmapping"
+        self.unset_flags(gtk.MAPPED)
+        self.pending_unmaps += 1
         self.set_property("iconic", True)
         self.window.hide()
         self.client_window.hide()
+        print "Unmapped"
             
     def do_map(self):
-        # See notes on do_unmap.
         assert self.flags() & gtk.REALIZED
         if self.flags() & gtk.MAPPED:
             return
         print "Mapping"
-        self._flag(gtk.MAPPED)
+        self.set_flags(gtk.MAPPED)
         self.set_property("iconic", False)
-        self.window.show()
-        self.client_window.show()
+        self.window.show_unraised()
+        self.client_window.show_unraised()
+        print "Mapped"
 
     def do_realize(self):
         print "Realizing (allocation = %r)" % (tuple(self.allocation),)
 
-        self._flag(gtk.REALIZED)
+        self.set_flags(gtk.REALIZED)
         self.window = gtk.gdk.Window(self.get_parent_window(),
                                      width=self.allocation.width,
                                      height=self.allocation.height,
@@ -473,31 +495,29 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # the client to directly resize themselves.)
         parti.wrapped.substructureRedirect(self.window,
                                            None,
-                                           self._handle_ConfigureRequest,
+                                           self._handle_configure_request,
                                            None)
         # Give it a nice theme-defined background
         self.style.attach(self.window)
         self.style.set_background(self.window, gtk.STATE_NORMAL)
         self.window.move_resize(*self.allocation)
 
-        # FIXME: respect sizing hints (fixed size should left at the same size
-        # and centered, constrained sizes should be best-fitted)
-
         def setup_child():
             parti.wrapped.XAddToSaveSet(self.client_window)
             self.client_window.reparent(self.window, 0, 0)
-            parti.wrapped.configureAndNotify(self.client_window,
-                                             *self.calc_geometry(self.allocation))
+            self._set_client_geometry(self.allocation)
         trap.swallow(setup_child)
 
         self.emit("managed")
         print "Realized"
 
     def do_size_request(self, requisition):
-        # Just put something; we generally expect to have a fixed-size
-        # container regardless.
-        requisition.width = 100
-        requisition.height = 100
+        if self.flags() & gtk.REALIZED:
+            size = self.get_property("actual-size")
+        else:
+            size = self.geometry_constraint.requested
+        (requisition.width, requisition.height) = size
+
 
     def do_unrealize(self):
         print "Unrealizing"
@@ -505,12 +525,24 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # do_unmap, etc.
         self.unmap()
         
-        self._unflag(gtk.REALIZED)
+        self.unset_flags(gtk.REALIZED)
 
+        self.set_property("actual-size", None)
+        self.set_property("user-friendly-size", None)
         def reparent_away():
+            # This *would* cause an UnmapNotify (and thus require us to
+            # increment self.pending_unmaps), except that we know that we are
+            # unmapped here.
+            assert not self.flags() & gtk.MAPPED
             self.client_window.reparent(gtk.gdk.get_default_root_window(),
                                         0, 0)
             parti.wrapped.sendConfigureNotify(self.client_window)
+            # FIXME: If we are unrealizing because the whole program is
+            # shutting down, then we should leave the window mapped (so the
+            # next WM will be able to find it).  If we are unrealizing because
+            # the window has been withdrawn, or because we are just
+            # unrealizing this widget momentarily, then we should leave it
+            # unmapped.  ATM we just leave it unmapped always.
         trap.swallow(reparent_away)
                 
         # Break circular reference
@@ -522,9 +554,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         print "New allocation = %r" % (tuple(self.allocation),)
         if self.flags() & gtk.REALIZED:
             self.window.move_resize(*allocation)
-            trap.swallow(parti.wrapped.configureAndNotify,
-                         self.client_window,
-                         *self.calc_geometry(self.allocation))
+            self._set_client_geometry(self.allocation)
 
 # This is necessary to inform GObject about the new subclass; if it doesn't
 # know about the subclass, then it thinks we are trying to instantiate
@@ -542,3 +572,49 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
 # <B object (__main__+B) at 0x2ad124756fa0>
 
 gobject.type_register(Window)
+
+class GeometryFree(object):
+    def __init__(self, requested):
+        self.requested = requested
+
+    def fit(self, width, height):
+        return (0, 0, width, height, width, height)
+
+class GeometryFixed(object):
+    def __init__(self, size):
+        self.requested = size
+        self.x, self.y = size
+
+    def fit(self, width, height):
+        def center(size, space):
+            # This can be negative; that's all right.
+            return (space - size) // 2
+        return (center(self.x, width), center(self.y, height),
+                self.x, self.y, self.x, self.y)
+
+class GeometryInc(object):
+    def __init__(self, requested,
+                 base_width, base_height, inc_width, inc_height):
+        self.requested = requested
+        self.base_width = base_width
+        self.base_height = base_height
+        self.inc_width = inc_width
+        self.inc_height = inc_height
+        
+    def fit(self, width, height):
+        (w, wvis) = self._fit1(self.base_width, self.inc_width, width)
+        (h, hvis) = self._fit1(self.base_height, self.inc_height, height)
+        print ("Fitting %sx%s+%sx%s into %sx%s: %sx%s (%sx%s)"
+               % (self.base_width, self.base_height,
+                  self.inc_width, self.inc_height,
+                  width, height, w, h, wvis, hvis))
+        return (0, 0, w, h, wvis, hvis)
+        
+    def _fit1(self, base, inc, avail):
+        if avail < base:
+            return (base, 0)
+        rubber = avail - base
+        slop = rubber % inc
+        used = avail - slop
+        visible = used // inc
+        return (used, visible)

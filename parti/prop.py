@@ -9,6 +9,9 @@ def unsupported(*args):
     raise UnsupportedException
 
 def force_length(data, length):
+    if len(data) != length:
+        print ("Odd-lengthed prop, wanted %s bytes, got %s: %r"
+               % (length, len(data), data))
     data += "\0" * length
     return data[:length]
 
@@ -24,6 +27,8 @@ class WMSizeHints(object):
          max_aspect_num, max_aspect_den,
          base_width, base_height,
          win_gravity) = struct.unpack("@" + "i" * 18, data)
+        #print repr(data)
+        #print struct.unpack("@" + "i" * 18, data)
         # Only extract the things we care about, i.e., max, min, base,
         # increments.
         if flags & const["PMaxSize"]:

@@ -1,6 +1,11 @@
 #!/bin/sh
 
+RUNNER=python
+#RUNNER=pydb --trace
+#RUNNER=pydb --fntrace
+#RUNNER=gdb python --args
+
 set -e
 rm -rf build install
 CFLAGS=-O0 python setup.py install --home=install
-DISPLAY=:1.0 PYTHONPATH=install/lib/python:$PYTHONPATH python install/bin/partiwm -sync
+DISPLAY=:1.0 PYTHONPATH=install/lib/python:$PYTHONPATH $RUNNER install/bin/partiwm -sync

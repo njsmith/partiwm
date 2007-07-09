@@ -14,6 +14,7 @@ class WindowSet(gobject.GObject):
         self.d = {}
 
     def manage(self, gdkwindow, tray_hint):
+        assert not gdkwindow in self
         try:
             window = Window(gdkwindow, tray_hint)
         except Unmanageable:

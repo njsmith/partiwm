@@ -4,6 +4,8 @@
 # a cdef function in one pyrex file and then use it in another, except via
 # some complex thing involving an extension type.)
 
+import struct
+
 import gobject
 import gtk
 import gtk.gdk
@@ -240,6 +242,13 @@ def XChangeProperty(pywindow, property, value):
                               <unsigned char *>data_str,
                               len(data) / (format / 8))
 
+def _munge_packed_longs_to_ints(data):
+    assert len(data) % sizeof(long) == 0
+    n = len(data) / sizeof(long)
+    format_from = "@" + "l" * n
+    format_to = "@" + "i" * n
+    return struct.pack(format_to, *struct.unpack(format_from, data))
+
 class PropertyError(Exception):
     pass
 class BadPropertyType(PropertyError):
@@ -255,23 +264,47 @@ def XGetWindowProperty(pywindow, property, req_type):
     cdef int actual_format
     cdef unsigned long nitems, bytes_after
     cdef unsigned char * prop
-    cXGetWindowProperty(gdk_x11_get_default_xdisplay(),
-                        get_xwindow(pywindow),
-                        get_xatom(property),
-                        0, buffer_size / 4, False,
-                        get_xatom(req_type), &actual_type,
-                        &actual_format, &nitems, &bytes_after, &prop)
+    cdef Status status
+    # This is the most bloody awful API I have ever seen.
+    status = cXGetWindowProperty(gdk_x11_get_default_xdisplay(),
+                                 get_xwindow(pywindow),
+                                 get_xatom(property),
+                                 0,
+                                 # This argument has to be divided by 4.  Thus
+                                 # speaks the spec.
+                                 buffer_size / 4,
+                                 False,
+                                 get_xatom(req_type), &actual_type,
+                                 &actual_format, &nitems, &bytes_after, &prop)
+    if status != Success:
+        raise PropertyError, "no such window"
     if actual_type == XNone:
         raise NoSuchProperty, property
     if bytes_after and not nitems:
         raise BadPropertyType, actual_type
     assert actual_format > 0
-    nbytes = (actual_format / 8) * nitems
     if bytes_after:
         raise PropertyOverflow, nbytes + bytes_after
+    # actual_format is in (8, 16, 32), and is the number of bits in a logical
+    # element.  However, this doesn't mean that each element is stored in that
+    # many bits, oh no.  On a 32-bit machine it is, but on a 64-bit machine,
+    # iff the output array contains 32-bit integers, than each one is given
+    # 64-bits of space.
+    if actual_format == 8:
+        bytes_per_item = 1
+    elif actual_format == 16:
+        bytes_per_item = sizeof(short)
+    elif actual_format == 32:
+        bytes_per_item = sizeof(long)
+    else:
+        assert False
+    nbytes = bytes_per_item * nitems
     data = PyString_FromStringAndSize(<char *>prop, nbytes)
     XFree(prop)
-    return data
+    if actual_format == 32:
+        return _munge_packed_longs_to_ints(data)
+    else:
+        return data
 
 def XDeleteProperty(pywindow, property):
     cXDeleteProperty(gdk_x11_get_default_xdisplay(),

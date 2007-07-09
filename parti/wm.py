@@ -100,7 +100,7 @@ class Wm(object):
         # the existing clients.
         parti.wrapped.substructureRedirect(self._real_root,
                                            self._handle_root_map_request,
-                                           None,
+                                           self._handle_root_configure_request,
                                            None)
         for w in inherited_windows:
             if parti.wrapped.is_mapped(w):
@@ -130,8 +130,14 @@ class Wm(object):
     # This is the key function, where we have detected a new client window,
     # and start managing it.
     def _manage_client(self, gdkwindow):
-        # FIXME: totally lame tray setting
+        if gdkwindow in self._windows:
+            # This can happen if a window sends two map requests in quick
+            # succession, so that the second MapRequest arrives before we have
+            # reparented the window.  FSF Emacs 22.1.50.1 does this, at least.
+            print "Cannot manage the same window twice, ignoring"
+            return
         try:
+            # FIXME: totally lame tray setting
             self._windows.manage(gdkwindow, [self._trays.trays[0]])
         except:
             import pdb; import sys; pdb.post_mortem(sys.exc_traceback)
@@ -187,6 +193,20 @@ class Wm(object):
     def _handle_root_map_request(self, event):
         print "Found a potential client"
         self._manage_client(event.window)
+
+    def _handle_root_configure_request(self, event):
+        # The point of this method is to handle configure requests on
+        # withdrawn windows.  We simply allow them to move/resize any way they
+        # want.  This is harmless because the window isn't visible anyway (and
+        # apps can create unmapped windows with whatever coordinates they want
+        # anyway, no harm in letting them move existing ones around), and it
+        # means that when the window actually gets mapped, we have more
+        # accurate info on what the app is actually requesting.
+        if event.window not in self._windows:
+            print "Reconfigure on withdrawn window"
+            parti.wrapped.configureAndNotify(event.window,
+                                             event.x, event.y,
+                                             event.width, event.height)
 
     def _dispatch_client_event(self, event):
         if event.window == self._real_root:
