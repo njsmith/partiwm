@@ -149,3 +149,7 @@ WithdrawnState
 NormalState
 IconicState
 
+# XSetInputFocus
+RevertToParent
+RevertToPointerRoot
+RevertToNone

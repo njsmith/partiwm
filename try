@@ -7,5 +7,7 @@ RUNNER=python
 
 set -e
 rm -rf build install
+python make-constants-pxi.py parti/parti.wrapped.const.txt parti/parti.wrapped.const.pxi
 CFLAGS=-O0 python setup.py install --home=install
-DISPLAY=:1.0 PYTHONPATH=install/lib/python:$PYTHONPATH $RUNNER install/bin/partiwm -sync
+PYTHONPATH=install/lib/python:$PYTHONPATH xinit /bin/sh -c "$RUNNER install/bin/partiwm -sync & x-terminal-emulator" -- /usr/bin/Xephyr :2 -ac
+#DISPLAY=:1.0 PYTHONPATH=install/lib/python:$PYTHONPATH $RUNNER install/bin/partiwm -sync

@@ -86,6 +86,7 @@ cdef extern from *:
     ctypedef int Status
     ctypedef int Atom
     ctypedef int Window
+    ctypedef int Time
 
     int XFree(void * data)
 
@@ -187,6 +188,9 @@ cdef extern from *:
     Status XQueryTree(Display * display, Window w,
                       Window * root, Window * parent,
                       Window ** children, unsigned int * nchildren)
+
+    int cXSetInputFocus "XSetInputFocus" (Display * display, Window focus,
+                                          int revert_to, Time time)
 
 ######
 # GDK primitives, and wrappers for Xlib
@@ -339,6 +343,14 @@ def is_mapped(pywindow):
                          &attrs)
     return attrs.map_state != IsUnmapped
 
+# Focus management
+def XSetInputFocus(pywindow, time):
+    # Always does RevertToParent
+    cXSetInputFocus(gdk_x11_get_default_xdisplay(),
+                    get_xwindow(pywindow),
+                    RevertToParent,
+                    time)
+
 ###################################
 # Smarter convenience wrappers
 ###################################
@@ -386,7 +398,9 @@ def sendConfigureNotify(pywindow):
                                  get_xwindow(gtk.gdk.get_default_root_window()),
                                  0, 0,
                                  &dest_x, &dest_y, &child):
-        raise "can't happen"
+        # Window seems to have disappeared, so never mind.
+        print "couldn't TranslateCoordinates (maybe window is gone)"
+        return
 
     # Send synthetic ConfigureNotify (ICCCM 4.2.3, for example)
     cdef XEvent e

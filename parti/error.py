@@ -21,6 +21,8 @@
 # super-fast connections to the X server, everything running on fast
 # computers... does being this careful to avoid sync's actually matter?)
 
+import sys
+
 import gtk.gdk as _gdk
 import parti.wrapped as _wrapped
 
@@ -82,11 +84,12 @@ class _ErrorManager(object):
             self.enter()
             value = fun(*args, **kwargs)
         except:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
             try:
                 self._exit(need_sync)
             except XError:
                 print "XError detected while already in unwind; discarding"
-            raise
+            raise exc_type, exc_value, exc_traceback
         self._exit(need_sync)
         return value
 
