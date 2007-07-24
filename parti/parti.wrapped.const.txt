@@ -153,3 +153,17 @@ IconicState
 RevertToParent
 RevertToPointerRoot
 RevertToNone
+
+# Focus events: modes
+NotifyNormal
+NotifyGrab
+NotifyUngrab
+# Focus events: details
+NotifyAncestor
+NotifyVirtual
+NotifyInferior
+NotifyNonlinear
+NotifyNonlinearVirtual
+NotifyPointer
+NotifyPointerRoot
+NotifyDetailNone

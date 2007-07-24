@@ -1,18 +1,31 @@
 import gobject
+import gtk
 
-class Tray(object):
+class Tray(gtk.Window):
     def __init__(self, trayset, tag):
+        super(Tray, self).__init__()
         self.trayset = trayset
         self.tag = tag
 
+    # Pure virtual methods, for children to implement:
     def add(self, window):
         raise NotImplementedError
 
     def windows(self):
         raise NotImplementedError
 
-    def reconfig(self, config):
-        self.config = config
+    def take_focus(self):
+        raise NotImplementedError
+
+    # Magic to interact with X, GTK+, the rest of Parti
+    def do_focus_in_event(self, event):
+        pass
+
+    def do_focus_out_event(self, event):
+        pass
+
+    def do_focus(self):
+        pass
 
 # An arbitrarily ordered set, with key-based access.  (Currently just backed
 # by an array.)

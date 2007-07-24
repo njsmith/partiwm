@@ -21,7 +21,7 @@ from parti.prop import prop_get, prop_set
 #       icon_x, icon_y, icon_mask
 #   WM_CLASS: can be ignored, except plugins or whatever might want to peek at
 #   WM_TRANSIENT_FOR
-#   WM_PROTOCOLS -- maybe WM_TAKE_FOCUS (I don't understand focus yet),
+#   WM_PROTOCOLS -- WM_TAKE_FOCUS (I don't understand focus yet),
 #       definitely WM_DELETE_WINDOW
 #   _NET_WM_WINDOW_TYPE
 #   _NET_WM_STATE (modal, demands attention, hidden, fullscreen, etc.)
@@ -138,6 +138,8 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         managed, for whatever reason.  ATM, this mostly means that the window
         died somehow before we could do anything with it."""
 
+        parti.wrapped.printFocus()
+
         super(Window, self).__init__()
         # The way Gtk.Widget works, we have to make our actual top-level
         # window named "self.window".  And we need to put a window between the
@@ -163,6 +165,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
 
         self.geometry_constraint = GeometryFree((100, 100))
 
+        # FIXME: make this dependent on whether the client accepts input focus
         self.set_property("can-focus", True)
 
         def setup_client():
@@ -451,6 +454,10 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                 parti.wrapped.XDeleteProperty(self.client_window, prop)
         trap.swallow(doit)
 
+    def _server_time(self):
+        assert self.flags() & gtk.REALIZED
+        return gtk.gdk.x11_get_server_time(self.window)
+
     ################################
     # Widget stuff:
     ################################
@@ -472,6 +479,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
             return
         print "Mapping"
         self.set_flags(gtk.MAPPED)
+        self._set_client_geometry(self.allocation)
         self.set_property("iconic", False)
         self.window.show_unraised()
         self.client_window.show_unraised()
@@ -489,6 +497,10 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                                      # FIXME: any reason not to just zero this
                                      # out?
                                      event_mask=self.get_events())
+        # Make sure PROPERTY_CHANGE_MASK is enabled, so we can call
+        # x11_get_server_time on this window.
+        self.window.set_events(self.window.get_events()
+                               | gtk.gdk.PROPERTY_CHANGE_MASK)
         self.window.set_user_data(self)
         # Disallow and ignore any attempts by other clients to play with any
         # child windows.  (In particular, this will intercept any attempts by
@@ -505,14 +517,13 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         def setup_child():
             parti.wrapped.XAddToSaveSet(self.client_window)
             self.client_window.reparent(self.window, 0, 0)
-            self._set_client_geometry(self.allocation)
         trap.swallow(setup_child)
 
         self.emit("managed")
         print "Realized"
 
     def do_size_request(self, requisition):
-        if self.flags() & gtk.REALIZED:
+        if self.flags() & gtk.MAPPED:
             size = self.get_property("actual-size")
         else:
             size = self.geometry_constraint.requested
@@ -527,8 +538,6 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         
         self.unset_flags(gtk.REALIZED)
 
-        self.set_property("actual-size", None)
-        self.set_property("user-friendly-size", None)
         def reparent_away():
             # This *would* cause an UnmapNotify (and thus require us to
             # increment self.pending_unmaps), except that we know that we are
@@ -554,7 +563,27 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         print "New allocation = %r" % (tuple(self.allocation),)
         if self.flags() & gtk.REALIZED:
             self.window.move_resize(*allocation)
-            self._set_client_geometry(self.allocation)
+            if self.flags() & gtk.MAPPED:
+                self._set_client_geometry(self.allocation)
+
+    ################################
+    # Focus handling:
+    ################################
+    
+    def do_focus_in_event(self, event):
+        print "Got focus, giving it to child"
+        # Have to fetch the time, not just use CurrentTime, because ICCCM says
+        # that WM_TAKE_FOCUS must use a real time.
+        print "1"
+        gtk.gdk.flush()
+        print "2"
+        now = self._server_time()
+        print "3"
+        # FIXME: use WM_TAKE_FOCUS if the client supports it
+        trap.swallow(parti.wrapped.XSetInputFocus, self.client_window, now)
+        print "4"
+        gtk.gdk.flush()
+        print "5"
 
 # This is necessary to inform GObject about the new subclass; if it doesn't
 # know about the subclass, then it thinks we are trying to instantiate

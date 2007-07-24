@@ -1,0 +1,80 @@
+This is Parti, a modern titling window manager.
+
+Tagline(s)
+----------
+
+Tabs: not just for web browsers anymore
+
+Licensing
+---------
+
+Copyright (C) 2007 to Nathaniel Smith <njs@pobox.com>
+Released under the terms of the GNU GPL v2 or (at your option) any
+later version.  See the file COPYING for details (and note in
+particular the LACK OF ANY WARRANTY).
+
+Getting started
+---------------
+
+Run './try' in the source directory to build and start a parti session
+inside a Xephyr nested X server.  Parti requires at least xlib,
+python, pyrex, pygobject, and pygtk, and the given './try' script also
+requires Xephyr.
+
+Why another window manager?
+---------------------------
+
+The Unix GUI and desktop have advanced dramatically in recent years,
+with the advent of foundational improvements (e.g. XRender,
+XComposite, Cairo, Pango), advanced toolkits (e.g. GTK+, Qt), advanced
+desktop environments (e.g. Gnome, KDE), and system-wide integration
+(e.g. HAL, NetworkManager).
+
+
+Over the same time period, we have made similarly dramatic
+improvements in
+
+The Parti line
+--------------
+
+Parti's first goal is usability.  For us, a usable program is one that
+is unobtrusive, to the point of becoming an invisible and unnoticed
+extension of the user's will.
+
+Parti's second goal is hackability.  To this end, Parti is written in
+Python (with any truly necessary extensions written in Pyrex), using a
+standard toolkit (GTK+).  The goal is that large parts of its
+functionality can be written in straight GTK+, with all idioms
+carrying over.  In particular, Parti exposes client windows as simply
+a new sort of GTK+ Widget, which can be placed in containers, focused,
+etc., exactly as programmers are already used to do.  Hackability
+generally also requires code to be clean, small, and with automated
+tests, but we admit the possibility of exceptions.
+
+Parti's third goal is standards compliance.  We attempt to comply to
+all relevant standards (esp. ICCCM and EWMH).  We anticipate
+submitting extension proposals to EWMH, as it becomes clearer how to
+improve interaction between clients and a tiling wm.
+
+These goals are listed in order of importance.  For instance, we will
+not bother complying with a standard that does not improve user
+experience if it makes the code more complex.
+
+Usability trumps all.
+
+Desktop support
+---------------
+
+Parti uses GTK+ -- not because of any particular preference for GTK+
+over Qt, but simply because in the initial prototype, the Python Qt
+bindings seemed to make it hard to do certain evil hacks.  (I actually
+had never programmed with either API before starting Parti.)
+
+Parti may use some parts of Gnome where appropriate, but we desire it
+to be fully usable on any desktop environment (including details like,
+say, doing auto-configuration to the environment), and will be happy
+to accept patches to that effect.
+
+Because Parti aims for full ICCCM and EWMH compliance (where possible
+for a primarily tiling window manager), it should work well with any
+EWMH-compliant desktop environment.

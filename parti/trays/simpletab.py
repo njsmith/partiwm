@@ -2,6 +2,10 @@ import gtk
 import gtk.gdk
 import parti.tray
 
+# For take_focus
+import parti.wrapped
+import parti.error
+
 class SimpleTabTray(parti.tray.Tray):
     def __init__(self, trayset, tag):
         super(SimpleTabTray, self).__init__(trayset, tag)
@@ -16,11 +20,21 @@ class SimpleTabTray(parti.tray.Tray):
         self.right_notebook = gtk.Notebook()
         self.hpane.add2(self.right_notebook)
 
+        self.left_notebook.grab_focus()
+
         for notebook in (self.left_notebook, self.right_notebook):
             notebook.set_group_id(5)
 
         self.main.add(self.hpane)
         self.main.show_all()
+
+    def take_focus(self):
+        # Can't use the GDK focus functions, because they go via the WM.
+        # FIXME: this is poorly factored, should be in a superclass or even
+        # the Wm or TraySet or something.
+        print "Taking focus"
+        # Note *not* swallowing errors here, this should always succeed
+        print parti.wrapped.XSetInputFocus(self.main.window)
 
     def add(self, window):
         window.connect("unmanaged", self._handle_window_departure)
@@ -30,6 +44,7 @@ class SimpleTabTray(parti.tray.Tray):
         else:
             notebook = self.left_notebook
         notebook.append_page(window)
+        window.grab_focus()
         notebook.set_tab_label_text(window,
                                     window.get_property("title"))
         notebook.set_tab_reorderable(window, True)

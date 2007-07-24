@@ -110,6 +110,12 @@ class Wm(object):
                 w.hide()
                 self._manage_client(w)
 
+        # Turn on focus handling:
+        parti.wrapped.selectFocusChange(self._real_root,
+                                        self._handle_root_focus_in,
+                                        None)
+        self._give_someone_focus()
+
         # FIXME:
 
         # Need to watch for screen geometry changes to update
@@ -143,6 +149,10 @@ class Wm(object):
             import pdb; import sys; pdb.post_mortem(sys.exc_traceback)
             raise
 
+    def _give_someone_focus(self):
+        # FIXME: totally broken, need viewport support
+        self._trays.trays[0].take_focus()
+
     def _handle_root_client_message(self, event):
         # FIXME
         pass
@@ -156,39 +166,6 @@ class Wm(object):
 
     def mainloop(self):
         gtk.main()
-
-    def _update_window_list(self, *args):
-        prop_set(self._real_root, "_NET_CLIENT_LIST",
-                 ["window"], self._windows.window_list())
-        # This is a lie, but we don't maintain a stacking order, so...
-        prop_set(self._real_root, "_NET_CLIENT_LIST_STACKING",
-                 ["window"], self._windows.window_list())
-
-    def _update_desktop_list(self, *args):
-        prop_set(self._real_root, "_NET_NUMBER_OF_DESKTOPS",
-                 "u32", len(self._trays))
-        prop_set(self._real_root, "_NET_DESKTOP_NAMES",
-                 ["utf8"], self._trays.tags())
-
-    def _dispatch_gdk_event(self, event):
-        # This function is called for every event GDK sees.  Most of them we
-        # want to just pass on to GTK, but some we are especially interested
-        # in...
-        handlers = {
-            # Client events on root window, mostly
-            gtk.gdk.CLIENT_EVENT: self._dispatch_client_event,
-            # These other events are on client windows, mostly
-            gtk.gdk.PROPERTY_NOTIFY: self._dispatch_property_notify,
-            gtk.gdk.UNMAP: self._dispatch_unmap,
-            gtk.gdk.DESTROY: self._dispatch_destroy,
-            # I can get CONFIGURE and MAP for client windows too,
-            # but actually I don't care ATM:
-            #gtk.gdk.GDK_MAP: self._dispatch_map,
-            #gtk.gdk.GDK_CONFIGURE: self._dispatch_configure
-            }
-        if event.type in handlers:
-            handlers[event.type](event)
-        gtk.main_do_event(event)
 
     def _handle_root_map_request(self, event):
         print "Found a potential client"
@@ -208,6 +185,43 @@ class Wm(object):
                                              event.x, event.y,
                                              event.width, event.height)
 
+    def _handle_root_focus_in(self, event):
+        # The purpose of this function is to detect when the focus mode has
+        # gone to PointerRoot or None, so that it can be given back to
+        # something real.  This is easy to detect -- a FocusIn event with
+        # detail PointerRoot or None is generated on the root window.
+        print event.__dict__
+        if event.detail in (parti.wrapped.const["PointerRoot"],
+                            parti.wrapped.const["XNone"]):
+            self._give_someone_focus()
+
+    def _dispatch_gdk_event(self, event):
+        # This function is called for every event GDK sees.  Most of them we
+        # want to just pass on to GTK, but some we are especially interested
+        # in...
+        handlers = {
+            # Client events on root window, mostly
+            gtk.gdk.CLIENT_EVENT: self._dispatch_client_event,
+            # These other events are on client windows, mostly
+            gtk.gdk.PROPERTY_NOTIFY: self._dispatch_property_notify,
+            gtk.gdk.UNMAP: self._dispatch_unmap,
+            gtk.gdk.DESTROY: self._dispatch_destroy,
+            # I can get CONFIGURE and MAP for client windows too,
+            # but actually I don't care ATM:
+            #gtk.gdk.GDK_MAP: self._dispatch_map,
+            #gtk.gdk.GDK_CONFIGURE: self._dispatch_configure
+            }
+        if event.type in handlers:
+            handlers[event.type](event)
+        #self._debug_dump_gdk_event(event)
+        gtk.main_do_event(event)
+
+    def _debug_dump_gdk_event(self, event):
+        print "GdkEvent %s" % event.type
+        print event.window
+        if event.type == gtk.gdk.FOCUS_CHANGE:
+            print event.in_
+
     def _dispatch_client_event(self, event):
         if event.window == self._real_root:
             self._handle_root_client_message(event)
@@ -226,6 +240,19 @@ class Wm(object):
     def _dispatch_destroy(self, event):
         if event.window in self._windows:
             self._windows[event.window].emit("client-destroy-event", event)
+
+    def _update_window_list(self, *args):
+        prop_set(self._real_root, "_NET_CLIENT_LIST",
+                 ["window"], self._windows.window_list())
+        # This is a lie, but we don't maintain a stacking order, so...
+        prop_set(self._real_root, "_NET_CLIENT_LIST_STACKING",
+                 ["window"], self._windows.window_list())
+
+    def _update_desktop_list(self, *args):
+        prop_set(self._real_root, "_NET_NUMBER_OF_DESKTOPS",
+                 "u32", len(self._trays))
+        prop_set(self._real_root, "_NET_DESKTOP_NAMES",
+                 ["utf8"], self._trays.tags())
 
     def _setup_ewmh_window(self):
         # Set up a 1x1 invisible unmapped window, with which to participate in

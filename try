@@ -9,5 +9,7 @@ set -e
 rm -rf build install
 python make-constants-pxi.py parti/parti.wrapped.const.txt parti/parti.wrapped.const.pxi
 CFLAGS=-O0 python setup.py install --home=install
-PYTHONPATH=install/lib/python:$PYTHONPATH xinit /bin/sh -c "$RUNNER install/bin/partiwm -sync & x-terminal-emulator" -- /usr/bin/Xephyr :2 -ac
+# NB Xephyr has a segfault bug in its reset logic -- shouldn't come up
+# when run via xinit like this, but use -noreset anyway.
+PYTHONPATH=install/lib/python:$PYTHONPATH xinit /bin/sh -c "$RUNNER install/bin/partiwm -sync & x-terminal-emulator" -- /usr/bin/Xephyr :7 -ac -noreset
 #DISPLAY=:1.0 PYTHONPATH=install/lib/python:$PYTHONPATH $RUNNER install/bin/partiwm -sync
