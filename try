@@ -7,7 +7,7 @@ RUNNER=python
 
 set -e
 rm -rf build install
-python make-constants-pxi.py parti/parti.wrapped.const.txt parti/parti.wrapped.const.pxi
+python make-constants-pxi.py parti/parti._lowlevel.const.txt parti/parti._lowlevel.const.pxi
 CFLAGS=-O0 python setup.py install --home=install
 # NB Xephyr has a segfault bug in its reset logic -- shouldn't come up
 # when run via xinit like this, but use -noreset anyway.

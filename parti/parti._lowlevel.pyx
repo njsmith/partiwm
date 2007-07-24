@@ -77,7 +77,7 @@ cdef cGObject * unwrap(box, pyclass) except? NULL:
 # Xlib primitives and constants
 ######
 
-include "parti.wrapped.const.pxi"
+include "parti._lowlevel.const.pxi"
 
 cdef extern from *:
     ctypedef struct Display:

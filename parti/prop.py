@@ -1,6 +1,6 @@
 import struct
 import gtk.gdk
-from parti.wrapped import \
+from parti.lowlevel import \
      XGetWindowProperty, XChangeProperty, PropertyError, \
      get_xatom, get_pyatom, get_xwindow, get_pywindow, const
 from parti.error import trap, XError

@@ -24,7 +24,7 @@
 import sys
 
 import gtk.gdk as _gdk
-import parti.wrapped as _wrapped
+import parti.lowlevel as _lowlevel
 
 class XError(Exception):
     pass
@@ -40,7 +40,7 @@ _exc_for_error = {}
 #     exc_name = "X%s" % error
 #     exc_class = type(exc_name, (XError,), {})
 #     locals()[exc_name] = exc_class
-#     _exc_for_error[_wrapped.const[error]] = exc_class
+#     _exc_for_error[_lowlevel.const[error]] = exc_class
 
 # gdk has its own depth tracking stuff, but we have to duplicate it here to
 # minimize calls to XSync.
@@ -60,7 +60,7 @@ class _ErrorManager(object):
             _gdk.flush()
         # This is a Xlib error constant (Success == 0)
         error = _gdk.error_trap_pop()
-        if error != _wrapped.const["Success"]:
+        if error != _lowlevel.const["Success"]:
             if error in _exc_for_error:
                 raise _exc_for_error[error](error)
             else:

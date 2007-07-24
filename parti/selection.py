@@ -16,7 +16,7 @@ import gtk.gdk
 from struct import pack, unpack
 from warnings import warn
 
-import parti.wrapped
+import parti.lowlevel
 
 class ManagerSelection(gobject.GObject):
     __gsignals__ = {
@@ -58,17 +58,17 @@ class ManagerSelection(gobject.GObject):
         ts_data = self.clipboard.wait_for_contents("TIMESTAMP").data
         ts_num = unpack("@i", ts_data[:4])[0]
         # Calculate the X atom for this selection:
-        selection_xatom = parti.wrapped.get_xatom(self.atom)
+        selection_xatom = parti.lowlevel.get_xatom(self.atom)
         # Ask X what window we used:
-        owner_window = parti.wrapped.myGetSelectionOwner(self.atom)
+        owner_window = parti.lowlevel.myGetSelectionOwner(self.atom)
         
         # FIXME: for some reason this causes a warning when we get back to the
         # main loop that looks like:
         #   GtkWarning: /build/buildd/gtk+2.0-2.10.13/gdk/x11/gdkproperty-x11.c:318 invalid X atom: 3139772627
         # No clue why.
-        parti.wrapped.sendClientMessage(gtk.gdk.get_default_root_window(),
+        parti.lowlevel.sendClientMessage(gtk.gdk.get_default_root_window(),
                                         False,
-                                        parti.wrapped.const["StructureNotifyMask"],
+                                        parti.lowlevel.const["StructureNotifyMask"],
                                         "MANAGER",
                                         ts_num,
                                         selection_xatom,

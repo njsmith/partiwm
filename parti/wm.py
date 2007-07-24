@@ -8,7 +8,7 @@ import gtk.gdk
 # gdk_window_set_composited() (2.12+ only)
 
 import parti.selection
-import parti.wrapped
+import parti.lowlevel
 from parti.prop import prop_set
 
 from parti.windowset import WindowSet
@@ -83,7 +83,7 @@ class Wm(object):
 
         # Get this list now, before creating anything new, so that we won't
         # see our own windows
-        inherited_windows = parti.wrapped.get_children(self._real_root)
+        inherited_windows = parti.lowlevel.get_children(self._real_root)
 
         # Set up the necessary EWMH properties on the root window.
         self._setup_ewmh_window()
@@ -98,12 +98,12 @@ class Wm(object):
 
         # Okay, ready to select for SubstructureRedirect and then load in all
         # the existing clients.
-        parti.wrapped.substructureRedirect(self._real_root,
+        parti.lowlevel.substructureRedirect(self._real_root,
                                            self._handle_root_map_request,
                                            self._handle_root_configure_request,
                                            None)
         for w in inherited_windows:
-            if parti.wrapped.is_mapped(w):
+            if parti.lowlevel.is_mapped(w):
                 # Make it start off unmapped, for consistency.  (In
                 # particular, figuring out what an UnmapNotify on a window
                 # means is delicate enough already.)
@@ -111,7 +111,7 @@ class Wm(object):
                 self._manage_client(w)
 
         # Turn on focus handling:
-        parti.wrapped.selectFocusChange(self._real_root,
+        parti.lowlevel.selectFocusChange(self._real_root,
                                         self._handle_root_focus_in,
                                         None)
         self._give_someone_focus()
@@ -181,7 +181,7 @@ class Wm(object):
         # accurate info on what the app is actually requesting.
         if event.window not in self._windows:
             print "Reconfigure on withdrawn window"
-            parti.wrapped.configureAndNotify(event.window,
+            parti.lowlevel.configureAndNotify(event.window,
                                              event.x, event.y,
                                              event.width, event.height)
 
@@ -191,8 +191,8 @@ class Wm(object):
         # something real.  This is easy to detect -- a FocusIn event with
         # detail PointerRoot or None is generated on the root window.
         print event.__dict__
-        if event.detail in (parti.wrapped.const["PointerRoot"],
-                            parti.wrapped.const["XNone"]):
+        if event.detail in (parti.lowlevel.const["PointerRoot"],
+                            parti.lowlevel.const["XNone"]):
             self._give_someone_focus()
 
     def _dispatch_gdk_event(self, event):

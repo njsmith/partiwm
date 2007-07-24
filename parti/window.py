@@ -4,7 +4,7 @@ import sets
 import gobject
 import gtk
 import gtk.gdk
-import parti.wrapped
+import parti.lowlevel
 import parti.util
 from parti.error import *
 from parti.prop import prop_get, prop_set
@@ -138,7 +138,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         managed, for whatever reason.  ATM, this mostly means that the window
         died somehow before we could do anything with it."""
 
-        parti.wrapped.printFocus()
+        parti.lowlevel.printFocus()
 
         super(Window, self).__init__()
         # The way Gtk.Widget works, we have to make our actual top-level
@@ -228,13 +228,13 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                                                                 allocated_h)
         self.set_property("actual-size", (w, h))
         self.set_property("user-friendly-size", (wvis, hvis))
-        trap.swallow(parti.wrapped.configureAndNotify,
+        trap.swallow(parti.lowlevel.configureAndNotify,
                      self.client_window, x, y, w, h)
 
     def _handle_configure_request(self, event):
         # Ignore the request, but as per ICCCM 4.1.5, send back a synthetic
         # ConfigureNotify telling the client that nothing has happened.
-        trap.swallow(parti.wrapped.sendConfigureNotify,
+        trap.swallow(parti.lowlevel.sendConfigureNotify,
                      event.window)
         self.set_property("requested-position", (event.x, event.y))
         self.geometry_constraint.requested = (event.width, event.height)
@@ -408,11 +408,11 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # that is as it should be.
         if self.get_property("iconic"):
             prop_set(self.client_window, "WM_STATE",
-                     "u32", parti.wrapped.const["IconicState"])
+                     "u32", parti.lowlevel.const["IconicState"])
             self.state_add("_NET_WM_STATE_HIDDEN")
         else:
             prop_set(self.client_window, "WM_STATE",
-                     "u32", parti.wrapped.const["NormalState"])
+                     "u32", parti.lowlevel.const["NormalState"])
             self.state_remove("_NET_WM_STATE_HIDDEN")
 
     # There are three ways a window can get urgency = True:
@@ -451,7 +451,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                   ]
         def doit():
             for prop in remove:
-                parti.wrapped.XDeleteProperty(self.client_window, prop)
+                parti.lowlevel.XDeleteProperty(self.client_window, prop)
         trap.swallow(doit)
 
     def _server_time(self):
@@ -505,7 +505,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # Disallow and ignore any attempts by other clients to play with any
         # child windows.  (In particular, this will intercept any attempts by
         # the client to directly resize themselves.)
-        parti.wrapped.substructureRedirect(self.window,
+        parti.lowlevel.substructureRedirect(self.window,
                                            None,
                                            self._handle_configure_request,
                                            None)
@@ -515,7 +515,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         self.window.move_resize(*self.allocation)
 
         def setup_child():
-            parti.wrapped.XAddToSaveSet(self.client_window)
+            parti.lowlevel.XAddToSaveSet(self.client_window)
             self.client_window.reparent(self.window, 0, 0)
         trap.swallow(setup_child)
 
@@ -545,7 +545,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
             assert not self.flags() & gtk.MAPPED
             self.client_window.reparent(gtk.gdk.get_default_root_window(),
                                         0, 0)
-            parti.wrapped.sendConfigureNotify(self.client_window)
+            parti.lowlevel.sendConfigureNotify(self.client_window)
             # FIXME: If we are unrealizing because the whole program is
             # shutting down, then we should leave the window mapped (so the
             # next WM will be able to find it).  If we are unrealizing because
@@ -580,7 +580,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         now = self._server_time()
         print "3"
         # FIXME: use WM_TAKE_FOCUS if the client supports it
-        trap.swallow(parti.wrapped.XSetInputFocus, self.client_window, now)
+        trap.swallow(parti.lowlevel.XSetInputFocus, self.client_window, now)
         print "4"
         gtk.gdk.flush()
         print "5"

@@ -3,7 +3,7 @@ import gtk.gdk
 import parti.tray
 
 # For take_focus
-import parti.wrapped
+import parti.lowlevel
 import parti.error
 
 class SimpleTabTray(parti.tray.Tray):
@@ -34,7 +34,7 @@ class SimpleTabTray(parti.tray.Tray):
         # the Wm or TraySet or something.
         print "Taking focus"
         # Note *not* swallowing errors here, this should always succeed
-        print parti.wrapped.XSetInputFocus(self.main.window)
+        print parti.lowlevel.XSetInputFocus(self.main.window)
 
     def add(self, window):
         window.connect("unmanaged", self._handle_window_departure)
