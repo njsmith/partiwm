@@ -5,8 +5,6 @@ pygtk.require('2.0')
 import gtk
 import gtk.gdk
 
-# gdk_window_set_composited() (2.12+ only)
-
 import parti.selection
 import parti.lowlevel
 from parti.prop import prop_set
@@ -39,6 +37,8 @@ class Wm(object):
         # important to say we support the _NET_WM_USER_TIME_WINDOW property,
         # because this tells applications that they do not need to constantly
         # ping any pagers etc. that might be running -- see EWMH for details.
+        # (Though it's not clear that any applications actually take advantage
+        # of this yet.)
         "_NET_WM_USER_TIME",
         "_NET_WM_USER_TIME_WINDOW",
         # Not fully:
@@ -71,7 +71,7 @@ class Wm(object):
         # Start snooping on the raw GDK event stream
         gtk.gdk.event_handler_set(self._dispatch_gdk_event)
 
-        # Become the Official Window Manager of this year's game:
+        # Become the Official Window Manager of this year's display:
         self._wm_selection = parti.selection.ManagerSelection("WM_S0")
         self._wm_selection.connect("selection-lost", self._lost_wm_selection)
         if self._wm_selection.owned():
@@ -79,7 +79,9 @@ class Wm(object):
             sys.exit()
         self._wm_selection.acquire()
         # (If we become a compositing manager, then we will want to do the
-        # same thing with the _NET_WM_CM_S0 selection (says EWMH).)
+        # same thing with the _NET_WM_CM_S0 selection (says EWMH).  AFAICT
+        # this basically will just be used by clients to know that they can
+        # use RGBA visuals.)
 
         # Get this list now, before creating anything new, so that we won't
         # see our own windows

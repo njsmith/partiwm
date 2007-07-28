@@ -577,6 +577,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     ################################
     
     def do_focus_in_event(self, event):
+        assert self.get_property("has-focus")
         print "Got focus, giving it to child"
         # Have to fetch the time, not just use CurrentTime, both because ICCCM
         # says that WM_TAKE_FOCUS must use a real time and because there are

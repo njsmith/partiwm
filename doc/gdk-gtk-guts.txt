@@ -1,4 +1,4 @@
-Some undocumented functions in gtk.gdk:
+Some interesting undocumented functions in gtk.gdk:
   flush
   x11_get_default_screen
   x11_get_server_time
@@ -10,8 +10,8 @@ Some undocumented functions in gtk.gdk:
   error_trap_pop
 
   event_send_client_message_for_display
-    ^^ doesn't seem to let you set the mask, though :-(
-
+    ^^ this one doesn't seem to let you set the mask, though, hence is
+    useless
 
 
 How gdk/gtk event handling works:
@@ -42,10 +42,10 @@ How gdk/gtk event handling works:
   for "unmap".
 
 
-Easiest thing might be to use gtk.gdk.event_handler_set to filter
-events after they have already been moved into Python, but before any
-real processing has been done on them -- passing all the ones I'm not
-interested in on to gtk.main_do_event.
+Easiest way to get at some events is to use gtk.gdk.event_handler_set
+to filter events after they have already been moved into Python, but
+before any real processing has been done on them -- passing all the
+ones I'm not interested in on to gtk.main_do_event.
 
 def func(event, user_data):
     gtk.main_do_event(event)
@@ -106,8 +106,9 @@ How focus works in gtk/gdk:
   delivered to the focus window will end up being processed by GDK as
   if they were sent to the toplevel.
 
-  (how the heck do plugs handle this?  Please tell me they don't send
-  all keyboard events via synthesized messages or something...?
+  (how the heck do XEmbed plugs handle this?  Please tell me they
+  don't send all keyboard events via synthesized messages or
+  something...?
 
   ...it looks like maybe they do.)
 

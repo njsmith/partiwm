@@ -67,9 +67,9 @@ cdef cGObject * unwrap(box, pyclass) except? NULL:
 #     else:
 #         print "contents is %s" % (<long long>unwrapped)
 
-# cdef object wrap(cGObject * contents):
-#     # Put a raw GObject* into a PyGObject wrapper.
-#     return pygobject_new(contents)
+cdef object wrap(cGObject * contents):
+    # Put a raw GObject* into a PyGObject wrapper.
+    return pygobject_new(contents)
 
 ###################################
 # Raw Xlib and GDK
@@ -201,6 +201,10 @@ cdef extern from *:
     # Debugging:
     int cXGetInputFocus "XGetInputFocus" (Display * display, Window * focus,
                                           int * revert_to)
+
+    ctypedef struct GdkDisplay:
+        pass
+    GdkDisplay * c_gdk_display_open "gdk_display_open" (char * name)
 
 ######
 # GDK primitives, and wrappers for Xlib
@@ -373,6 +377,10 @@ def printFocus():
     cXGetInputFocus(gdk_x11_get_default_xdisplay(), &w, &revert_to)
     print "Current focus: %s, %s" % (hex(w), revert_to)
     
+# For some reason this is not wrapped.
+# FIXME: is this doing ref-counting properly?
+def gdk_display_open(name):
+    return wrap(<cGObject*>c_gdk_display_open(name))
 
 ###################################
 # Smarter convenience wrappers
