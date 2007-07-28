@@ -33,8 +33,13 @@ class SimpleTabTray(parti.tray.Tray):
         # FIXME: this is poorly factored, should be in a superclass or even
         # the Wm or TraySet or something.
         print "Taking focus"
-        # Note *not* swallowing errors here, this should always succeed
-        print parti.lowlevel.XSetInputFocus(self.main.window)
+        # Weird hack: our toplevel is a GDK window, and the only way to
+        # properly get input focus to a GDK window is to send it
+        # WM_TAKE_FOCUS.  So this is sending a WM_TAKE_FOCUS to this WM
+        # process, which will then issue an XSetInputFocus itself.
+        # Note *not* swallowing errors here, this should always succeed.
+        now = gtk.gdk.x11_get_server_time(self.main.window)
+        print parti.lowlevel.send_wm_take_focus(self.main.window, now)
 
     def add(self, window):
         window.connect("unmanaged", self._handle_window_departure)

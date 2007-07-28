@@ -163,6 +163,8 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # worry about it too much...
         self.pending_unmaps = 0
 
+        self.connect("notify::iconic", self._handle_iconic_update)
+
         self.geometry_constraint = GeometryFree((100, 100))
 
         # FIXME: make this dependent on whether the client accepts input focus
@@ -257,12 +259,13 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     def _handle_wm_hints(self):
         wm_hints = prop_get(self.client_window,
                             "WM_HINTS", "wm-hints")
-        # GdkWindow or None
-        self.set_property("group-leader", wm_hints.group_leader)
-        # FIXME: extract state and input hint
-        
-        if wm_hints.urgency:
-            self.set_property("urgency-requested", True)
+        if wm_hints is not None:
+            # GdkWindow or None
+            self.set_property("group-leader", wm_hints.group_leader)
+            # FIXME: extract state and input hint
+
+            if wm_hints.urgency:
+                self.set_property("urgency-requested", True)
 
     _property_handlers["WM_HINTS"] = _handle_wm_hints
 
@@ -323,13 +326,14 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
 
         class_instance = prop_get(self.client_window,
                                   "WM_CLASS", "latin1")
-        try:
-            (c, i, fluff) = class_instance.split("\0")
-        except ValueError:
-            print "Malformed WM_CLASS, ignoring"
-        else:
-            self.set_property("class", c)
-            self.set_property("instance", i)
+        if class_instance:
+            try:
+                (c, i, fluff) = class_instance.split("\0")
+            except ValueError:
+                print "Malformed WM_CLASS, ignoring"
+            else:
+                self.set_property("class", c)
+                self.set_property("instance", i)
 
         transient_for = prop_get(self.client_window,
                                  "WM_TRANSIENT_FOR", "window")
@@ -338,7 +342,8 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
 
         protocols = prop_get(self.client_window,
                              "WM_PROTOCOLS", ["atom"])
-        #May be None
+        if protocols is None:
+            protocols = []
         self.set_property("protocols", protocols)
 
         window_types = prop_get(self.client_window,
@@ -401,18 +406,19 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     def state_isset(self, state_name):
         return gtk.gdk.atom_intern(state_name) in self.get_property("state")
 
-    def _handle_iconic_update(self, property):
+    def _handle_iconic_update(self, *args):
         # FIXME: Need to think carefully about how this should be handled.
         # ATM you cannot _put_ a client into iconic/non-iconic state by
-        # setting this property, only by showing/hiding the widget.  Perhaps
-        # that is as it should be.
+        # setting this property, only by showing/hiding the widget (which will
+        # also update this property as a side effect).  Perhaps that is as it
+        # should be.
         if self.get_property("iconic"):
-            prop_set(self.client_window, "WM_STATE",
-                     "u32", parti.lowlevel.const["IconicState"])
+            trap.swallow(prop_set, self.client_window, "WM_STATE",
+                         "u32", parti.lowlevel.const["IconicState"])
             self.state_add("_NET_WM_STATE_HIDDEN")
         else:
-            prop_set(self.client_window, "WM_STATE",
-                     "u32", parti.lowlevel.const["NormalState"])
+            trap.swallow(prop_set, self.client_window, "WM_STATE",
+                         "u32", parti.lowlevel.const["NormalState"])
             self.state_remove("_NET_WM_STATE_HIDDEN")
 
     # There are three ways a window can get urgency = True:
@@ -539,9 +545,9 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         self.unset_flags(gtk.REALIZED)
 
         def reparent_away():
-            # This *would* cause an UnmapNotify (and thus require us to
-            # increment self.pending_unmaps), except that we know that we are
-            # unmapped here.
+            # This reparenting *would* cause an UnmapNotify (and thus require
+            # us to increment self.pending_unmaps), except that we know that
+            # we are unmapped here.
             assert not self.flags() & gtk.MAPPED
             self.client_window.reparent(gtk.gdk.get_default_root_window(),
                                         0, 0)
@@ -572,18 +578,22 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     
     def do_focus_in_event(self, event):
         print "Got focus, giving it to child"
-        # Have to fetch the time, not just use CurrentTime, because ICCCM says
-        # that WM_TAKE_FOCUS must use a real time.
-        print "1"
+        # Have to fetch the time, not just use CurrentTime, both because ICCCM
+        # says that WM_TAKE_FOCUS must use a real time and because there are
+        # genuine race conditions here (e.g. suppose the client does not
+        # actually get around to requesting the focus until after we have
+        # already changed our mind and decided to give it to someone else).
         gtk.gdk.flush()
-        print "2"
         now = self._server_time()
-        print "3"
-        # FIXME: use WM_TAKE_FOCUS if the client supports it
-        trap.swallow(parti.lowlevel.XSetInputFocus, self.client_window, now)
-        print "4"
+        if "WM_TAKE_FOCUS" in self.get_property("protocols"):
+            print "WM_TAKE_FOCUS"
+            trap.swallow(parti.lowlevel.send_wm_take_focus,
+                         self.client_window, now)
+        else:
+            print "XSetInputFocus"
+            trap.swallow(parti.lowlevel.XSetInputFocus,
+                         self.client_window, now)
         gtk.gdk.flush()
-        print "5"
 
 # This is necessary to inform GObject about the new subclass; if it doesn't
 # know about the subclass, then it thinks we are trying to instantiate

@@ -10,6 +10,8 @@ import gobject
 import gtk
 import gtk.gdk
 
+from parti.util import dump_exc
+
 ###################################
 # Headers, python magic
 ###################################
@@ -229,10 +231,10 @@ cdef extern from *:
 def get_xatom(gdkatom_or_str_or_xatom):
     """Returns the X atom corresponding to the given PyGdkAtom or Python
     string or Python integer (assumed to already be an X atom)."""
-    if isinstance(gdkatom_or_str_or_xatom, int):
+    if isinstance(gdkatom_or_str_or_xatom, (int, long)):
         return gdkatom_or_str_or_xatom
     if isinstance(gdkatom_or_str_or_xatom, str):
-        gdkatom_or_str = gtk.gdk.atom_intern(gdkatom_or_str_or_xatom)
+        gdkatom_or_str_or_xatom = gtk.gdk.atom_intern(gdkatom_or_str_or_xatom)
     # Assume it is a PyGdkAtom (since there's no easy way to check, sigh)
     return gdk_x11_atom_to_xatom(PyGdkAtom_Get(gdkatom_or_str_or_xatom))
 
@@ -369,7 +371,7 @@ def printFocus():
     cdef Window w
     cdef int revert_to
     cXGetInputFocus(gdk_x11_get_default_xdisplay(), &w, &revert_to)
-    print "Current focus: %s, %s" % (w, revert_to)
+    print "Current focus: %s, %s" % (hex(w), revert_to)
     
 
 ###################################
@@ -389,6 +391,7 @@ def sendClientMessage(target, propagate, event_mask,
     display = gdk_x11_get_default_xdisplay()
     cdef Window w
     w = get_xwindow(target)
+    print "sending message to %s" % hex(w)
     cdef XEvent e
     e.type = ClientMessage
     e.xany.display = display
@@ -505,41 +508,46 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
                                                 void * userdata):
     cdef XEvent * e
     e = <XEvent*>e_gdk
-    (map_callback, configure_callback, circulate_callback) = <object>userdata
-    if e.type == MapRequest:
-        print "MapRequest"
-        if map_callback is not None:
-            pyev = LameStruct()
-            pyev.parent = get_pywindow(e.xmaprequest.parent)
-            pyev.window = get_pywindow(e.xmaprequest.window)
-            map_callback(pyev)
-        return GDK_FILTER_REMOVE
-    elif e.type == ConfigureRequest:
-        print "ConfigureRequest"
-        if configure_callback is not None:
-            pyev = LameStruct()
-            pyev.parent = get_pywindow(e.xconfigurerequest.parent)
-            pyev.window = get_pywindow(e.xconfigurerequest.window)
-            pyev.x = e.xconfigurerequest.x
-            pyev.y = e.xconfigurerequest.y
-            pyev.width = e.xconfigurerequest.width
-            pyev.height = e.xconfigurerequest.height
-            pyev.border_width = e.xconfigurerequest.border_width
-            pyev.above = get_pywindow(e.xconfigurerequest.above)
-            pyev.detail = e.xconfigurerequest.detail
-            pyev.value_mask = e.xconfigurerequest.value_mask
-            configure_callback(pyev)
-        return GDK_FILTER_REMOVE
-    elif e.type == CirculateRequest:
-        print "CirculateRequest"
-        if circulate_callback is not None:
-            pyev = LameStruct()
-            pyev.parent = get_pywindow(e.xcirculaterequest.parent)
-            pyev.window = get_pywindow(e.xcirculaterequest.window)
-            pyev.place = e.xcirculaterequest.place
-            circulate_callback(pyev)
-        return GDK_FILTER_REMOVE
-    return GDK_FILTER_CONTINUE
+    try:
+        (map_callback, configure_callback, circulate_callback) = <object>userdata
+        if e.type == MapRequest:
+            print "MapRequest"
+            if map_callback is not None:
+                pyev = LameStruct()
+                pyev.parent = get_pywindow(e.xmaprequest.parent)
+                pyev.window = get_pywindow(e.xmaprequest.window)
+                map_callback(pyev)
+            return GDK_FILTER_REMOVE
+        elif e.type == ConfigureRequest:
+            print "ConfigureRequest"
+            if configure_callback is not None:
+                pyev = LameStruct()
+                pyev.parent = get_pywindow(e.xconfigurerequest.parent)
+                pyev.window = get_pywindow(e.xconfigurerequest.window)
+                pyev.x = e.xconfigurerequest.x
+                pyev.y = e.xconfigurerequest.y
+                pyev.width = e.xconfigurerequest.width
+                pyev.height = e.xconfigurerequest.height
+                pyev.border_width = e.xconfigurerequest.border_width
+                pyev.above = get_pywindow(e.xconfigurerequest.above)
+                pyev.detail = e.xconfigurerequest.detail
+                pyev.value_mask = e.xconfigurerequest.value_mask
+                configure_callback(pyev)
+            return GDK_FILTER_REMOVE
+        elif e.type == CirculateRequest:
+            print "CirculateRequest"
+            if circulate_callback is not None:
+                pyev = LameStruct()
+                pyev.parent = get_pywindow(e.xcirculaterequest.parent)
+                pyev.window = get_pywindow(e.xcirculaterequest.window)
+                pyev.place = e.xcirculaterequest.place
+                circulate_callback(pyev)
+            return GDK_FILTER_REMOVE
+        return GDK_FILTER_CONTINUE
+    except:
+        print "Exception in pyrex callback:"
+        dump_exc()
+        raise
 
 def substructureRedirect(pywindow,
                          map_callback,
@@ -566,21 +574,26 @@ cdef GdkFilterReturn focusFilter(GdkXEvent * e_gdk,
                                  void * userdata):
     cdef XEvent * e
     e = <XEvent*>e_gdk
-    pyev = LameStruct()
-    pyev.window = get_pywindow(e.xfocus.window)
-    pyev.mode = e.xfocus.mode
-    pyev.detail = e.xfocus.detail
-    (focus_in_callback, focus_out_callback) = <object>userdata
-    if e.type == FocusIn:
-        print "FocusIn"
-        if focus_in_callback is not None:
-            focus_in_callback(pyev)
-    elif e.type == FocusOut:
-        print "FocusOut"
-        if focus_out_callback is not None:
-            focus_out_callback(pyev)
-    # GDK also selects for Focus events for its own purposes
-    return GDK_FILTER_CONTINUE
+    try:
+        pyev = LameStruct()
+        pyev.window = get_pywindow(e.xfocus.window)
+        pyev.mode = e.xfocus.mode
+        pyev.detail = e.xfocus.detail
+        (focus_in_callback, focus_out_callback) = <object>userdata
+        if e.type == FocusIn:
+            print "FocusIn"
+            if focus_in_callback is not None:
+                focus_in_callback(pyev)
+        elif e.type == FocusOut:
+            print "FocusOut"
+            if focus_out_callback is not None:
+                focus_out_callback(pyev)
+        # GDK also selects for Focus events for its own purposes
+        return GDK_FILTER_CONTINUE
+    except:
+        print "Exception in pyrex callback:"
+        dump_exc()
+        raise
 
 def selectFocusChange(pywindow, in_callback, out_callback):
     addXSelectInput(pywindow, FocusChangeMask)

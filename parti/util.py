@@ -1,3 +1,6 @@
+import cgitb
+import sys
+
 class AutoPropGObjectMixin(object):
     """Mixin for automagic property support in GObjects.
 
@@ -12,3 +15,7 @@ class AutoPropGObjectMixin(object):
 
     def do_set_property(self, pspec, value):
         self._gproperties[pspec] = value
+
+
+def dump_exc():
+    print cgitb.text(sys.exc_info())

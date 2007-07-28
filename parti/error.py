@@ -104,13 +104,15 @@ class _ErrorManager(object):
     def swallow_unsynced(self, fun, *args, **kwargs):
         try:
             return self.call_unsynced(fun, *args, **kwargs)
-        except XError:
+        except XError, e:
+            print "Ignoring X error: %s" % e
             pass
 
     def swallow_synced(self, fun, *args, **kwargs):
         try:
             return self.call_synced(fun, *args, **kwargs)
         except XError:
+            print "Ignoring X error: %s" % e
             pass
 
     swallow = swallow_unsynced

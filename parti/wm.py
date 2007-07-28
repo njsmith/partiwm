@@ -112,8 +112,8 @@ class Wm(object):
 
         # Turn on focus handling:
         parti.lowlevel.selectFocusChange(self._real_root,
-                                        self._handle_root_focus_in,
-                                        None)
+                                         self._handle_root_focus_in,
+                                         self._handle_root_focus_out)
         self._give_someone_focus()
 
         # FIXME:
@@ -190,10 +190,16 @@ class Wm(object):
         # gone to PointerRoot or None, so that it can be given back to
         # something real.  This is easy to detect -- a FocusIn event with
         # detail PointerRoot or None is generated on the root window.
+        print "FocusIn on root"
         print event.__dict__
-        if event.detail in (parti.lowlevel.const["PointerRoot"],
-                            parti.lowlevel.const["XNone"]):
+        if event.detail in (parti.lowlevel.const["NotifyPointerRoot"],
+                            parti.lowlevel.const["NotifyDetailNone"]):
+            print "PointerRoot or None?  This won't do... giving someone focus"
             self._give_someone_focus()
+
+    def _handle_root_focus_out(self, event):
+        print "Focus left root, FYI"
+        parti.lowlevel.printFocus()
 
     def _dispatch_gdk_event(self, event):
         # This function is called for every event GDK sees.  Most of them we
@@ -228,7 +234,6 @@ class Wm(object):
 
     def _dispatch_property_notify(self, event):
         if event.window in self._windows:
-            print "Property notify for window"
             self._windows[event.window].emit("client-property-notify-event", event)
         else:
             print "Property notify for who?"
