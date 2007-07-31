@@ -6,40 +6,22 @@ import parti.tray
 import parti.lowlevel
 import parti.error
 
-class SimpleTabTray(parti.tray.Tray):
+class SimpleTabTray(parti.tray.Tray, gtk.HPaned):
     def __init__(self, trayset, tag):
         super(SimpleTabTray, self).__init__(trayset, tag)
         self.windows = []
-        self.main = gtk.Window()
-        self.main.set_size_request(gtk.gdk.screen_width(),
-                                   gtk.gdk.screen_height())
-        self.hpane = gtk.HPaned()
-        self.hpane.set_position(gtk.gdk.screen_width() / 2)
+        self.set_position(gtk.gdk.screen_width() / 2)
         self.left_notebook = gtk.Notebook()
-        self.hpane.add1(self.left_notebook)
+        self.add1(self.left_notebook)
         self.right_notebook = gtk.Notebook()
-        self.hpane.add2(self.right_notebook)
+        self.add2(self.right_notebook)
 
         self.left_notebook.grab_focus()
 
         for notebook in (self.left_notebook, self.right_notebook):
             notebook.set_group_id(5)
 
-        self.main.add(self.hpane)
-        self.main.show_all()
-
-    def take_focus(self):
-        # Can't use the GDK focus functions, because they go via the WM.
-        # FIXME: this is poorly factored, should be in a superclass or even
-        # the Wm or TraySet or something.
-        print "Taking focus"
-        # Weird hack: our toplevel is a GDK window, and the only way to
-        # properly get input focus to a GDK window is to send it
-        # WM_TAKE_FOCUS.  So this is sending a WM_TAKE_FOCUS to this WM
-        # process, which will then issue an XSetInputFocus itself.
-        # Note *not* swallowing errors here, this should always succeed.
-        now = gtk.gdk.x11_get_server_time(self.main.window)
-        print parti.lowlevel.send_wm_take_focus(self.main.window, now)
+        self.show_all()
 
     def add(self, window):
         window.connect("unmanaged", self._handle_window_departure)
@@ -49,15 +31,14 @@ class SimpleTabTray(parti.tray.Tray):
         else:
             notebook = self.left_notebook
         notebook.append_page(window)
-        window.grab_focus()
-        notebook.set_tab_label_text(window,
-                                    window.get_property("title"))
         notebook.set_tab_reorderable(window, True)
         notebook.set_tab_detachable(window, True)
         window.connect("notify::title", self._handle_title_change)
+        self._handle_title_change(window)
         window.show()
+        window.grab_focus()
 
-    def _handle_title_change(self, window, title):
+    def _handle_title_change(self, window, *args):
         left_children = self.left_notebook.get_children()
         right_children = self.right_notebook.get_children()
         if window in left_children:

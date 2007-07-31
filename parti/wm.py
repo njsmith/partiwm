@@ -9,6 +9,8 @@ import parti.selection
 import parti.lowlevel
 from parti.prop import prop_set
 
+from parti.world import WorldWindow
+
 from parti.windowset import WindowSet
 from parti.tray import TraySet
 from parti.trays.simpletab import SimpleTabTray
@@ -17,11 +19,19 @@ class Wm(object):
     NAME = "Parti"
 
     _NET_SUPPORTED = [
+        "_NET_SUPPORTED", # a bit redundant, perhaps...
         "_NET_SUPPORTING_WM_CHECK",
         "_NET_WM_FULL_PLACEMENT",
         "_NET_WM_HANDLED_ICONS",
         "_NET_CLIENT_LIST",
         "_NET_CLIENT_LIST_STACKING",
+        "_NET_DESKTOP_VIEWPORT",
+        "_NET_DESKTOP_GEOMETRY",
+        "_NET_NUMBER_OF_DESKTOPS",
+        "_NET_DESKTOP_NAMES",
+        #FIXME: "_NET_WORKAREA",
+        "_NET_ACTIVE_WINDOW",
+
         "WM_NAME", "_NET_WM_NAME",
         "WM_ICON_NAME", "_NET_WM_ICON_NAME",
         "WM_CLASS",
@@ -63,10 +73,11 @@ class Wm(object):
         self._windows.connect("window-list-changed", self._update_window_list)
 
         self._trays = TraySet()
-        self._trays.connect("tray-set-changed", self._update_desktop_list)
+        self._trays.connect("changed", self._update_desktop_list)
 
         self._real_root = gtk.gdk.get_default_root_window()
         self._ewmh_window = None
+        self._world = None
         
         # Start snooping on the raw GDK event stream
         gtk.gdk.event_handler_set(self._dispatch_gdk_event)
@@ -95,35 +106,37 @@ class Wm(object):
                  ["u32"], [0, 0])
         self._update_window_list()
 
+        # Create our giant window
+        self._world = WorldWindow()
+        self._world.show_all()
+        self._viewport = Viewport(self._trays)
+        self._world.add(self._viewport)
+
         # FIXME: be less stupid
         self._trays.new(u"default", SimpleTabTray)
+
+        self._world.show_all()
 
         # Okay, ready to select for SubstructureRedirect and then load in all
         # the existing clients.
         parti.lowlevel.substructureRedirect(self._real_root,
-                                           self._handle_root_map_request,
-                                           self._handle_root_configure_request,
-                                           None)
-        for w in inherited_windows:
-            if parti.lowlevel.is_mapped(w):
-                # Make it start off unmapped, for consistency.  (In
-                # particular, figuring out what an UnmapNotify on a window
-                # means is delicate enough already.)
-                w.hide()
-                self._manage_client(w)
+                                            self._handle_root_map_request,
+                                            self._handle_root_configure_request,
+                                            None)
 
-        # Turn on focus handling:
-        parti.lowlevel.selectFocusChange(self._real_root,
-                                         self._handle_root_focus_in,
-                                         self._handle_root_focus_out)
-        self._give_someone_focus()
+        for w in parti.lowlevel.get_children(self._real_root):
+            # Checking for FOREIGN here filters out anything that we've
+            # created ourselves (like, say, the world window), and checking
+            # for mapped filters out any withdrawn windows.
+            if (w.get_window_type() == gtk.gdk.WINDOW_FOREIGN
+                and parti.lowlevel.is_mapped(w)):
+                self._manage_client(w)
 
         # FIXME:
 
-        # Need to watch for screen geometry changes to update
-        #   _NET_DESKTOP_GEOMETRY, also _NET_WORKAREA
         # Need viewport abstraction for _NET_CURRENT_DESKTOP...
         # Tray's need to provide info for _NET_ACTIVE_WINDOW and _NET_WORKAREA
+        # (and notifications for both)
 
         # Need to listen for:
         #   _NET_CLOSE_WINDOW
@@ -144,16 +157,8 @@ class Wm(object):
             # reparented the window.  FSF Emacs 22.1.50.1 does this, at least.
             print "Cannot manage the same window twice, ignoring"
             return
-        try:
-            # FIXME: totally lame tray setting
-            self._windows.manage(gdkwindow, [self._trays.trays[0]])
-        except:
-            import pdb; import sys; pdb.post_mortem(sys.exc_traceback)
-            raise
-
-    def _give_someone_focus(self):
-        # FIXME: totally broken, need viewport support
-        self._trays.trays[0].take_focus()
+        # FIXME: totally lame tray setting
+        self._windows.manage(gdkwindow, [self._trays.trays[0]])
 
     def _handle_root_client_message(self, event):
         # FIXME
@@ -186,22 +191,6 @@ class Wm(object):
             parti.lowlevel.configureAndNotify(event.window,
                                              event.x, event.y,
                                              event.width, event.height)
-
-    def _handle_root_focus_in(self, event):
-        # The purpose of this function is to detect when the focus mode has
-        # gone to PointerRoot or None, so that it can be given back to
-        # something real.  This is easy to detect -- a FocusIn event with
-        # detail PointerRoot or None is generated on the root window.
-        print "FocusIn on root"
-        print event.__dict__
-        if event.detail in (parti.lowlevel.const["NotifyPointerRoot"],
-                            parti.lowlevel.const["NotifyDetailNone"]):
-            print "PointerRoot or None?  This won't do... giving someone focus"
-            self._give_someone_focus()
-
-    def _handle_root_focus_out(self, event):
-        print "Focus left root, FYI"
-        parti.lowlevel.printFocus()
 
     def _dispatch_gdk_event(self, event):
         # This function is called for every event GDK sees.  Most of them we

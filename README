@@ -1,9 +1,13 @@
-This is Parti, a modern titling window manager.
+This is Parti, a tabbing/tiling window manager, written in (almost)
+pure Python, using modern toolkits, and integrating pleasantly with
+modern desktops.
 
 Tagline(s)
 ----------
 
-Tabs: not just for web browsers anymore
+Tabs: not just for browsers anymore
+
+(FIXME: better taglines)
 
 Licensing
 ---------
@@ -18,21 +22,105 @@ Getting started
 
 Run './try' in the source directory to build and start a parti session
 inside a Xephyr nested X server.  Parti requires at least xlib,
-python, pyrex, pygobject, and pygtk, and the given './try' script also
-requires Xephyr.
+python, pyrex, pygobject, and pygtk (including C headers for all of
+those), and the included './try' script also requires Xephyr and tries
+to use 'x-terminal-emulator' to start a terminal in the nested server.
 
 Why another window manager?
 ---------------------------
 
-The Unix GUI and desktop have advanced dramatically in recent years,
-with the advent of foundational improvements (e.g. XRender,
-XComposite, Cairo, Pango), advanced toolkits (e.g. GTK+, Qt), advanced
-desktop environments (e.g. Gnome, KDE), and system-wide integration
-(e.g. HAL, NetworkManager).
+Tradition dictates that every window manager start with a rant.  This
+is mine.
 
+So.  These days, let's start by saying, the Unix desktop totally
+rocks.  We have beautiful widgets, fantastic hardware integration,
+best GUI APIs ever, highly usable and accessible apps, incredible
+i18n, you name it.
 
-Over the same time period, we have made similarly dramatic
-improvements in
+Except for one thing.  Our mainstream window managers suck, suck,
+suck.  Fundamentally.  Suck.
+
+What do I mean by this?  Think about it: the basic job of a window
+manager is to help you manage and switch between the different tasks
+you're engaged in.  That's a pretty basic and pervasive part of user
+experience, and so it carries a heavy responsibility.  Modern window
+managers rise to this responsibility by... ignoring it totally.  We
+have startup notification and wobbly windows and the basic user
+experience of TWM, with windows as boxes dropped on the screen in some
+arbitrary size and position.  If you want the windows arranged
+differently, then you, the human, get to reach over and slide them
+around one by one.  But at least you're free to have a bunch of
+overlapping partially visible windows that you can't read.
+
+Most of the time I don't really need that freedom.  I just want to
+look at one window, or at two windows, or maybe an editor and two
+terminals.  These are not complicated layout problems.  I think I have
+better things to do with my time than solving them by hand, myself,
+every time.  Let the computer do it.
+
+Most of the time, I don't want to do fiddly high-precision work with
+the mouse just to switch to a different window.  I'm not even making
+the standard old complaint about moving the hand away from the
+keyboard, that's pretty quick and I can do it without looking; but
+using a pointer accurately is a high-precision motor task.  It takes
+careful attention and hand-eye coordination.  That's *exactly* what I
+*don't* need when I'm trying to juggle state and maintain flow.  So
+perhaps once the computer has become smart enough to put windows into
+two columns, it can devote some extra cycles to figuring out how to
+have a single-key command for "switch to other column"?
+
+It's not like I'm the first person to notice this.  Think of all the
+hue and cry over tabs in web browsers.  This isn't just a geeky
+preoccupation; it's gotten so my mom won't use a browser without tab
+support.  Even Microsoft has figured this one out.  And then there are
+the tabbed terminals, tabbed editors, tabbed chat clients, on and on.
+In the app space, traditional MDI is dead, and tabbing rules the
+world.
+
+Or in other words, the app developers have universally decided that
+the standard sliding-little-rectangles-around-a-big-rectangle world is
+annoying, to the point that it is considered a major feature if you
+implement a little private tabbed window manager so that users can
+avoid dealing with their main one as much as possible.  In the mean
+time, according to the usability studies, lots of users are hacking up
+their work style to approximate between-app tabbed as closely as they
+can, by keeping ever window maximized all the time.  So there's some
+room for improvement here.
+
+The app developers have all sorts of cool new ideas, too.  Browser
+tabs that show mini progress bars and visually track whether you've
+looked at the tab yet, chat windows that change color to show what
+sort of activity is going on, Emacs' genius iswitchb buffer-switching
+interface.  Let's give every app this richer experience.  Let's expose
+it to the desktop, and make it better at the same time -- let's write
+window managers that let you maximize one window on a small laptop
+screen, and still get the rich little notification cues from the apps
+that aren't visible.  Let's do something *new*.
+
+Not that the basic idea of tabbing window managers is new.  Parti owes
+a huge debt to the likes of pwm, ratpoison, stumpwm, trswm, xmonad and
+especially the brilliant ion and wmii.  For some reason, though, the
+previous window managers exploring these ideas seem to all be written
+by extreme minimalists.  They like raw Xlib and write rants about
+desktop bloat, and I have nothing against that per se, but honestly I
+just want NetworkManager and pleasant looking fonts *and* the ability
+to switch between tasks without gnashing my teeth.
+
+So here's the Parti line: Parti is aimed first and foremost at
+usability, and for us, a usable program is one that is unobtrusive to
+the point of becoming an invisible and unnoticed extension of the
+user's will.  Because we can't do this without fresh blood and
+experimentation, Parti is written in Python, and writing new layout
+schemes is as easy packing some GTK+ widgets.  Because this is too big
+a job to do on our own, we use pre-existing libraries whereever
+possible.  Because we need seamless integration into the desktop, we
+will reach out to other developers, to extend EWMH and existing apps
+to perfect our user experience.
+
+And our goal is nothing less than acceptance as a, or the, default
+window manager for a major desktop environment.  Is that an
+unreasonable goal?  Possibly, and there's a long, long way between
+here and there.  But let's see how far we can get.
 
 The Parti line
 --------------
@@ -62,13 +150,13 @@ experience if it makes the code more complex.
 
 Usability trumps all.
 
-Desktop support
----------------
+A note on the desktop wars
+--------------------------
 
 Parti uses GTK+ -- not because of any particular preference for GTK+
 over Qt, but simply because in the initial prototype, the Python Qt
-bindings seemed to make it hard to do certain evil hacks.  (I actually
-had never programmed with either API before starting Parti.)
+bindings seemed to make it hard(er) to do certain evil hacks.  (I
+actually had never programmed with either API before starting Parti.)
 
 Parti may use some parts of Gnome where appropriate, but we desire it
 to be fully usable on any desktop environment (including details like,
@@ -78,3 +166,9 @@ to accept patches to that effect.
 Because Parti aims for full ICCCM and EWMH compliance (where possible
 for a primarily tiling window manager), it should work well with any
 EWMH-compliant desktop environment.
+
+Is Parti fast, dynamic, light-weight, bloat-free, modern, flexible,
+and clean?
+-------------------------------------------------------------------
+
+Dunno, you tell me.

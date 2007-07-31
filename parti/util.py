@@ -18,4 +18,5 @@ class AutoPropGObjectMixin(object):
 
 
 def dump_exc():
+    """Call this from a except: clause to print a nice traceback."""
     print cgitb.text(sys.exc_info())

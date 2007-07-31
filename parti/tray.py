@@ -1,7 +1,11 @@
 import gobject
 import gtk
 
-class Tray(gtk.Window):
+# FIXME: The current design here is lame... these should probably be models of
+# some sort, or possibly hold many models, so that one can cycle through
+# multiple layout implementations losslessly.  But just making them widgets is
+# expedient for now.
+class Tray(gtk.Widget):
     def __init__(self, trayset, tag):
         super(Tray, self).__init__()
         self.trayset = trayset
@@ -14,25 +18,34 @@ class Tray(gtk.Window):
     def windows(self):
         raise NotImplementedError
 
-    def take_focus(self):
+    def work_area(self):
+        # Returns (x, y, width, height) of part of allocation that is using
+        # for client windows (e.g. minus any STRUT reservations).
         raise NotImplementedError
 
-    # Magic to interact with X, GTK+, the rest of Parti
-    def do_focus_in_event(self, event):
-        pass
-
-    def do_focus_out_event(self, event):
-        pass
-
-    def do_focus(self):
-        pass
+    # A tray should also be clever about receiving focus (e.g., remembering
+    # which client had it the last time the tray was focused, and putting it
+    # back there).
 
 # An arbitrarily ordered set, with key-based access.  (Currently just backed
-# by an array.)
+# by an array.)  Think of this as an MVC Model.
 class TraySet(gobject.GObject):
     __gsignals__ = {
-        "tray-set-changed": (gobject.SIGNAL_RUN_LAST,
-                             gobject.TYPE_NONE, ()),
+        "removed": (gobject.SIGNAL_RUN_LAST,
+                   gobject.TYPE_NONE,
+                 (gobject.TYPE_PYOBJECT, gobject.TYPE_PYOBJECT,)),
+        "moved": (gobject.SIGNAL_RUN_LAST,
+                   gobject.TYPE_NONE,
+                 (gobject.TYPE_PYOBJECT, gobject.TYPE_PYOBJECT,)),
+        "added": (gobject.SIGNAL_RUN_LAST,
+                  gobject.TYPE_NONE,
+                  (gobject.TYPE_PYOBJECT, gobject.TYPE_PYOBJECT,)),
+        "renamed": (gobject.SIGNAL_RUN_LAST,
+                   gobject.TYPE_NONE,
+                   (gobject.TYPE_PYOBJECT, gobject.TYPE_PYOBJECT,)),
+        # Emitted by all of the above signals:
+        "changed": (gobject.SIGNAL_RUN_LAST,
+                    gobject.TYPE_NONE, ()),
         }
 
     def __init__(self):
@@ -64,8 +77,11 @@ class TraySet(gobject.GObject):
     def remove(self, tag):
         for i in range(len(self.trays)):
             if self.trays[i] == tag:
+                tray = self.trays[i]
                 del self.trays[i]
-                self.emit("tray-set-changed")
+                self.emit("removed", tag, tray)
+                self.emit("changed")
+                return
 
     def index(self, tag):
         for i in range(len(self.trays)):
@@ -81,18 +97,21 @@ class TraySet(gobject.GObject):
         oldidx = self.index(tag)
         tray = self.trays.pop(oldidx)
         self.trays.insert(newidx, tray)
-        self.emit("tray-set-changed")
+        self.emit("moved", tag, newidx)
+        self.emit("changed")
 
     def new(self, tag, type):
         assert tag not in self
         assert isinstance(tag, unicode)
         tray = type(self, tag)
         self.trays.append(tray)
-        self.emit("tray-set-changed")
+        self.emit("added", tag, tray)
+        self.emit("changed")
         return tray
 
     def rename(self, tag, newtag):
         self[tag].tag = newtag
-        self.emit("tray-set-changed")
+        self.emit("renamed", tag, newtag)
+        self.emit("changed")
 
 gobject.type_register(TraySet)

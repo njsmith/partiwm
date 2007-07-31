@@ -1,4 +1,7 @@
-# Keep track of all information for a single window
+"""The magic GTK widget that represents a client window.
+
+Most of the gunk required to be a valid window manager (reparenting, synthetic
+events, mucking about with properties, etc. etc.) is wrapped up in here."""
 
 import sets
 import gobject
@@ -60,6 +63,9 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     __gproperties__ = {
         # Interesting properties of the client window, that will be
         # automatically kept up to date:
+        "client-window": (gobject.TYPE_PYOBJECT,
+                          "GdkWindow representing the client toplevel", "",
+                          gobject.PARAM_READWRITE),
         "actual-size": (gobject.TYPE_PYOBJECT,
                         "Size of client window (actual (width,height))", "",
                         gobject.PARAM_READWRITE),
@@ -148,6 +154,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # that buffer window, and self.client_window for the actual client
         # window.
         self.client_window = gdkwindow
+        self.set_property("client-window", gdkwindow)
 
         # We count how many times we have asked that the child be unmapped, so
         # that when the server tells us that the child has been unmapped, we
@@ -176,6 +183,13 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                                           | gtk.gdk.STRUCTURE_MASK
                                           | gtk.gdk.PROPERTY_CHANGE_MASK)
 
+            # The child might already be mapped, in case we inherited it from
+            # a previous window manager.  If so, we unmap it now, for
+            # consistency (otherwise we'd get an unmap event later when we
+            # reparent and confuse ourselves).
+            self.client_window.hide()
+            self.pending_unmaps += 1
+            
             # Process properties
             self._read_initial_properties()
             self._write_initial_properties_and_setup()
@@ -421,10 +435,13 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                          "u32", parti.lowlevel.const["NormalState"])
             self.state_remove("_NET_WM_STATE_HIDDEN")
 
-    # There are three ways a window can get urgency = True:
+    # There are four ways a window can get urgency = True:
     #   1) _NET_WM_STATE_DEMANDS_ATTENTION in the _initial_ state hints
     #   2) setting the bit WM_HINTS, at _any_ time
-    #   3) if we (the wm) decide they should be and set it
+    #   3) sending a request to the root window to add
+    #      _NET_WM_STATE_DEMANDS_ATTENTION to their state hints (FIXME, grok
+    #      this)
+    #   4) if we (the wm) decide they should be and set it
     def _handle_urgency_requested(self, *args):
         if self.get_property("urgency-requested"):
             self.state_add("_NET_WM_STATE_DEMANDS_ATTENTION")
@@ -459,10 +476,6 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
             for prop in remove:
                 parti.lowlevel.XDeleteProperty(self.client_window, prop)
         trap.swallow(doit)
-
-    def _server_time(self):
-        assert self.flags() & gtk.REALIZED
-        return gtk.gdk.x11_get_server_time(self.window)
 
     ################################
     # Widget stuff:
@@ -576,25 +589,26 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     # Focus handling:
     ################################
     
-    def do_focus_in_event(self, event):
-        assert self.get_property("has-focus")
-        print "Got focus, giving it to child"
+    def give_client_focus(self):
+        """The focus manager has decided that our client should recieve X
+        focus.  See world.py for details."""
+        assert self.get_property("has-focus") # We should have GTK focus.
+        print "Giving focus to client"
         # Have to fetch the time, not just use CurrentTime, both because ICCCM
         # says that WM_TAKE_FOCUS must use a real time and because there are
         # genuine race conditions here (e.g. suppose the client does not
         # actually get around to requesting the focus until after we have
         # already changed our mind and decided to give it to someone else).
-        gtk.gdk.flush()
-        now = self._server_time()
+        assert self.flags() & gtk.REALIZED
+        now = gtk.gdk.x11_get_server_time(self.window)
         if "WM_TAKE_FOCUS" in self.get_property("protocols"):
-            print "WM_TAKE_FOCUS"
+            print "... using WM_TAKE_FOCUS"
             trap.swallow(parti.lowlevel.send_wm_take_focus,
                          self.client_window, now)
         else:
-            print "XSetInputFocus"
+            print "... using XSetInputFocus"
             trap.swallow(parti.lowlevel.XSetInputFocus,
                          self.client_window, now)
-        gtk.gdk.flush()
 
 # This is necessary to inform GObject about the new subclass; if it doesn't
 # know about the subclass, then it thinks we are trying to instantiate

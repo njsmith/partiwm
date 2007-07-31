@@ -3,7 +3,7 @@
 # selection, we can either abort or steal it.  Once we have it, if someone
 # else steals it, then we should exit.
 
-# ICCCMBUG: ICCCM 2.8 specifies exactly how we are supposed to do the
+# Standards BUG: ICCCM 2.8 specifies exactly how we are supposed to do the
 # detection/stealing stuff, and we totally ignore it, because G[TD]K don't
 # make it convenient to 1) ask directly whether a selection is owned, 2) wait
 # for a window to be destroyed.  So instead, we detect if the selection is
@@ -20,8 +20,6 @@ import parti.lowlevel
 
 class ManagerSelection(gobject.GObject):
     __gsignals__ = {
-        # FIXME: no clue why I'm setting SIGNAL_RUN_LAST here, but
-        # the examples all do.
         'selection-lost': (gobject.SIGNAL_RUN_LAST,
                            gobject.TYPE_NONE, ()),
         }

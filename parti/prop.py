@@ -1,3 +1,8 @@
+"""All the goo needed to deal with X properties.
+
+Everyone else should just use prop_set/prop_get with nice clean Python calling
+conventions, and if you need more (un)marshalling smarts, add them here."""
+
 import struct
 import gtk.gdk
 from parti.lowlevel import \
@@ -8,16 +13,17 @@ from parti.error import trap, XError
 def unsupported(*args):
     raise UnsupportedException
 
-def force_length(data, length):
+def _force_length(data, length):
     if len(data) != length:
         print ("Odd-lengthed prop, wanted %s bytes, got %s: %r"
                % (length, len(data), data))
+    # Zero-pad data
     data += "\0" * length
     return data[:length]
 
 class WMSizeHints(object):
     def __init__(self, data):
-        data = force_length(data, 18 * 4)
+        data = _force_length(data, 18 * 4)
         (flags,
          pad1, pad2, pad3, pad4,
          min_width, min_height,
@@ -50,7 +56,7 @@ class WMSizeHints(object):
 
 class WMHints(object):
     def __init__(self, data):
-        data = force_length(data, 9 * 4)
+        data = _force_length(data, 9 * 4)
         (flags, input, initial_state,
          icon_pixmap, icon_window, icon_x, icon_y, icon_mask,
          window_group) = struct.unpack("@" + "i" * 9, data)
@@ -70,7 +76,7 @@ class WMHints(object):
         else:
             self.input = None
 
-prop_types = {
+_prop_types = {
     # Python type, X type Atom, format, serializer, deserializer, list
     # terminator
     "utf8": (unicode, "UTF8_STRING", 8,
@@ -106,19 +112,19 @@ prop_types = {
                  None),
     }
 
-def prop_encode(type, value):
+def _prop_encode(type, value):
     if isinstance(type, list):
         return _prop_encode_list(type[0], value)
     else:
         return _prop_encode_scalar(type, value)
 
 def _prop_encode_scalar(type, value):
-    (pytype, atom, format, serialize, deserialize, terminator) = prop_types[type]
+    (pytype, atom, format, serialize, deserialize, terminator) = _prop_types[type]
     assert isinstance(value, pytype)
     return (atom, format, serialize(value))
 
 def _prop_encode_list(type, value):
-    (pytype, atom, format, serialize, deserialize, terminator) = prop_types[type]
+    (pytype, atom, format, serialize, deserialize, terminator) = _prop_types[type]
     value = list(value)
     serialized = [_prop_encode_scalar(type, v)[2] for v in value]
     # Strings in X really are null-separated, not null-terminated (ICCCM
@@ -128,23 +134,23 @@ def _prop_encode_list(type, value):
 
 def prop_set(target, key, type, value):
     trap.call_unsynced(XChangeProperty, target, key,
-                       prop_encode(type, value))
+                       _prop_encode(type, value))
 
 
-def prop_decode(type, data):
+def _prop_decode(type, data):
     if isinstance(type, list):
         return _prop_decode_list(type[0], data)
     else:
         return _prop_decode_scalar(type, data)
 
 def _prop_decode_scalar(type, data):
-    (pytype, atom, format, serialize, deserialize, terminator) = prop_types[type]
+    (pytype, atom, format, serialize, deserialize, terminator) = _prop_types[type]
     value = deserialize(data)
     assert isinstance(value, pytype)
     return value
 
 def _prop_decode_list(type, data):
-    (pytype, atom, format, serialize, deserialize, terminator) = prop_types[type]
+    (pytype, atom, format, serialize, deserialize, terminator) = _prop_types[type]
     if terminator:
         datums = data.split(terminator)
     else:
@@ -160,9 +166,9 @@ def prop_get(target, key, type):
         scalar_type = type[0]
     else:
         scalar_type = type
-    (pytype, atom, format, serialize, deserialize, terminator) = prop_types[scalar_type]
+    (pytype, atom, format, serialize, deserialize, terminator) = _prop_types[scalar_type]
     try:
         data = trap.call_synced(XGetWindowProperty, target, key, atom)
     except (XError, PropertyError):
         return None
-    return prop_decode(type, data)
+    return _prop_decode(type, data)
