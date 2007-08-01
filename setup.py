@@ -26,7 +26,7 @@ setup(
   author="Nathaniel Smith",
   author_email="njs@pobox.com",
   scripts=["partiwm"],
-  packages=["parti", "parti.trays"],
+  packages=["parti", "parti.trays", "parti.addons"],
   ext_modules=[ 
     Extension("parti._lowlevel",
               ["parti/parti._lowlevel.pyx"],

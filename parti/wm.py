@@ -16,6 +16,8 @@ from parti.windowset import WindowSet
 from parti.tray import TraySet
 from parti.trays.simpletab import SimpleTabTray
 
+from parti.addons.ipython_embed import open_repl
+
 class Wm(object):
     NAME = "Parti"
 
@@ -95,10 +97,6 @@ class Wm(object):
         # this basically will just be used by clients to know that they can
         # use RGBA visuals.)
 
-        # Get this list now, before creating anything new, so that we won't
-        # see our own windows
-        inherited_windows = parti.lowlevel.get_children(self._real_root)
-
         # Set up the necessary EWMH properties on the root window.
         self._setup_ewmh_window()
         prop_set(self._real_root, "_NET_SUPPORTED",
@@ -148,6 +146,10 @@ class Wm(object):
         #   _NET_RESTACK_WINDOW
         #   _NET_WM_DESKTOP
         #   _NET_WM_STATE
+
+        # For testing, spawn an interactive shell
+        open_repl({"wm": self, "w": self._windows, "t": self._trays,
+                   "lowlevel": parti.lowlevel})
 
     # This is the key function, where we have detected a new client window,
     # and start managing it.

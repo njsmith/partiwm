@@ -17,6 +17,7 @@ class PseudoclientWindow(gtk.Window):
     def __init__(self, *args, **kwargs):
         super(PseudoclientWindow, self).__init__(*args, **kwargs)
 
+        global _alternate_connection
         if _alternate_connection is None:
             name = gtk.gdk.display_get_default().get_name()
             _alternate_connection = parti.lowlevel.gdk_display_open(name)

@@ -71,7 +71,8 @@ class Viewport(gtk.Container):
         self._current.set_child_visible(True)
 
     def _after_set_focus_child(self, self_again, child):
-        self._switch_to(child)
+        if child is not None:
+            self._switch_to(child)
 
     def do_size_request(self, requisition):
         if self._current:
