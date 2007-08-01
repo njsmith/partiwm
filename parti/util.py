@@ -1,5 +1,6 @@
 import cgitb
 import sys
+import types
 
 class AutoPropGObjectMixin(object):
     """Mixin for automagic property support in GObjects.
@@ -20,3 +21,21 @@ class AutoPropGObjectMixin(object):
 def dump_exc():
     """Call this from a except: clause to print a nice traceback."""
     print cgitb.text(sys.exc_info())
+
+
+# A little utility to make it slightly terser to call base class methods
+# without always running into bugs after tweaking the base class.
+# Usage:
+#   class Foo(Bar):
+#     def foo(self, arg):
+#       # Equivalent to: Bar.foo(self, arg)
+#       base(self).foo(self, arg)
+# This is like a simple version of super, without all the weird magic
+# (http://fuhm.net/super-harmful/), the PyGtk bugs (#315079, #351566), etc.
+def base(obj):
+    # For now disallow base(Foo).<whatever>
+    assert not isinstance(obj, type)
+    # New-style classes only
+    assert not isinstance(obj, types.ClassType)
+    assert not isinstance(obj.__class__, types.ClassType)
+    return obj.__class__.__base__

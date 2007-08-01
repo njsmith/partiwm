@@ -2,10 +2,13 @@
 their display."""
 
 import gtk
+import gobject
+
+from parti.util import base
 
 # FIXME: there should be multiple logical viewports, one for each xinerama
-# screen, somehow... not clear how to get that, since GTK has a widget tree,
-# not a widget DAG.
+# screen, somehow... not clear what the best way to get that is, since GTK has
+# a widget tree, not a widget DAG.
 
 class Viewport(gtk.Container):
     def __init__(self, trayset):
@@ -15,6 +18,13 @@ class Viewport(gtk.Container):
         self._current = None
 
         self.set_flags(gtk.NO_WINDOW)
+
+        # FIXME: This would better be a default handler, but there is a bug in
+        # the superclass's default handler that means we can't call it
+        # properly[0], so as a workaround we let the real default handler run,
+        # and then come in afterward to do what we need to.
+        #   [0] http://bugzilla.gnome.org/show_bug.cgi?id=462368
+        self.connect_after("set-focus-child", self._after_set_focus_child)
 
         self._trayset.connect_after("removed", self._tray_removed)
         self._trayset.connect_after("added", self._tray_added)
@@ -26,7 +36,7 @@ class Viewport(gtk.Container):
 
     def do_add(self, child):
         if child not in self._children:
-            self._children.add(child)
+            self._children.append(child)
             child.set_parent(self)
             if self._current is None:
                 self._switch_to(self._children[0])
@@ -60,8 +70,7 @@ class Viewport(gtk.Container):
         self._current = child
         self._current.set_child_visible(True)
 
-    def do_set_focus_child(self, child):
-        super(Viewport, self).do_set_focus_child(child)
+    def _after_set_focus_child(self, self_again, child):
         self._switch_to(child)
 
     def do_size_request(self, requisition):
@@ -75,4 +84,6 @@ class Viewport(gtk.Container):
         self.allocation = allocation
         def apply_allocation(child, data):
             child.size_allocate(allocation)
-        self.forall(apply_allocation)
+        self.forall(apply_allocation, None)
+
+gobject.type_register(Viewport)

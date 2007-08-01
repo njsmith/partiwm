@@ -599,7 +599,6 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # genuine race conditions here (e.g. suppose the client does not
         # actually get around to requesting the focus until after we have
         # already changed our mind and decided to give it to someone else).
-        assert self.flags() & gtk.REALIZED
         now = gtk.gdk.x11_get_server_time(self.window)
         if "WM_TAKE_FOCUS" in self.get_property("protocols"):
             print "... using WM_TAKE_FOCUS"

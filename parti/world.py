@@ -1,7 +1,10 @@
 import gtk
+import gobject
 import parti.lowlevel
 import parti.window
 import parti.prop
+from parti.util import base
+from parti.error import trap
 
 # This file requires a very long comment, because focus management is teh
 # awesome.  The basic problems are:
@@ -79,8 +82,10 @@ class WorldWindow(gtk.Window):
     def _resize(self, *args):
         x = gtk.gdk.screen_width()
         y = gtk.gdk.screen_height()
+        print "sizing world to %sx%s" % (x, y)
+        self.set_size_request(x, y)
         self.resize(x, y)
-        parti.prop.prop_set(gtk.gdk.get_default_root_window,
+        parti.prop.prop_set(gtk.gdk.get_default_root_window(),
                             "_NET_DESKTOP_GEOMETRY",
                             ["u32"], [x, y])
 
@@ -100,9 +105,10 @@ class WorldWindow(gtk.Window):
     #      -- it is possible that we should not in fact have the X focus at
     #         this time, though, so then give it to whoever should
     #   -- and finally ignore all subsequent focus-in-events
-    def do_map(self):
+    def do_map(self, *args):
+        base(self).do_map(self, *args)
+
         # We are being mapped, so we can focus ourselves.
-        super(FocusManager, self).do_map()
         # Check for the property, just in case this is the second time we are
         # being mapped -- otherwise we might miss the special call to
         # _give_focus_to_them_that_deserves_it in do_focus_in_event:
@@ -112,11 +118,13 @@ class WorldWindow(gtk.Window):
             # happen to care, and this guarantees that we *will* get the
             # focus, and thus a real FocusIn event.
             parti.lowlevel.send_wm_take_focus(self.window,
-                                              parti.lowlevel.constants["CurrentTime"])
+                                              parti.lowlevel.const["CurrentTime"])
 
     def do_focus_in_event(self, *args):
+        print "world window got focus"
         if not self.get_property("has-toplevel-focus"):
-            super(FocusManager, self).do_focus_in_event(*args)
+            #super(WorldWindow, self).do_focus_in_event(*args)
+            gtk.Window.do_focus_in_event(self, *args)
             self._give_focus_to_them_that_deserves_it()
 
     def do_focus_out_event(self, *args):
@@ -138,18 +146,21 @@ class WorldWindow(gtk.Window):
 
     def _give_focus_to_them_that_deserves_it(self):
         focus = self.get_focus()
+        print focus
         if isinstance(focus, parti.window.Window):
             focus.give_client_focus()
-            trap.swallow(prop_set, gtk.gdk.get_default_root_window(),
+            trap.swallow(parti.prop.prop_set, gtk.gdk.get_default_root_window(),
                          "_NET_ACTIVE_WINDOW", "window",
                          focus.get_property("client-window"))
         else:
             self._take_focus()
-            prop_set(gtk.gdk.get_default_root_window(),
-                     "_NET_ACTIVE_WINDOW", "u32", parti.lowlevel.constants["XNone"])
+            parti.prop.prop_set(gtk.gdk.get_default_root_window(),
+                                "_NET_ACTIVE_WINDOW", "u32",
+                                parti.lowlevel.const["XNone"])
 
     def do_set_focus(self, *args):
         # GTK focus has changed.
+        base(self).do_set_focus(self, *args)
         self._give_focus_to_them_that_deserves_it()
 
     # Finally, the code to handle root focus:
@@ -168,3 +179,5 @@ class WorldWindow(gtk.Window):
     def _handle_root_focus_out(self, event):
         print "Focus left root, FYI"
         parti.lowlevel.printFocus()
+
+gobject.type_register(WorldWindow)

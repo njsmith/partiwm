@@ -10,6 +10,7 @@ class SimpleTabTray(parti.tray.Tray, gtk.HPaned):
     def __init__(self, trayset, tag):
         super(SimpleTabTray, self).__init__(trayset, tag)
         self.windows = []
+        # Hack to start the spacer in the middle of the window
         self.set_position(gtk.gdk.screen_width() / 2)
         self.left_notebook = gtk.Notebook()
         self.add1(self.left_notebook)

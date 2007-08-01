@@ -10,6 +10,7 @@ import parti.lowlevel
 from parti.prop import prop_set
 
 from parti.world import WorldWindow
+from parti.viewport import Viewport
 
 from parti.windowset import WindowSet
 from parti.tray import TraySet
