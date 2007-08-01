@@ -592,7 +592,6 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     def give_client_focus(self):
         """The focus manager has decided that our client should recieve X
         focus.  See world.py for details."""
-        assert self.get_property("has-focus") # We should have GTK focus.
         print "Giving focus to client"
         # Have to fetch the time, not just use CurrentTime, both because ICCCM
         # says that WM_TAKE_FOCUS must use a real time and because there are

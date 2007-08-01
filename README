@@ -21,10 +21,24 @@ Getting started
 ---------------
 
 Run './try' in the source directory to build and start a parti session
-inside a Xephyr nested X server.  Parti requires at least xlib,
-python, pyrex, pygobject, and pygtk (including C headers for all of
-those), and the included './try' script also requires Xephyr and tries
-to use 'x-terminal-emulator' to start a terminal in the nested server.
+inside a Xephyr nested X server.
+
+Parti requires at least:
+   python
+   xlib
+   pyrex
+   pygobject
+   pygtk
+   ipython
+
+Building Parti requires development packages of all of the above
+(i.e., you need all the C header files, which may be split out into a
+package whose name ends in "-dev" or "-devel").
+
+The included './try' script also requires Xephyr.
+
+The ipython dependency should probably become optional (it is only
+needed for the REPL support).  Patches accepted.
 
 Why another window manager?
 ---------------------------

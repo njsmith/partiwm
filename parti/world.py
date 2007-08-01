@@ -68,6 +68,14 @@ class WorldWindow(gtk.Window):
     def __init__(self):
         super(WorldWindow, self).__init__()
 
+        # FIXME: This would better be a default handler, but there is a bug in
+        # the superclass's default handler that means we can't call it
+        # properly[0], so as a workaround we let the real default handler run,
+        # and then come in afterward to do what we need to.  (See also
+        # Viewport._after_set_focus_child.)
+        #   [0] http://bugzilla.gnome.org/show_bug.cgi?id=462368
+        self.connect_after("set-focus", self._after_set_focus)
+
         # Make sure that we are always the same size as the screen
         self.set_resizable(False)
         gtk.gdk.screen_get_default().connect("size-changed", self._resize)
@@ -158,10 +166,11 @@ class WorldWindow(gtk.Window):
                                 "_NET_ACTIVE_WINDOW", "u32",
                                 parti.lowlevel.const["XNone"])
 
-    def do_set_focus(self, *args):
-        # GTK focus has changed.
-        base(self).do_set_focus(self, *args)
-        self._give_focus_to_them_that_deserves_it()
+    def _after_set_focus(self, *args):
+        # GTK focus has changed.  See comment in __init__ for why this isn't a
+        # default handler.
+        if self.get_focus() is not None:
+            self._give_focus_to_them_that_deserves_it()
 
     # Finally, the code to handle root focus:
     def _handle_root_focus_in(self, event):

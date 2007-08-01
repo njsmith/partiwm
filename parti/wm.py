@@ -16,7 +16,9 @@ from parti.windowset import WindowSet
 from parti.tray import TraySet
 from parti.trays.simpletab import SimpleTabTray
 
-from parti.addons.ipython_embed import open_repl
+from parti.addons.ipython_embed import spawn_repl_window
+
+from parti.bus import PartiDBusService
 
 class Wm(object):
     NAME = "Parti"
@@ -131,6 +133,9 @@ class Wm(object):
                 and parti.lowlevel.is_mapped(w)):
                 self._manage_client(w)
 
+        # Start providing D-Bus api
+        self._dbus = PartiDBusService(self)
+
         # FIXME:
 
         # Need viewport abstraction for _NET_CURRENT_DESKTOP...
@@ -146,10 +151,6 @@ class Wm(object):
         #   _NET_RESTACK_WINDOW
         #   _NET_WM_DESKTOP
         #   _NET_WM_STATE
-
-        # For testing, spawn an interactive shell
-        open_repl({"wm": self, "w": self._windows, "t": self._trays,
-                   "lowlevel": parti.lowlevel})
 
     # This is the key function, where we have detected a new client window,
     # and start managing it.
@@ -277,3 +278,12 @@ class Wm(object):
                  "window", self._ewmh_window)
         prop_set(self._real_root, "_NET_SUPPORTING_WM_CHECK",
                  "window", self._ewmh_window)
+
+    # Other global actions:
+
+    def spawn_repl_window(self):
+        spawn_repl_window({"wm": self,
+                           "windows": self._windows,
+                           "trays": self._trays,
+                           "lowlevel": parti.lowlevel})
+

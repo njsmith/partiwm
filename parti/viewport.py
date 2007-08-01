@@ -22,7 +22,8 @@ class Viewport(gtk.Container):
         # FIXME: This would better be a default handler, but there is a bug in
         # the superclass's default handler that means we can't call it
         # properly[0], so as a workaround we let the real default handler run,
-        # and then come in afterward to do what we need to.
+        # and then come in afterward to do what we need to.  (See also
+        # WorldWindow._after_set_focus.)
         #   [0] http://bugzilla.gnome.org/show_bug.cgi?id=462368
         self.connect_after("set-focus-child", self._after_set_focus_child)
 
