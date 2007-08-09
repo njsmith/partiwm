@@ -33,7 +33,7 @@ setup(
   name = 'parti',
   author="Nathaniel Smith",
   author_email="njs@pobox.com",
-  scripts=["scripts/parti"],
+  scripts=["scripts/parti", "scripts/parti-repl"],
   packages=["parti", "parti.trays", "parti.addons", "parti.scripts"],
   ext_modules=[ 
     Extension("parti._lowlevel",

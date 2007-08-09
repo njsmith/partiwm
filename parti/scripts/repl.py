@@ -1,8 +1,9 @@
-# This is the main script that starts up Parti itself.
+# This is a little script that uses D-Bus to request the running Parti spawn a
+# REPL window.
 
 import os
 from parti.scripts import PartiOptionParser
-import parti.wm
+import parti.bus
 
 def main(cmdline):
     parser = PartiOptionParser()
@@ -14,8 +15,10 @@ def main(cmdline):
     os.environ["PYGTK_FATAL_EXCEPTIONS"] = "1"
 
     try:
-        wm = parti.wm.Wm()
-        wm.mainloop()
+        proxy = parti.bus.get_parti_proxy()
+        print "Using D-Bus to request running Parti spawn a REPL window"
+        proxy.SpawnReplWindow()
+        print "Done"
     except:
         if "_PARTI_PDB" in os.environ:
             import sys, pdb

@@ -19,3 +19,9 @@ class PartiDBusService(dbus.service.Object):
                          in_signature="", out_signature="")
     def SpawnReplWindow(self):
         self._wm.spawn_repl_window()
+
+def get_parti_proxy():
+    bus = dbus.SessionBus(mainloop=DBusGMainLoop())
+    obj_proxy = bus.get_object(_NAME, _ROOT)
+    iface_proxy = dbus.Interface(obj_proxy, _INTERFACE)
+    return iface_proxy
