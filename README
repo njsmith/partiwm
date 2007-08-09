@@ -1,27 +1,78 @@
-This is Parti, a tabbing/tiling window manager, written in (almost)
-pure Python, using modern toolkits, and integrating pleasantly with
-modern desktops.
+FAQ for the Parti window manager
+================================
 
-Tagline(s)
-----------
+What is Parti?
+--------------
 
-Tabs: not just for browsers anymore
+Parti is a window manager, i.e., it is a program that provides an
+interface for arranging and switching between all the other programs
+on your computer, comparable to KWin or Metacity.
 
-(FIXME: better taglines)
 
-Licensing
----------
+There are like seven thousand window managers out there.  What's
+different about Parti?
+--------------------------------------------------------------------
+
+There are lots of window managers (WMs) like Compiz or KWin or
+Metacity that focus on integrating cleanly with modern Unix desktops,
+and looking good while doing it.  These WMs all use the traditional
+"desktop" metaphor where applications are like sheets of paper that
+you can put anywhere you want and in whatever arrangement makes sense
+to you.  The problem with this is that my real-world desk is a total
+mess, and the windows on my computer desktop are not much better, even
+though in principle that computer could be doing all sorts of things
+to help me keep track of windows and arrange them for me.
+
+There are also lots of lesser-known WMs like ion or wmii that focus on
+providing exactly this kind of help, by picking a few good layouts
+(tiled, or tabbed, or one window full-screen, etc.), and automatically
+keeping windows arranged for you.  The result is vastly more usable,
+because you stop having to screw around arranging windows by hand, the
+resulting arrangements are actually better, and more powerful keyboard
+control becomes possible.  The problem with these is that they're ugly
+(oh well) and their desktop integration is poor to nonexistent (big
+problem!).
+
+So Parti attempts to bring the usability of tabbing/tiling WMs to
+modern desktop environments, and serve as a test bed for new
+experiments in computer-aided task and attention management.  To make
+this as easy as possible, Parti is written in (almost) pure Python and
+GTK+.  The main approach of Parti is to expose client windows as a
+special Gtk widget, so if you can write a Gtk program, you can write a
+window manager too.
+
+Our development priorities are usability, hackability, and standards
+compliance, in that order.  For us a usable program is one that is
+unobtrusive, to the point of becoming an invisible and unnoticed
+extension of the user's will.  For us a hackable program is one that
+has as little code as possible, and what code exists is clean with
+automated tests.  For us standards compliance does not include
+conforming to pointless rules that make the code more complicated
+without improving user experience, but it does include defining and
+submitting new standards as it becomes clearer how to improve
+interaction between clients and a tiling WM.
+
+
+So should I start using it?
+---------------------------
+
+Probably not, it's still pretty alpha.  You can help fix that, though.
+
+
+How is Parti licensed?
+----------------------
 
 Copyright (C) 2007 to Nathaniel Smith <njs@pobox.com>
 Released under the terms of the GNU GPL v2 or (at your option) any
 later version.  See the file COPYING for details (and note in
 particular the LACK OF ANY WARRANTY).
 
-Getting started
----------------
 
-Run './try' in the source directory to build and start a parti session
-inside a Xephyr nested X server.
+How can I try Parti?
+--------------------
+
+Running './try' in the source directory will build Parti, and start a
+parti session inside a Xephyr nested X server.
 
 Parti requires at least:
    python
@@ -40,16 +91,43 @@ The included './try' script also requires Xephyr.
 The ipython dependency should probably become optional (it is only
 needed for the REPL support).  Patches accepted.
 
-Why another window manager?
----------------------------
+Later versions will likely require support for the X Composite
+extension, as well.
 
-Tradition dictates that every window manager start with a rant.  This
-is mine.
 
-So.  These days, let's start by saying, the Unix desktop totally
-rocks.  We have beautiful widgets, fantastic hardware integration,
-best GUI APIs ever, highly usable and accessible apps, incredible
-i18n, you name it.
+Why GTK+?  Don't you know Qt is way better, you Gnome bigot?
+------------------------------------------------------------
+
+Well, obviously, I did have to pick one or the other.  I started with
+no experience with either API, and the initial prototype did actually
+use Qt; I guess I could have stuck with that and then phrased this
+question the other way around.  Anyway, though, I switched to GTK+
+because the Python Qt bindings seemed to make some evil hacks harder.
+(Window managers need to muck around in the guts of X, and that means
+you need evil hacks to get both Python and high-level toolkits to play
+along.)
+
+So the point is, Parti has no desire to be a Gnome-specific kind of
+thing.  We might use some parts of Gnome where appropriate, but really
+we'd like it to be fully usable on any desktop environment (including
+the critical polish details like auto-configuring to local
+expectations), and will be happy to accept patches to that effect.
+
+Because Parti aims for full ICCCM and EWMH compliance (where possible
+for a primarily tiling window manager), all basic functionality should
+work on any EWMH-compliant desktop environment even without special
+patches.
+
+
+These answers are all way too temperate.  Can't you say the same
+things as a rant?  It's not really a window manager without a rant.
+-------------------------------------------------------------------
+
+Well, if you insist.
+
+These days, let's start by saying, the Unix desktop totally rocks.  We
+have beautiful widgets, fantastic hardware integration, best GUI APIs
+ever, highly usable and accessible apps, incredible i18n, you name it.
 
 Except for one thing.  Our mainstream window managers suck, suck,
 suck.  Fundamentally.  Suck.
@@ -70,18 +148,23 @@ Most of the time I don't really need that freedom.  I just want to
 look at one window, or at two windows, or maybe an editor and two
 terminals.  These are not complicated layout problems.  I think I have
 better things to do with my time than solving them by hand, myself,
-every time.  Let the computer do it.
+every time.  Let the computer do it.  It'll do a better job, too; half
+the time I end up leaving big gaps that I can see my desktop through,
+and while my desktop background is very pretty, I have seen it many
+times and on this tiny laptop screen there are probably better things
+those pixels could be doing.
 
 Most of the time, I don't want to do fiddly high-precision work with
 the mouse just to switch to a different window.  I'm not even making
 the standard old complaint about moving the hand away from the
 keyboard, that's pretty quick and I can do it without looking; but
 using a pointer accurately is a high-precision motor task.  It takes
-careful attention and hand-eye coordination.  That's *exactly* what I
-*don't* need when I'm trying to juggle state and maintain flow.  So
-perhaps once the computer has become smart enough to put windows into
-two columns, it can devote some extra cycles to figuring out how to
-have a single-key command for "switch to other column"?
+careful attention and hand-eye coordination.  That's *exactly* the
+kind of distraction I *don't* need when I'm trying to juggle state and
+maintain flow.  So perhaps once the computer has become smart enough
+to put windows into two columns, it can devote some extra cycles to
+figuring out how to have a single-key command for "switch to other
+column"?
 
 It's not like I'm the first person to notice this.  Think of all the
 hue and cry over tabs in web browsers.  This isn't just a geeky
@@ -136,53 +219,9 @@ window manager for a major desktop environment.  Is that an
 unreasonable goal?  Possibly, and there's a long, long way between
 here and there.  But let's see how far we can get.
 
-The Parti line
---------------
 
-Parti's first goal is usability.  For us, a usable program is one that
-is unobtrusive, to the point of becoming an invisible and unnoticed
-extension of the user's will.
+I'm making a window manager comparison table.  Is Parti fast, dynamic,
+light-weight, bloat-free, modern, flexible, and/or clean?
+----------------------------------------------------------------------
 
-Parti's second goal is hackability.  To this end, Parti is written in
-Python (with any truly necessary extensions written in Pyrex), using a
-standard toolkit (GTK+).  The goal is that large parts of its
-functionality can be written in straight GTK+, with all idioms
-carrying over.  In particular, Parti exposes client windows as simply
-a new sort of GTK+ Widget, which can be placed in containers, focused,
-etc., exactly as programmers are already used to do.  Hackability
-generally also requires code to be clean, small, and with automated
-tests, but we admit the possibility of exceptions.
-
-Parti's third goal is standards compliance.  We attempt to comply to
-all relevant standards (esp. ICCCM and EWMH).  We anticipate
-submitting extension proposals to EWMH, as it becomes clearer how to
-improve interaction between clients and a tiling wm.
-
-These goals are listed in order of importance.  For instance, we will
-not bother complying with a standard that does not improve user
-experience if it makes the code more complex.
-
-Usability trumps all.
-
-A note on the desktop wars
---------------------------
-
-Parti uses GTK+ -- not because of any particular preference for GTK+
-over Qt, but simply because in the initial prototype, the Python Qt
-bindings seemed to make it hard(er) to do certain evil hacks.  (I
-actually had never programmed with either API before starting Parti.)
-
-Parti may use some parts of Gnome where appropriate, but we desire it
-to be fully usable on any desktop environment (including details like,
-say, doing auto-configuration to the environment), and will be happy
-to accept patches to that effect.
-
-Because Parti aims for full ICCCM and EWMH compliance (where possible
-for a primarily tiling window manager), it should work well with any
-EWMH-compliant desktop environment.
-
-Is Parti fast, dynamic, light-weight, bloat-free, modern, flexible,
-and clean?
--------------------------------------------------------------------
-
-Dunno, you tell me.
+Probably.

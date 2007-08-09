@@ -1,0 +1,12 @@
+Parti 0.0.1: 2007-08-09
+=======================
+
+Initial release.
+
+Contains basic window manager functionality, including a fair amount
+of compliance to ICCCM/EWMH, focus handling, etc., and doesn't seem to
+crash in basic testing.
+
+Doesn't do much useful with this; only a simple placeholder layout
+manager is included, and only skeleton of virtual desktop support is
+yet written.

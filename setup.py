@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+# NOTE (FIXME): This setup.py file will not work on its own; you have to run
+#   $ python make-constants-pxi.py parti/parti._lowlevel.const.txt parti/parti._lowlevel.const.pxi
+# before using this setup.py, and again if you change
+# parti/parti._lowlevel.const.txt.
+
+# FIXME: Pyrex.Distutils.build_ext leaves crud in the source directory.  (So
+# does the make-constants-pxi.py hack.)
+
 from distutils.core import setup
 from distutils.extension import Extension
 from Pyrex.Distutils import build_ext
@@ -33,5 +41,6 @@ setup(
               **pkgconfig("pygobject-2.0", "gdk-x11-2.0", "gtk+-x11-2.0")
               ),
     ],
+  # Turn on Pyrex-sensitivity:
   cmdclass = {'build_ext': build_ext}
 )

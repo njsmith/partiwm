@@ -11,4 +11,4 @@ python make-constants-pxi.py parti/parti._lowlevel.const.txt parti/parti._lowlev
 CFLAGS=-O0 python setup.py install --home=install
 # NB Xephyr has a segfault bug in its reset logic -- shouldn't come up
 # when run via xinit like this, but use -noreset anyway.
-PYTHONPATH=install/lib/python:$PYTHONPATH xinit /bin/sh -c "x-terminal-emulator & $RUNNER install/bin/partiwm -sync" -- /usr/bin/Xephyr :7 -ac -noreset
+PYTHONPATH=install/lib/python:$PYTHONPATH xinit /bin/sh -c "x-terminal-emulator || xterm & $RUNNER install/bin/partiwm -sync" -- /usr/bin/Xephyr :7 -ac -noreset
