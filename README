@@ -72,7 +72,9 @@ How can I try Parti?
 --------------------
 
 Running './try' in the source directory will build Parti, and start a
-parti session inside a Xephyr nested X server.
+parti session inside a Xephyr nested X server.  Currently you may need
+to hit "tab" to get a client window focused, and you may find running
+the "parti-repl" command interesting.
 
 Parti requires at least:
    python
