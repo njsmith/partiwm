@@ -13,6 +13,12 @@ There are like seven thousand window managers out there.  What's
 different about Parti?
 --------------------------------------------------------------------
 
+Short answer: Parti is a tabbing/tiling window manager written in
+Python, using GTK+, and aiming for first-class integration with modern
+desktop environments.
+
+Long answer:
+
 There are lots of window managers (WMs) like Compiz or KWin or
 Metacity that focus on integrating cleanly with modern Unix desktops,
 and looking good while doing it.  These WMs all use the traditional
@@ -82,6 +88,7 @@ Parti requires at least:
    pyrex
    pygobject
    pygtk
+   dbus-python
    ipython
 
 Building Parti requires development packages of all of the above
@@ -96,23 +103,28 @@ needed for the REPL support).  Patches accepted.
 Later versions will likely require support for the X Composite
 extension, as well.
 
+On Debian-based OSes, try:
+  # aptitude install libx11-dev python-pyrex python-gobject-dev \
+    python-gtk2-dev python-dbus ipython xserver-xephyr
+
+(If you work out a similar line for another OS, please send it in.)
+
 
 Why GTK+?  Don't you know Qt is way better, you Gnome bigot?
 ------------------------------------------------------------
 
-Well, obviously, I did have to pick one or the other.  I started with
-no experience with either API, and the initial prototype did actually
-use Qt; I guess I could have stuck with that and then phrased this
-question the other way around.  Anyway, though, I switched to GTK+
-because the Python Qt bindings seemed to make some evil hacks harder.
-(Window managers need to muck around in the guts of X, and that means
-you need evil hacks to get both Python and high-level toolkits to play
-along.)
+Well, obviously, I had to pick one or the other.  I started with no
+experience with either API, and the initial prototype did actually use
+Qt; I guess I could have stuck with that and then phrased this
+question the other way around.  I switched to GTK+, though, because
+the Python Qt bindings seemed to make some evil hacks harder.  (Window
+managers need to muck around in the guts of X, and that means you need
+evil hacks to get both Python and high-level toolkits to play along.)
 
 So the point is, Parti has no desire to be a Gnome-specific kind of
 thing.  We might use some parts of Gnome where appropriate, but really
-we'd like it to be fully usable on any desktop environment (including
-the critical polish details like auto-configuring to local
+we'd like it to be a first class citizen on any desktop environment
+(including the critical polish details like auto-configuring to local
 expectations), and will be happy to accept patches to that effect.
 
 Because Parti aims for full ICCCM and EWMH compliance (where possible
@@ -222,8 +234,8 @@ unreasonable goal?  Possibly, and there's a long, long way between
 here and there.  But let's see how far we can get.
 
 
-I'm making a window manager comparison table.  Is Parti fast, dynamic,
-light-weight, bloat-free, modern, flexible, and/or clean?
-----------------------------------------------------------------------
+I'm making a window manager feature comparison table.  Is Parti fast,
+dynamic, light-weight, bloat-free, modern, flexible, and/or clean?
+---------------------------------------------------------------------
 
 Probably.
