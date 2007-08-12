@@ -84,7 +84,7 @@ class Wm(object):
             display = gtk.gdk.display_manager_get().get_default_display()
         self._display = display
         self._alt_display = gtk.gdk.Display(self._display.get_name())
-        self._root = gtk.gdk.get_default_root_window()
+        self._root = self._display.get_default_screen().get_root_window()
         self._ewmh_window = None
         self._world = None
         
@@ -94,9 +94,7 @@ class Wm(object):
         # Become the Official Window Manager of this year's display:
         self._wm_selection = parti.selection.ManagerSelection(self._display, "WM_S0")
         self._wm_selection.connect("selection-lost", self._lost_wm_selection)
-        if self._wm_selection.owned():
-            print "A window manager is already running; exiting"
-            sys.exit()
+        # May throw AlreadyOwned:
         self._wm_selection.acquire()
         # (If we become a compositing manager, then we will want to do the
         # same thing with the _NET_WM_CM_S0 selection (says EWMH).  AFAICT

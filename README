@@ -82,7 +82,7 @@ parti session inside a Xephyr nested X server.  Currently you may need
 to hit "tab" to get a client window focused, and you may find running
 the "parti-repl" command interesting.
 
-Parti requires at least:
+Running Parti requires at least:
    python
    xlib
    pyrex
@@ -91,11 +91,13 @@ Parti requires at least:
    dbus-python
    ipython
 
-Building Parti requires development packages of all of the above
-(i.e., you need all the C header files, which may be split out into a
-package whose name ends in "-dev" or "-devel").
-
-The included './try' script also requires Xephyr.
+Developing on Parti also requires:
+   nose
+   Xephyr
+   Xvfb
+As well as development packages of all of the above (i.e., you need
+all the C header files, which may be split out into a package whose
+name ends in "-dev" or "-devel").
 
 The ipython dependency should probably become optional (it is only
 needed for the REPL support).  Patches accepted.
@@ -105,7 +107,8 @@ extension, as well.
 
 On Debian-based OSes, try:
   # aptitude install libx11-dev python-pyrex python-gobject-dev \
-    python-gtk2-dev python-dbus ipython xserver-xephyr
+    python-gtk2-dev python-dbus ipython xserver-xephyr \
+    python-nose xvfb
 
 (If you work out a similar line for another OS, please send it in.)
 

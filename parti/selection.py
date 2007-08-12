@@ -18,6 +18,9 @@ from warnings import warn
 
 import parti.lowlevel
 
+class AlreadyOwned(Exception):
+    pass
+
 class ManagerSelection(gobject.GObject):
     __gsignals__ = {
         'selection-lost': (gobject.SIGNAL_RUN_LAST,
@@ -26,14 +29,17 @@ class ManagerSelection(gobject.GObject):
 
     def __init__(self, display, selection):
         gobject.GObject.__init__(self)
+        print display
         self.atom = selection
         self.clipboard = gtk.Clipboard(display, selection)
 
     def owned(self):
+        "Returns True if someone owns the given selection."
         return self.clipboard.wait_for_targets() is not None
 
-    def acquire(self):
-        assert not self.owned()
+    def acquire(self, force=False):
+        if not force and self.owned():
+            raise AlreadyOwned
         self.clipboard.set_with_data([("VERSION", 0, 0)],
                                      self._get,
                                      self._clear,

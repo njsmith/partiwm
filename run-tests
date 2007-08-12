@@ -1,0 +1,8 @@
+#!/bin/sh
+
+set -e
+rm -rf build install
+python make-constants-pxi.py parti/parti._lowlevel.const.txt parti/parti._lowlevel.const.pxi
+CFLAGS=-O0 python setup.py install --home=install
+
+nosetests -w install/lib/python/parti "$@"
