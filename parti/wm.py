@@ -73,14 +73,17 @@ class Wm(object):
         #"_NET_FRAME_EXTENTS",
         ]
 
-    def __init__(self):
+    def __init__(self, display=None):
         self._windows = WindowSet()
         self._windows.connect("window-list-changed", self._update_window_list)
 
         self._trays = TraySet()
         self._trays.connect("changed", self._update_desktop_list)
 
-        self._display = gtk.gdk.display_manager_get().get_default_display()
+        if display is None:
+            display = gtk.gdk.display_manager_get().get_default_display()
+        self._display = display
+        self._alt_display = gtk.gdk.Display(self._display.get_name())
         self._root = gtk.gdk.get_default_root_window()
         self._ewmh_window = None
         self._world = None
@@ -282,8 +285,13 @@ class Wm(object):
 
     # Other global actions:
 
+    def _make_window_pseudoclient(self, win):
+        "Used by PseudoclientWindow, only."
+        win.set_screen(self._alt_display.get_default_screen())
+
     def spawn_repl_window(self):
-        spawn_repl_window({"wm": self,
+        spawn_repl_window(self,
+                          {"wm": self,
                            "windows": self._windows,
                            "trays": self._trays,
                            "lowlevel": parti.lowlevel})

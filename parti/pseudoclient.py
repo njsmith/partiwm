@@ -2,21 +2,18 @@ import gtk
 import gtk.gdk
 import parti.lowlevel
 
-_alternate_connection = None
-
 class PseudoclientWindow(gtk.Window):
     """A gtk.Window that acts like an ordinary client.
 
     All the wm-magic that would normally accrue to a window created within our
-    process is removed."""
-    
-    # The trick is that we create a second connection to the X server, and use
-    # that.
-    def __init__(self, *args, **kwargs):
-        super(PseudoclientWindow, self).__init__(*args, **kwargs)
+    process is removed.
 
-        global _alternate_connection
-        if _alternate_connection is None:
-            name = gtk.gdk.display_get_default().get_name()
-            _alternate_connection = gtk.gdk.Display(name)
-        self.set_screen(_alternate_connection.get_default_screen())
+    Keyword arguments (notably 'type') are forwarded to
+    gtk.Window.__init__.
+
+    The reason this is a separate class, as opposed to say a gtk.Window
+    factory method on wm, is that this way allows for subclassing."""
+    
+    def __init__(self, wm, **kwargs):
+        gtk.Window.__init__(self, **kwargs)
+        wm._make_window_pseudoclient(self)

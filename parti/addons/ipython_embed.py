@@ -2,8 +2,8 @@ import gtk
 from parti.pseudoclient import PseudoclientWindow
 from parti.addons.ipython_view import IPythonView
 
-def spawn_repl_window(namespace):
-    window = PseudoclientWindow()
+def spawn_repl_window(wm, namespace):
+    window = PseudoclientWindow(wm)
     window.set_resizable(True)
     window.set_title("Parti REPL")
     scroll = gtk.ScrolledWindow()
