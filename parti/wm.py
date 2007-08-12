@@ -80,7 +80,8 @@ class Wm(object):
         self._trays = TraySet()
         self._trays.connect("changed", self._update_desktop_list)
 
-        self._real_root = gtk.gdk.get_default_root_window()
+        self._display = gtk.gdk.display_manager_get().get_default_display()
+        self._root = gtk.gdk.get_default_root_window()
         self._ewmh_window = None
         self._world = None
         
@@ -88,7 +89,7 @@ class Wm(object):
         gtk.gdk.event_handler_set(self._dispatch_gdk_event)
 
         # Become the Official Window Manager of this year's display:
-        self._wm_selection = parti.selection.ManagerSelection("WM_S0")
+        self._wm_selection = parti.selection.ManagerSelection(self._display, "WM_S0")
         self._wm_selection.connect("selection-lost", self._lost_wm_selection)
         if self._wm_selection.owned():
             print "A window manager is already running; exiting"
@@ -101,9 +102,9 @@ class Wm(object):
 
         # Set up the necessary EWMH properties on the root window.
         self._setup_ewmh_window()
-        prop_set(self._real_root, "_NET_SUPPORTED",
+        prop_set(self._root, "_NET_SUPPORTED",
                  ["atom"], self._NET_SUPPORTED)
-        prop_set(self._real_root, "_NET_DESKTOP_VIEWPORT",
+        prop_set(self._root, "_NET_DESKTOP_VIEWPORT",
                  ["u32"], [0, 0])
         self._update_window_list()
 
@@ -120,12 +121,12 @@ class Wm(object):
 
         # Okay, ready to select for SubstructureRedirect and then load in all
         # the existing clients.
-        parti.lowlevel.substructureRedirect(self._real_root,
+        parti.lowlevel.substructureRedirect(self._root,
                                             self._handle_root_map_request,
                                             self._handle_root_configure_request,
                                             None)
 
-        for w in parti.lowlevel.get_children(self._real_root):
+        for w in parti.lowlevel.get_children(self._root):
             # Checking for FOREIGN here filters out anything that we've
             # created ourselves (like, say, the world window), and checking
             # for mapped filters out any withdrawn windows.
@@ -224,7 +225,7 @@ class Wm(object):
             print event.in_
 
     def _dispatch_client_event(self, event):
-        if event.window == self._real_root:
+        if event.window == self._root:
             self._handle_root_client_message(event)
 
     def _dispatch_property_notify(self, event):
@@ -242,16 +243,16 @@ class Wm(object):
             self._windows[event.window].emit("client-destroy-event", event)
 
     def _update_window_list(self, *args):
-        prop_set(self._real_root, "_NET_CLIENT_LIST",
+        prop_set(self._root, "_NET_CLIENT_LIST",
                  ["window"], self._windows.window_list())
         # This is a lie, but we don't maintain a stacking order, so...
-        prop_set(self._real_root, "_NET_CLIENT_LIST_STACKING",
+        prop_set(self._root, "_NET_CLIENT_LIST_STACKING",
                  ["window"], self._windows.window_list())
 
     def _update_desktop_list(self, *args):
-        prop_set(self._real_root, "_NET_NUMBER_OF_DESKTOPS",
+        prop_set(self._root, "_NET_NUMBER_OF_DESKTOPS",
                  "u32", len(self._trays))
-        prop_set(self._real_root, "_NET_DESKTOP_NAMES",
+        prop_set(self._root, "_NET_DESKTOP_NAMES",
                  ["utf8"], self._trays.tags())
 
     def _setup_ewmh_window(self):
@@ -276,7 +277,7 @@ class Wm(object):
                                            title=self.NAME)
         prop_set(self._ewmh_window, "_NET_SUPPORTING_WM_CHECK",
                  "window", self._ewmh_window)
-        prop_set(self._real_root, "_NET_SUPPORTING_WM_CHECK",
+        prop_set(self._root, "_NET_SUPPORTING_WM_CHECK",
                  "window", self._ewmh_window)
 
     # Other global actions:

@@ -24,10 +24,10 @@ class ManagerSelection(gobject.GObject):
                            gobject.TYPE_NONE, ()),
         }
 
-    def __init__(self, selection):
+    def __init__(self, display, selection):
         gobject.GObject.__init__(self)
         self.atom = selection
-        self.clipboard = gtk.clipboard_get(selection)
+        self.clipboard = gtk.Clipboard(display, selection)
 
     def owned(self):
         return self.clipboard.wait_for_targets() is not None
@@ -56,22 +56,19 @@ class ManagerSelection(gobject.GObject):
         ts_data = self.clipboard.wait_for_contents("TIMESTAMP").data
         ts_num = unpack("@i", ts_data[:4])[0]
         # Calculate the X atom for this selection:
-        selection_xatom = parti.lowlevel.get_xatom(self.atom)
+        selection_xatom = parti.lowlevel.get_xatom(self.clipboard, self.atom)
         # Ask X what window we used:
-        owner_window = parti.lowlevel.myGetSelectionOwner(self.atom)
+        owner_window = parti.lowlevel.myGetSelectionOwner(self.clipboard, self.atom)
         
-        # FIXME: for some reason this causes a warning when we get back to the
-        # main loop that looks like:
-        #   GtkWarning: /build/buildd/gtk+2.0-2.10.13/gdk/x11/gdkproperty-x11.c:318 invalid X atom: 3139772627
-        # No clue why.
-        parti.lowlevel.sendClientMessage(gtk.gdk.get_default_root_window(),
-                                        False,
-                                        parti.lowlevel.const["StructureNotifyMask"],
-                                        "MANAGER",
-                                        ts_num,
-                                        selection_xatom,
-                                        owner_window,
-                                        0, 0)
+        root = self.clipboard.get_display().get_default_screen().get_root_window()
+        parti.lowlevel.sendClientMessage(root,
+                                         False,
+                                         parti.lowlevel.const["StructureNotifyMask"],
+                                         "MANAGER",
+                                         ts_num,
+                                         selection_xatom,
+                                         owner_window,
+                                         0, 0)
 
     def _get(self, clipboard, outdata, which, userdata):
         # We are compliant with ICCCM version 2.0 (see section 4.3)

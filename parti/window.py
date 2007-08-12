@@ -144,7 +144,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         managed, for whatever reason.  ATM, this mostly means that the window
         died somehow before we could do anything with it."""
 
-        parti.lowlevel.printFocus()
+        parti.lowlevel.printFocus(gdkwindow)
 
         super(Window, self).__init__()
         # The way Gtk.Widget works, we have to make our actual top-level

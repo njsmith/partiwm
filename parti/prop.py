@@ -22,7 +22,7 @@ def _force_length(data, length):
     return data[:length]
 
 class WMSizeHints(object):
-    def __init__(self, data):
+    def __init__(self, disp, data):
         data = _force_length(data, 18 * 4)
         (flags,
          pad1, pad2, pad3, pad4,
@@ -55,7 +55,7 @@ class WMSizeHints(object):
             self.resize_inc = None
 
 class WMHints(object):
-    def __init__(self, data):
+    def __init__(self, disp, data):
         data = _force_length(data, 9 * 4)
         (flags, input, initial_state,
          icon_pixmap, icon_window, icon_x, icon_y, icon_mask,
@@ -80,27 +80,27 @@ _prop_types = {
     # Python type, X type Atom, format, serializer, deserializer, list
     # terminator
     "utf8": (unicode, "UTF8_STRING", 8,
-             lambda u: u.encode("UTF-8"),
-             lambda d: d.decode("UTF-8"),
+             lambda disp, u: u.encode("UTF-8"),
+             lambda disp, d: d.decode("UTF-8"),
              "\0"),
     # In theory, there should be something clever about COMPOUND_TEXT here.  I
     # am not sufficiently clever, even knowing that
     # Xutf8TextPropertyToTextList exists.
     "latin1": (unicode, "STRING", 8,
-               lambda u: u.encode("latin1"),
-               lambda d: d.decode("latin1"),
+               lambda disp, u: u.encode("latin1"),
+               lambda disp, d: d.decode("latin1"),
                "\0"),
     "atom": (str, "ATOM", 32,
-             lambda a: struct.pack("@i", get_xatom(a)),
-             lambda d: str(get_pyatom(struct.unpack("@i", d)[0])),
+             lambda disp, a: struct.pack("@i", get_xatom(disp, a)),
+             lambda disp, d: str(get_pyatom(disp, struct.unpack("@i", d)[0])),
              ""),
     "u32": ((int, long), "CARDINAL", 32,
-            lambda c: struct.pack("@i", c),
-            lambda d: struct.unpack("@i", d)[0],
+            lambda disp, c: struct.pack("@i", c),
+            lambda disp, d: struct.unpack("@i", d)[0],
             ""),
     "window": (gtk.gdk.Window, "WINDOW", 32,
-               lambda c: struct.pack("@i", get_xwindow(c)),
-               lambda d: get_pywindow(struct.unpack("@i", d)[0]),
+               lambda disp, c: struct.pack("@i", get_xwindow(c)),
+               lambda disp, d: get_pywindow(struct.unpack("@i", d)[0]),
                ""),
     "wm-size-hints": (WMSizeHints, "WM_SIZE_HINTS", 32,
                       unsupported,
@@ -112,21 +112,21 @@ _prop_types = {
                  None),
     }
 
-def _prop_encode(type, value):
+def _prop_encode(disp, type, value):
     if isinstance(type, list):
-        return _prop_encode_list(type[0], value)
+        return _prop_encode_list(disp, type[0], value)
     else:
-        return _prop_encode_scalar(type, value)
+        return _prop_encode_scalar(disp, type, value)
 
-def _prop_encode_scalar(type, value):
+def _prop_encode_scalar(disp, type, value):
     (pytype, atom, format, serialize, deserialize, terminator) = _prop_types[type]
     assert isinstance(value, pytype)
-    return (atom, format, serialize(value))
+    return (atom, format, serialize(disp, value))
 
-def _prop_encode_list(type, value):
+def _prop_encode_list(disp, type, value):
     (pytype, atom, format, serialize, deserialize, terminator) = _prop_types[type]
     value = list(value)
-    serialized = [_prop_encode_scalar(type, v)[2] for v in value]
+    serialized = [_prop_encode_scalar(disp, type, v)[2] for v in value]
     # Strings in X really are null-separated, not null-terminated (ICCCM
     # 2.7.1, see also note in 4.1.2.5)
     return (atom, format, terminator.join(serialized))
@@ -134,22 +134,22 @@ def _prop_encode_list(type, value):
 
 def prop_set(target, key, type, value):
     trap.call_unsynced(XChangeProperty, target, key,
-                       _prop_encode(type, value))
+                       _prop_encode(target, type, value))
 
 
-def _prop_decode(type, data):
+def _prop_decode(disp, type, data):
     if isinstance(type, list):
-        return _prop_decode_list(type[0], data)
+        return _prop_decode_list(disp, type[0], data)
     else:
-        return _prop_decode_scalar(type, data)
+        return _prop_decode_scalar(disp, type, data)
 
-def _prop_decode_scalar(type, data):
+def _prop_decode_scalar(disp, type, data):
     (pytype, atom, format, serialize, deserialize, terminator) = _prop_types[type]
-    value = deserialize(data)
+    value = deserialize(disp, data)
     assert isinstance(value, pytype)
     return value
 
-def _prop_decode_list(type, data):
+def _prop_decode_list(disp, type, data):
     (pytype, atom, format, serialize, deserialize, terminator) = _prop_types[type]
     if terminator:
         datums = data.split(terminator)
@@ -158,7 +158,7 @@ def _prop_decode_list(type, data):
         while data:
             datums.append(data[:(format // 8)])
             data = data[(format // 8):]
-    return [_prop_decode_scalar(type, datum) for datum in datums]
+    return [_prop_decode_scalar(disp, type, datum) for datum in datums]
 
 # May return None.
 def prop_get(target, key, type):
@@ -171,4 +171,4 @@ def prop_get(target, key, type):
         data = trap.call_synced(XGetWindowProperty, target, key, atom)
     except (XError, PropertyError):
         return None
-    return _prop_decode(type, data)
+    return _prop_decode(target, type, data)

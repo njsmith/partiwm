@@ -187,6 +187,6 @@ class WorldWindow(gtk.Window):
 
     def _handle_root_focus_out(self, event):
         print "Focus left root, FYI"
-        parti.lowlevel.printFocus()
+        parti.lowlevel.printFocus(self)
 
 gobject.type_register(WorldWindow)

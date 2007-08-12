@@ -2,8 +2,6 @@ import gtk
 import gtk.gdk
 import parti.lowlevel
 
-# FIXME: use this or remove it
-
 _alternate_connection = None
 
 class PseudoclientWindow(gtk.Window):
@@ -20,5 +18,5 @@ class PseudoclientWindow(gtk.Window):
         global _alternate_connection
         if _alternate_connection is None:
             name = gtk.gdk.display_get_default().get_name()
-            _alternate_connection = parti.lowlevel.gdk_display_open(name)
+            _alternate_connection = gtk.gdk.Display(name)
         self.set_screen(_alternate_connection.get_default_screen())

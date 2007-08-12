@@ -67,9 +67,9 @@ cdef cGObject * unwrap(box, pyclass) except? NULL:
 #     else:
 #         print "contents is %s" % (<long long>unwrapped)
 
-cdef object wrap(cGObject * contents):
-    # Put a raw GObject* into a PyGObject wrapper.
-    return pygobject_new(contents)
+# cdef object wrap(cGObject * contents):
+#     # Put a raw GObject* into a PyGObject wrapper.
+#     return pygobject_new(contents)
 
 ###################################
 # Raw Xlib and GDK
@@ -202,10 +202,6 @@ cdef extern from *:
     int cXGetInputFocus "XGetInputFocus" (Display * display, Window * focus,
                                           int * revert_to)
 
-    ctypedef struct GdkDisplay:
-        pass
-    GdkDisplay * c_gdk_display_open "gdk_display_open" (char * name)
-
 ######
 # GDK primitives, and wrappers for Xlib
 ######
@@ -216,12 +212,30 @@ cdef extern from *:
         pass
     Window GDK_WINDOW_XID(cGdkWindow *)
 
-    Display * gdk_x11_get_default_xdisplay()
+    ctypedef struct cGdkDisplay "GdkDisplay":
+        pass
+    Display * GDK_DISPLAY_XDISPLAY(cGdkDisplay *)
 
 def get_xwindow(pywindow):
     return GDK_WINDOW_XID(<cGdkWindow*>unwrap(pywindow, gtk.gdk.Window))
 
 get_pywindow = gtk.gdk.window_foreign_new
+
+def get_display_for(obj):
+    if isinstance(obj, gtk.gdk.Display):
+        return obj
+    elif isinstance(obj, (gtk.gdk.Window,
+                          gtk.Widget,
+                          gtk.Clipboard)):
+        return obj.get_display()
+    else:
+        assert False, "Don't know how to get a display from %r" % (obj,)
+
+cdef cGdkDisplay * get_raw_display_for(obj) except? NULL:
+    return <cGdkDisplay*> unwrap(get_display_for(obj), gtk.gdk.Display)
+
+cdef Display * get_xdisplay_for(obj) except? NULL:
+    return GDK_DISPLAY_XDISPLAY(get_raw_display_for(obj))
 
 # Atom stuff:
 cdef extern from *:
@@ -229,10 +243,10 @@ cdef extern from *:
     # FIXME: this should have stricter type checking
     GdkAtom PyGdkAtom_Get(object)
     object PyGdkAtom_New(GdkAtom)
-    Atom gdk_x11_atom_to_xatom(GdkAtom)
-    GdkAtom gdk_x11_xatom_to_atom(Atom)
+    Atom gdk_x11_atom_to_xatom_for_display(cGdkDisplay *, GdkAtom)
+    GdkAtom gdk_x11_xatom_to_atom_for_display(cGdkDisplay *, Atom)
 
-def get_xatom(gdkatom_or_str_or_xatom):
+def get_xatom(display_source, gdkatom_or_str_or_xatom):
     """Returns the X atom corresponding to the given PyGdkAtom or Python
     string or Python integer (assumed to already be an X atom)."""
     if isinstance(gdkatom_or_str_or_xatom, (int, long)):
@@ -240,12 +254,25 @@ def get_xatom(gdkatom_or_str_or_xatom):
     if isinstance(gdkatom_or_str_or_xatom, str):
         gdkatom_or_str_or_xatom = gtk.gdk.atom_intern(gdkatom_or_str_or_xatom)
     # Assume it is a PyGdkAtom (since there's no easy way to check, sigh)
-    return gdk_x11_atom_to_xatom(PyGdkAtom_Get(gdkatom_or_str_or_xatom))
+    return gdk_x11_atom_to_xatom_for_display(
+        get_raw_display_for(display_source),
+        PyGdkAtom_Get(gdkatom_or_str_or_xatom),
+        )
 
-def get_pyatom(xatom):
-    return PyGdkAtom_New(gdk_x11_xatom_to_atom(xatom))
+def get_pyatom(display_source, xatom):
+    cdef cGdkDisplay * disp
+    disp = get_raw_display_for(display_source)
+    return PyGdkAtom_New(gdk_x11_xatom_to_atom_for_display(disp, xatom))
 
 # Property handling:
+
+# (Note: GDK actually has a wrapper for the Xlib property API,
+# gdk_property_{get,change,delete}.  However, the documentation for
+# gtk_property_get says "gtk_property_get() makes the situation worse...the
+# semantics should be considered undefined...You are advised to use
+# XGetWindowProperty() directly".  In light of this, we just ignore the GDK
+# property API and use the Xlib functions directly.)
+
 def XChangeProperty(pywindow, property, value):
     "Set a property on a window.  Returns a true value on failure."
     (type, format, data) = value
@@ -253,10 +280,10 @@ def XChangeProperty(pywindow, property, value):
     data_str = data
     assert format in (8, 16, 32)
     assert (len(data) % (format / 8)) == 0
-    result = cXChangeProperty(gdk_x11_get_default_xdisplay(),
+    result = cXChangeProperty(get_xdisplay_for(pywindow),
                               get_xwindow(pywindow),
-                              get_xatom(property),
-                              get_xatom(type),
+                              get_xatom(pywindow, property),
+                              get_xatom(pywindow, type),
                               format,
                               PropModeReplace,
                               <unsigned char *>data_str,
@@ -286,15 +313,15 @@ def XGetWindowProperty(pywindow, property, req_type):
     cdef unsigned char * prop
     cdef Status status
     # This is the most bloody awful API I have ever seen.
-    status = cXGetWindowProperty(gdk_x11_get_default_xdisplay(),
+    status = cXGetWindowProperty(get_xdisplay_for(pywindow),
                                  get_xwindow(pywindow),
-                                 get_xatom(property),
+                                 get_xatom(pywindow, property),
                                  0,
                                  # This argument has to be divided by 4.  Thus
                                  # speaks the spec.
                                  buffer_size / 4,
                                  False,
-                                 get_xatom(req_type), &actual_type,
+                                 get_xatom(pywindow, req_type), &actual_type,
                                  &actual_format, &nitems, &bytes_after, &prop)
     if status != Success:
         raise PropertyError, "no such window"
@@ -327,13 +354,13 @@ def XGetWindowProperty(pywindow, property, req_type):
         return data
 
 def XDeleteProperty(pywindow, property):
-    cXDeleteProperty(gdk_x11_get_default_xdisplay(),
+    cXDeleteProperty(get_xdisplay_for(pywindow),
                      get_xwindow(pywindow),
-                     get_xatom(property))
+                     get_xatom(pywindow, property))
 
 # Save set handling
 def XAddToSaveSet(pywindow):
-    cXAddToSaveSet(gdk_x11_get_default_xdisplay(),
+    cXAddToSaveSet(get_xdisplay_for(pywindow),
                    get_xwindow(pywindow))
 
 # Children listing
@@ -341,7 +368,7 @@ def get_children(pywindow):
     cdef Window root, parent
     cdef Window * children
     cdef unsigned int nchildren
-    XQueryTree(gdk_x11_get_default_xdisplay(),
+    XQueryTree(get_xdisplay_for(pywindow),
                get_xwindow(pywindow),
                &root, &parent, &children, &nchildren)
     pychildren = []
@@ -354,7 +381,7 @@ def get_children(pywindow):
 # Mapped status
 def is_mapped(pywindow):
     cdef XWindowAttributes attrs
-    XGetWindowAttributes(gdk_x11_get_default_xdisplay(),
+    XGetWindowAttributes(get_xdisplay_for(pywindow),
                          get_xwindow(pywindow),
                          &attrs)
     return attrs.map_state != IsUnmapped
@@ -364,31 +391,26 @@ def XSetInputFocus(pywindow, time=None):
     # Always does RevertToParent
     if time is None:
         time = CurrentTime
-    cXSetInputFocus(gdk_x11_get_default_xdisplay(),
+    cXSetInputFocus(get_xdisplay_for(pywindow),
                     get_xwindow(pywindow),
                     RevertToParent,
                     time)
     printFocus()
 
-def printFocus():
+def printFocus(display_source):
     # Debugging
     cdef Window w
     cdef int revert_to
-    cXGetInputFocus(gdk_x11_get_default_xdisplay(), &w, &revert_to)
+    cXGetInputFocus(get_xdisplay_for(display_source), &w, &revert_to)
     print "Current focus: %s, %s" % (hex(w), revert_to)
     
-# For some reason this is not wrapped.
-# FIXME: is this doing ref-counting properly?
-def gdk_display_open(name):
-    return wrap(<cGObject*>c_gdk_display_open(name))
-
 ###################################
 # Smarter convenience wrappers
 ###################################
 
-def myGetSelectionOwner(pyatom):
-    return XGetSelectionOwner(gdk_x11_get_default_xdisplay(),
-                              get_xatom(pyatom))
+def myGetSelectionOwner(display_source, pyatom):
+    return XGetSelectionOwner(get_xdisplay_for(display_source),
+                              get_xatom(display_source, pyatom))
 
 def sendClientMessage(target, propagate, event_mask,
                       message_type, data0, data1, data2, data3, data4):
@@ -396,7 +418,7 @@ def sendClientMessage(target, propagate, event_mask,
     # are passed through directly, or else they can be any form of atom (in
     # particular, strings), which are converted appropriately.
     cdef Display * display
-    display = gdk_x11_get_default_xdisplay()
+    display = get_xdisplay_for(target)
     cdef Window w
     w = get_xwindow(target)
     print "sending message to %s" % hex(w)
@@ -404,13 +426,13 @@ def sendClientMessage(target, propagate, event_mask,
     e.type = ClientMessage
     e.xany.display = display
     e.xany.window = w
-    e.xclient.message_type = get_xatom(message_type)
+    e.xclient.message_type = get_xatom(target, message_type)
     e.xclient.format = 32
-    e.xclient.data.l[0] = get_xatom(data0)
-    e.xclient.data.l[1] = get_xatom(data1)
-    e.xclient.data.l[2] = get_xatom(data2)
-    e.xclient.data.l[3] = get_xatom(data3)
-    e.xclient.data.l[4] = get_xatom(data4)
+    e.xclient.data.l[0] = get_xatom(target, data0)
+    e.xclient.data.l[1] = get_xatom(target, data1)
+    e.xclient.data.l[2] = get_xatom(target, data2)
+    e.xclient.data.l[3] = get_xatom(target, data3)
+    e.xclient.data.l[4] = get_xatom(target, data4)
     cdef Status s
     s = XSendEvent(display, w, propagate, event_mask, &e)
     if s == 0:
@@ -418,7 +440,7 @@ def sendClientMessage(target, propagate, event_mask,
 
 def sendConfigureNotify(pywindow):
     cdef Display * display
-    display = gdk_x11_get_default_xdisplay()
+    display = get_xdisplay_for(pywindow)
     cdef Window window
     window = get_xwindow(pywindow)
 
@@ -457,7 +479,7 @@ def sendConfigureNotify(pywindow):
 
 def configureAndNotify(pywindow, x, y, width, height):
     cdef Display * display
-    display = gdk_x11_get_default_xdisplay()
+    display = get_xdisplay_for(pywindow)
     cdef Window window
     window = get_xwindow(pywindow)
 
@@ -497,12 +519,12 @@ cdef extern from *:
 
 def addXSelectInput(pywindow, add_mask):
     cdef XWindowAttributes curr
-    XGetWindowAttributes(gdk_x11_get_default_xdisplay(),
+    XGetWindowAttributes(get_xdisplay_for(pywindow),
                          get_xwindow(pywindow),
                          &curr)
     mask = curr.your_event_mask
     mask = mask | add_mask
-    XSelectInput(gdk_x11_get_default_xdisplay(),
+    XSelectInput(get_xdisplay_for(pywindow),
                  get_xwindow(pywindow),
                  mask)
 
