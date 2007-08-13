@@ -29,7 +29,6 @@ class ManagerSelection(gobject.GObject):
 
     def __init__(self, display, selection):
         gobject.GObject.__init__(self)
-        print display
         self.atom = selection
         self.clipboard = gtk.Clipboard(display, selection)
 
