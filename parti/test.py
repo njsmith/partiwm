@@ -17,7 +17,8 @@ def assert_raises(exc_class, f, *args, **kwargs):
     else:
         raise AssertionError
 
-class TestWithX(object):
+class TestWithSession(object):
+    "A test that runs with its own isolated X11 and D-Bus session."
     display_name = ":13"
     display = None
 
@@ -42,9 +43,22 @@ class TestWithX(object):
         gtk.gdk.display_manager_get().set_default_display(self.display)
         print "Opened new display %r" % (self.display,)
 
+        self._dbus = subprocess.Popen(["dbus-daemon", "--session",
+                                       "--nofork", "--print-address"],
+                                      stdout=subprocess.PIPE)
+        self._dbus_address = self._dbus.stdout.readline().strip()
+        os.environ["DBUS_SESSION_BUS_ADDRESS"] = self._dbus_address
+        print "Started session D-Bus at %s" % self._dbus_address
+
     def tearDown(self):
         os.kill(self._x11.pid, 15)
+        os.kill(self._dbus.pid, 15)
         self._x11.wait()
+        self._dbus.wait()
+        # Could do more cleanup here (close X11 connections, unset
+        # os.environ["DBUS_SESSION_BUS_ADDRESS"], etc.), but our test runner
+        # runs us in a forked off process that will exit immediately after
+        # this, so who cares?
 
     def clone_display(self):
         clone = gtk.gdk.Display(self.display.get_name())

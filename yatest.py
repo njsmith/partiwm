@@ -24,11 +24,11 @@
 # Having the 'nose' package installed will give you more details on errors.
 #
 # Desireable future enhancements:
-#   -- Output capturing for children (including children).  Who's up to
+#   -- Output capturing for tests (including children).  Who's up to
 #      writing a select loop and fun os.dup2 stuff?
 #   -- Timeout support (even more fun select stuff -- this may call for
 #      twisted...).
-#   -- Parallel testing?
+#   -- Parallelized testing?
 
 import sys
 import os
@@ -95,6 +95,9 @@ class Runner(object):
                 self.maybe_load_and_scan_module(child_modname)
             
     def maybe_load_and_scan_module(self, module_name):
+        # Hack: Skip out early if the module cannot possibly be interesting.
+        if not self.thing_looks_testy(module_name, None):
+            return
         # __import__("foo.bar.baz") returns the foo module object:
         try:
             mod = __import__(module_name)

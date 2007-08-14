@@ -4,7 +4,7 @@ import parti.lowlevel
 
 import struct
 
-class TestSelection(TestWithX):
+class TestSelection(TestWithSession):
     def test_acquisition_stealing(self):
         d1 = self.clone_display()
         d2 = self.clone_display()
