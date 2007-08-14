@@ -23,10 +23,11 @@ class TestWithSession(object):
     display = None
 
     def setUp(self):
-        self._x11 = subprocess.Popen(["Xvfb", self.display_name,
+        self._x11 = subprocess.Popen(["Xvfb-for-parti", self.display_name,
                                       "-ac",
                                       "-audit", "10",
-                                      "+extension", "Composite"])
+                                      "+extension", "Composite"],
+                                     executable="Xvfb")
         # This is not a race condition, nor do we need to sleep here, because
         # gtk.gdk.Display is smart enough to silently block until the X server
         # comes up.
@@ -43,8 +44,9 @@ class TestWithSession(object):
         gtk.gdk.display_manager_get().set_default_display(self.display)
         print "Opened new display %r" % (self.display,)
 
-        self._dbus = subprocess.Popen(["dbus-daemon", "--session",
+        self._dbus = subprocess.Popen(["dbus-daemon-for-parti", "--session",
                                        "--nofork", "--print-address"],
+                                      executable="dbus-daemon",
                                       stdout=subprocess.PIPE)
         self._dbus_address = self._dbus.stdout.readline().strip()
         os.environ["DBUS_SESSION_BUS_ADDRESS"] = self._dbus_address
