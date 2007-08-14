@@ -269,7 +269,7 @@ class Wm(object):
         # clobber any XSelectInput calls that *we* might have wanted to make
         # on this window.)  Also, GDK might silently swallow all events that
         # are detected on it, anyway.
-        self._ewmh_window = gtk.gdk.Window(gtk.gdk.get_default_root_window(),
+        self._ewmh_window = gtk.gdk.Window(self._root,
                                            width=1,
                                            height=1,
                                            window_type=gtk.gdk.WINDOW_TOPLEVEL,

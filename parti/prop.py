@@ -84,8 +84,8 @@ _prop_types = {
              lambda disp, d: d.decode("UTF-8"),
              "\0"),
     # In theory, there should be something clever about COMPOUND_TEXT here.  I
-    # am not sufficiently clever, even knowing that
-    # Xutf8TextPropertyToTextList exists.
+    # am not sufficiently clever to deal with COMPOUNT_TEXT.  Even knowing
+    # that Xutf8TextPropertyToTextList exists.
     "latin1": (unicode, "STRING", 8,
                lambda disp, u: u.encode("latin1"),
                lambda disp, d: d.decode("latin1"),
@@ -100,7 +100,7 @@ _prop_types = {
             ""),
     "window": (gtk.gdk.Window, "WINDOW", 32,
                lambda disp, c: struct.pack("@i", get_xwindow(c)),
-               lambda disp, d: get_pywindow(struct.unpack("@i", d)[0]),
+               lambda disp, d: get_pywindow(disp, struct.unpack("@i", d)[0]),
                ""),
     "wm-size-hints": (WMSizeHints, "WM_SIZE_HINTS", 32,
                       unsupported,

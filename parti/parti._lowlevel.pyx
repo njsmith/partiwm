@@ -219,7 +219,9 @@ cdef extern from *:
 def get_xwindow(pywindow):
     return GDK_WINDOW_XID(<cGdkWindow*>unwrap(pywindow, gtk.gdk.Window))
 
-get_pywindow = gtk.gdk.window_foreign_new
+def get_pywindow(display_source, xwindow):
+    disp = get_display_for(display_source)
+    return gtk.gdk.window_foreign_new_for_display(disp, xwindow)
 
 def get_display_for(obj):
     if isinstance(obj, gtk.gdk.Display):
@@ -246,14 +248,13 @@ cdef extern from *:
     Atom gdk_x11_atom_to_xatom_for_display(cGdkDisplay *, GdkAtom)
     GdkAtom gdk_x11_xatom_to_atom_for_display(cGdkDisplay *, Atom)
 
-def get_xatom(display_source, gdkatom_or_str_or_xatom):
-    """Returns the X atom corresponding to the given PyGdkAtom or Python
-    string or Python integer (assumed to already be an X atom)."""
-    if isinstance(gdkatom_or_str_or_xatom, (int, long)):
-        return gdkatom_or_str_or_xatom
-    if isinstance(gdkatom_or_str_or_xatom, str):
-        gdkatom_or_str_or_xatom = gtk.gdk.atom_intern(gdkatom_or_str_or_xatom)
-    # Assume it is a PyGdkAtom (since there's no easy way to check, sigh)
+def get_xatom(display_source, str_or_xatom):
+    """Returns the X atom corresponding to the given Python string or Python
+    integer (assumed to already be an X atom)."""
+    if isinstance(str_or_xatom, (int, long)):
+        return str_or_xatom
+    if isinstance(str_or_xatom, str):
+        str_or_xatom = gtk.gdk.atom_intern(str_or_xatom)
     return gdk_x11_atom_to_xatom_for_display(
         get_raw_display_for(display_source),
         PyGdkAtom_Get(gdkatom_or_str_or_xatom),
@@ -262,7 +263,7 @@ def get_xatom(display_source, gdkatom_or_str_or_xatom):
 def get_pyatom(display_source, xatom):
     cdef cGdkDisplay * disp
     disp = get_raw_display_for(display_source)
-    return PyGdkAtom_New(gdk_x11_xatom_to_atom_for_display(disp, xatom))
+    return str(PyGdkAtom_New(gdk_x11_xatom_to_atom_for_display(disp, xatom)))
 
 # Property handling:
 
@@ -274,20 +275,20 @@ def get_pyatom(display_source, xatom):
 # property API and use the Xlib functions directly.)
 
 def XChangeProperty(pywindow, property, value):
-    "Set a property on a window.  Returns a true value on failure."
+    "Set a property on a window."
     (type, format, data) = value
     cdef char * data_str
     data_str = data
     assert format in (8, 16, 32)
     assert (len(data) % (format / 8)) == 0
-    result = cXChangeProperty(get_xdisplay_for(pywindow),
-                              get_xwindow(pywindow),
-                              get_xatom(pywindow, property),
-                              get_xatom(pywindow, type),
-                              format,
-                              PropModeReplace,
-                              <unsigned char *>data_str,
-                              len(data) / (format / 8))
+    cXChangeProperty(get_xdisplay_for(pywindow),
+                     get_xwindow(pywindow),
+                     get_xatom(pywindow, property),
+                     get_xatom(pywindow, type),
+                    format,
+                     PropModeReplace,
+                     <unsigned char *>data_str,
+                     len(data) / (format / 8))
 
 def _munge_packed_longs_to_ints(data):
     assert len(data) % sizeof(long) == 0
@@ -375,7 +376,7 @@ def get_children(pywindow):
                &root, &parent, &children, &nchildren)
     pychildren = []
     for i from 0 <= i < nchildren:
-        pychildren.append(get_pywindow(children[i]))
+        pychildren.append(get_pywindow(pywindow, children[i]))
     if children != NULL:
         XFree(children)
     return pychildren
@@ -541,27 +542,27 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
     cdef XEvent * e
     e = <XEvent*>e_gdk
     try:
-        (map_callback, configure_callback, circulate_callback) = <object>userdata
+        (disp, map_callback, configure_callback, circulate_callback) = <object>userdata
         if e.type == MapRequest:
             print "MapRequest"
             if map_callback is not None:
                 pyev = LameStruct()
-                pyev.parent = get_pywindow(e.xmaprequest.parent)
-                pyev.window = get_pywindow(e.xmaprequest.window)
+                pyev.parent = get_pywindow(disp, e.xmaprequest.parent)
+                pyev.window = get_pywindow(disp, e.xmaprequest.window)
                 map_callback(pyev)
             return GDK_FILTER_REMOVE
         elif e.type == ConfigureRequest:
             print "ConfigureRequest"
             if configure_callback is not None:
                 pyev = LameStruct()
-                pyev.parent = get_pywindow(e.xconfigurerequest.parent)
-                pyev.window = get_pywindow(e.xconfigurerequest.window)
+                pyev.parent = get_pywindow(disp, e.xconfigurerequest.parent)
+                pyev.window = get_pywindow(disp, e.xconfigurerequest.window)
                 pyev.x = e.xconfigurerequest.x
                 pyev.y = e.xconfigurerequest.y
                 pyev.width = e.xconfigurerequest.width
                 pyev.height = e.xconfigurerequest.height
                 pyev.border_width = e.xconfigurerequest.border_width
-                pyev.above = get_pywindow(e.xconfigurerequest.above)
+                pyev.above = get_pywindow(disp, e.xconfigurerequest.above)
                 pyev.detail = e.xconfigurerequest.detail
                 pyev.value_mask = e.xconfigurerequest.value_mask
                 configure_callback(pyev)
@@ -570,8 +571,8 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
             print "CirculateRequest"
             if circulate_callback is not None:
                 pyev = LameStruct()
-                pyev.parent = get_pywindow(e.xcirculaterequest.parent)
-                pyev.window = get_pywindow(e.xcirculaterequest.window)
+                pyev.parent = get_pywindow(disp, e.xcirculaterequest.parent)
+                pyev.window = get_pywindow(disp, e.xcirculaterequest.window)
                 pyev.place = e.xcirculaterequest.place
                 circulate_callback(pyev)
             return GDK_FILTER_REMOVE
@@ -591,7 +592,8 @@ def substructureRedirect(pywindow,
     be swallowed."""
 
     addXSelectInput(pywindow, SubstructureRedirectMask)
-    callback_tuple = (map_callback, configure_callback, circulate_callback)
+    disp = get_display_for(pywindow)
+    callback_tuple = (disp, map_callback, configure_callback, circulate_callback)
     # This tuple will be leaving Python-space.
     # FIXME: LEAK: how can we get notified when the GdkWindow eventually is
     # destructed, so we can DECREF?  (For that matter, are we sure that the
@@ -607,11 +609,11 @@ cdef GdkFilterReturn focusFilter(GdkXEvent * e_gdk,
     cdef XEvent * e
     e = <XEvent*>e_gdk
     try:
+        (disp, focus_in_callback, focus_out_callback) = <object>userdata
         pyev = LameStruct()
-        pyev.window = get_pywindow(e.xfocus.window)
+        pyev.window = get_pywindow(disp, e.xfocus.window)
         pyev.mode = e.xfocus.mode
         pyev.detail = e.xfocus.detail
-        (focus_in_callback, focus_out_callback) = <object>userdata
         if e.type == FocusIn:
             print "FocusIn"
             if focus_in_callback is not None:
@@ -629,7 +631,8 @@ cdef GdkFilterReturn focusFilter(GdkXEvent * e_gdk,
 
 def selectFocusChange(pywindow, in_callback, out_callback):
     addXSelectInput(pywindow, FocusChangeMask)
-    callback_tuple = (in_callback, out_callback)
+    disp = get_display_for(pywindow)
+    callback_tuple = (disp, in_callback, out_callback)
     # This tuple will be leaving Python-space.
     # FIXME: LEAK: how can we get notified when the GdkWindow eventually is
     # destructed, so we can DECREF?  (For that matter, are we sure that the
