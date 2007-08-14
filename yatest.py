@@ -24,10 +24,9 @@
 # Having the 'nose' package installed will give you more details on errors.
 #
 # Desireable future enhancements:
-#   -- Output capturing for tests (including children).  Who's up to
-#      writing a select loop and fun os.dup2 stuff?
 #   -- Timeout support (even more fun select stuff -- this may call for
 #      twisted...).
+#   -- Ability to run specific tests
 #   -- Parallelized testing?
 
 import sys
@@ -35,6 +34,7 @@ import os
 import os.path
 import traceback
 import signal
+import tempfile
 from cPickle import dump, load
 from types import ClassType
 from optparse import OptionParser
@@ -56,6 +56,10 @@ def ispkg(path):
 class YaTest(object):
     def main(self):
         parser = OptionParser(usage="%prog PATH-TO-PACKAGE")
+        parser.add_option("-S", "--nocapture",
+                          dest="capture_output",
+                          action="store_false", default=True,
+                          help="disable capture of stdout/stderr from tests")
         (opts, args) = parser.parse_args()
         if len(args) != 1:
             parser.error("Takes exactly 1 argument")
@@ -63,17 +67,22 @@ class YaTest(object):
         pkg_path = args[0]
         assert ispkg(pkg_path)
 
+        # Set up environment:
         pkg_dir, pkg_name = os.path.split(pkg_path)
         sys.path.insert(0, pkg_dir)
 
+        del os.environ["DBUS_SESSION_BUS_ADDRESS"]
+        del os.environ["DISPLAY"]
+
         reporter = Reporter()
-        Runner(reporter).scan_pkg(pkg_path, pkg_name)
+        Runner(reporter, opts.capture_output).scan_pkg(pkg_path, pkg_name)
         reporter.close()
         
 
 class Runner(object):
-    def __init__(self, reporter):
+    def __init__(self, reporter, capture_output):
         self.reporter = reporter
+        self.capture_output = capture_output
 
     def thing_looks_testy(self, name, obj):
         return (("test" in name or "Test" in name)
@@ -125,29 +134,41 @@ class Runner(object):
         (readable_fd, writeable_fd) = os.pipe()
         readable = os.fdopen(readable_fd, "rb")
         writeable = os.fdopen(writeable_fd, "wb")
+        if self.capture_output:
+            output = tempfile.TemporaryFile()
+        else:
+            output = None
         pid = os.fork()
         if pid:
             writeable.close()
             self.run_test_method_in_parent(pid,
-                                           class_name, cls, name, readable)
+                                           class_name, cls, name, readable,
+                                           output)
         else:
             readable.close()
-            self.run_test_method_in_child(cls, name, writeable)
+            self.run_test_method_in_child(cls, name, writeable,
+                                          output)
             # This should not return
             assert False
         
     def run_test_method_in_parent(self, child_pid,
-                                  class_name, cls, name, readable):
+                                  class_name, cls, name, readable, output):
         method_name = ".".join([class_name, name])
         try:
-            self.reporter.report(method_name, load(readable))
+            result = load(readable)
         except EOFError:
             one_result = (FAILURE, "?? (child blew up before reporting back)")
-            self.reporter.report(method_name,
-                                 (one_result, one_result, one_result))
+            result = (one_result, one_result, one_result)
         readable.close()
         os.kill(-child_pid, signal.SIGTERM)
         os.waitpid(child_pid, 0)
+        if output is not None:
+            output.seek(0)
+            output_data = output.read()
+            output.close()
+        else:
+            output_data = None
+        self.reporter.report(method_name, output_data, result)
 
     def string_for_traceback(self, exc_info):
         tb = "".join(traceback.format_exception(*exc_info))
@@ -162,8 +183,11 @@ class Runner(object):
         else:
             return (FAILURE, self.string_for_traceback(result))
 
-    def run_test_method_in_child(self, cls, name, writeable):
+    def run_test_method_in_child(self, cls, name, writeable, output):
         os.setpgid(0, 0)
+        if output is not None:
+            os.dup2(output.fileno(), 1)
+            os.dup2(output.fileno(), 2)
 
         instance = None         # None or instance of cls
         setup_result = None     # True or exc_info
@@ -212,8 +236,10 @@ class Reporter(object):
         self.total_run = 0
         self.total_passed = 0
         sys.stdout.write("Testing: ")
+        sys.stdout.flush()
 
-    def report(self, method_name, marshalled_result):
+    def report(self, method_name, output_data, marshalled_result):
+        # NB output_data may be None if output capturing is disabled
         self.total_run += 1
         (setup, test, teardown) = marshalled_result
         if (setup[0] == SUCCESS
@@ -221,12 +247,21 @@ class Reporter(object):
             and teardown[0] == SUCCESS):
             self.total_passed += 1
             sys.stdout.write(".")
+            sys.stdout.flush()
         else:
             # NB the newline at the start of this string
+            if output_data is None:
+                output_string = "<child output not captured>"
+            else:
+                # FIXME: sanitize output?
+                output_string = output_data
             sys.stdout.write("""
 =========================================
 Problem in: %s
 =========================================
+test output:
+%s
+-----------------------------------------
 __init__ and setUp: %s
 -----------------------------------------
 test itself: %s
@@ -234,9 +269,11 @@ test itself: %s
 tearDown: %s
 -----------------------------------------
 """ % (method_name,
+       output_string,
        "\n".join(setup),
        "\n".join(test),
        "\n".join(teardown)))
+            sys.stdout.flush()
 
     def close(self):
         sys.stdout.write("\nRun complete; %s tests, %s failures.\n"

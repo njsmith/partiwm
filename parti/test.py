@@ -13,9 +13,9 @@ def assert_raises(exc_class, f, *args, **kwargs):
     except exc_class:
         pass
     except:
-        raise AssertionError
+        raise AssertionError, "unexpected exception"
     else:
-        raise AssertionError
+        raise AssertionError, "no exception"
 
 class TestWithSession(object):
     "A test that runs with its own isolated X11 and D-Bus session."
@@ -32,7 +32,9 @@ class TestWithSession(object):
         # gtk.gdk.Display is smart enough to silently block until the X server
         # comes up.
         self.display = gtk.gdk.Display(self.display_name)
-        gtk.gdk.display_manager_get().get_default_display().close()
+        default_display = gtk.gdk.display_manager_get().get_default_display()
+        if default_display is not None:
+            default_display.close()
         # This line is critical, because many gtk functions (even
         # _for_display/_for_screen functions) actually use the default
         # display, even if only temporarily.  For instance,

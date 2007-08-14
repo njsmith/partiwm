@@ -48,7 +48,7 @@ class _ErrorManager(object):
     def __init__(self):
         self.depth = 0
 
-    def enter(self):
+    def _enter(self):
         assert self.depth >= 0
         _gdk.error_trap_push()
         self.depth += 1
@@ -66,14 +66,6 @@ class _ErrorManager(object):
             else:
                 raise XError, error
 
-    def exit_unsynced(self):
-        self._exit(True)
-
-    def exit_synced(self):
-        self._exit(False)
-
-    exit = exit_unsynced
-
     def _call(self, need_sync, fun, args, kwargs):
         # Goal: call the function.  In all conditions, call _exit exactly once
         # on the way out.  However, if we are exiting because of an exception,
@@ -81,7 +73,7 @@ class _ErrorManager(object):
         # that might also be raised, so suppress the XError in that case.
         value = None
         try:
-            self.enter()
+            self._enter()
             value = fun(*args, **kwargs)
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()
