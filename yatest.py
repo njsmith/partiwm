@@ -26,7 +26,6 @@
 # Desireable future enhancements:
 #   -- Timeout support (even more fun select stuff -- this may call for
 #      twisted...).
-#   -- Ability to run specific tests
 #   -- Some way to have setup that happens in the parent for multiple children
 #      (e.g. spawning Xvfb, dbus-daemon, and trusting that they will reset
 #      when all their clients have been *killed off*, even if we do not trust
@@ -59,17 +58,19 @@ def ispkg(path):
 
 class YaTest(object):
     def main(self):
-        parser = OptionParser(usage="%prog PATH-TO-PACKAGE")
+        parser = OptionParser(usage="%prog PATH-TO-PACKAGE [TEST-NAMES]")
         parser.add_option("-S", "--nocapture",
                           dest="capture_output",
                           action="store_false", default=True,
                           help="disable capture of stdout/stderr from tests")
         (opts, args) = parser.parse_args()
-        if len(args) != 1:
-            parser.error("Takes exactly 1 argument")
+        if len(args) < 1:
+            parser.error("Requires at least 1 argument")
             
         pkg_path = args[0]
         assert ispkg(pkg_path)
+
+        test_names = args[1:]
 
         # Set up environment:
         pkg_dir, pkg_name = os.path.split(pkg_path)
@@ -81,7 +82,7 @@ class YaTest(object):
             del os.environ["DISPLAY"]
 
         reporter = Reporter()
-        Runner(reporter, opts.capture_output).scan_pkg(pkg_path, pkg_name)
+        Runner(reporter, opts.capture_output).scan_pkg(pkg_path, pkg_name, test_names)
         reporter.close()
         
 
@@ -94,22 +95,23 @@ class Runner(object):
         return (("test" in name or "Test" in name)
                 and getattr(obj, "__test__", True))
 
-    def scan_pkg(self, pkg_path, pkg_name):
+    def scan_pkg(self, pkg_path, pkg_name, test_names):
         assert ispkg(pkg_path)
         # packages are themselves basically modules
-        self.maybe_load_and_scan_module(pkg_name)
+        self.maybe_load_and_scan_module(pkg_name, test_names)
         # look for children
         for child_basename in os.listdir(pkg_path):
             child_path = os.path.join(pkg_path, child_basename)
             if ispkg(child_path):
                 self.scan_pkg(child_path,
-                              ".".join([pkg_name, child_basename]))
+                              ".".join([pkg_name, child_basename]),
+                              test_names)
             if (child_path.endswith(".py")
                 and child_basename != "__init__.py"):
                 child_modname = ".".join([pkg_name, child_basename[:-3]])
-                self.maybe_load_and_scan_module(child_modname)
+                self.maybe_load_and_scan_module(child_modname, test_names)
             
-    def maybe_load_and_scan_module(self, module_name):
+    def maybe_load_and_scan_module(self, module_name, test_names):
         # Hack: Skip out early if the module cannot possibly be interesting.
         if not self.thing_looks_testy(module_name, None):
             return
@@ -128,12 +130,23 @@ class Runner(object):
         for key, val in mod.__dict__.iteritems():
             if (self.thing_looks_testy(key, val)
                 and isinstance(val, (type, ClassType))):
-                self.run_test_class(".".join([module_name, key]), val)
+                self.run_test_class(".".join([module_name, key]), val, test_names)
 
-    def run_test_class(self, class_name, cls):
+    def method_matches_names(self, method_name, test_names):
+        if not test_names:
+            return True
+        else:
+            matches = False
+            for name in test_names:
+                if name in method_name:
+                    matches = True
+            return matches
+
+    def run_test_class(self, class_name, cls, test_names):
         for key, val in cls.__dict__.iteritems():
             if (self.thing_looks_testy(key, val)
-                and callable(val)):
+                and callable(val)
+                and self.method_matches_names(".".join([class_name, key]), test_names)):
                 self.run_test_method(class_name, cls, key)
 
     def run_test_method(self, class_name, cls, name):
