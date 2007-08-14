@@ -28,9 +28,9 @@
 #      twisted...).
 #   -- Ability to run specific tests
 #   -- Some way to have setup that happens in the parent for multiple children
-#      (e.g. spawning Xvfb, dbus-daemon, trusting that they will reset when
-#      all their clients have been *killed off*, even if we do not trust
-#      anything less than that to work).
+#      (e.g. spawning Xvfb, dbus-daemon, and trusting that they will reset
+#      when all their clients have been *killed off*, even if we do not trust
+#      anything less than that to clean things up fully).
 #   -- Parallelized testing?
 
 import sys
