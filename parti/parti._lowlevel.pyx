@@ -253,11 +253,11 @@ def get_xatom(display_source, str_or_xatom):
     integer (assumed to already be an X atom)."""
     if isinstance(str_or_xatom, (int, long)):
         return str_or_xatom
-    if isinstance(str_or_xatom, str):
-        str_or_xatom = gtk.gdk.atom_intern(str_or_xatom)
+    assert isinstance(str_or_xatom, str)
+    gdkatom = gtk.gdk.atom_intern(str_or_xatom)
     return gdk_x11_atom_to_xatom_for_display(
         get_raw_display_for(display_source),
-        PyGdkAtom_Get(gdkatom_or_str_or_xatom),
+        PyGdkAtom_Get(gdkatom),
         )
 
 def get_pyatom(display_source, xatom):
