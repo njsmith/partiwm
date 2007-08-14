@@ -22,7 +22,10 @@ class TestWithX(object):
     display = None
 
     def setUp(self):
-        self._x11 = subprocess.Popen(["Xvfb", self.display_name, "-ac"])
+        self._x11 = subprocess.Popen(["Xvfb", self.display_name,
+                                      "-ac",
+                                      "-audit", "10",
+                                      "+extension", "Composite"])
         # This is not a race condition, nor do we need to sleep here, because
         # gtk.gdk.Display is smart enough to silently block until the X server
         # comes up.

@@ -31,12 +31,12 @@ cdef extern from "Python.h":
     void Py_DECREF(object o)
     object PyString_FromStringAndSize(char * s, int len)
 
-# Serious black magic (I owe these guys beers):
+# Serious black magic happens here (I owe these guys beers):
 cdef extern from "pygobject.h":
     void init_pygobject()
 init_pygobject()
     
-cdef extern from"pygtk/pygtk.h":
+cdef extern from "pygtk/pygtk.h":
     void init_pygtk()
 init_pygtk()
 # Now all the macros in those header files will work.
@@ -312,7 +312,9 @@ def XGetWindowProperty(pywindow, property, req_type):
     cdef unsigned long nitems, bytes_after
     cdef unsigned char * prop
     cdef Status status
-    # This is the most bloody awful API I have ever seen.
+    # This is the most bloody awful API I have ever seen.  You will probably
+    # not be able to understand this code fully without reading
+    # XGetWindowProperty's man page at least 3 times, slowly.
     status = cXGetWindowProperty(get_xdisplay_for(pywindow),
                                  get_xwindow(pywindow),
                                  get_xatom(pywindow, property),

@@ -21,15 +21,14 @@
 # Except, if the module or class or method has __test__ = False set, then it
 # will be ignored.
 #
-# Having 'nose' installed will give you more details on errors.
-#
-# Limitations:
-#   1) All of your modules (or things that look like modules) will be
-#      imported.  Things will blow up if they can't be.
+# Having the 'nose' package installed will give you more details on errors.
 #
 # Desireable future enhancements:
 #   -- Output capturing for children (including children).  Who's up to
 #      writing a select loop and fun os.dup2 stuff?
+#   -- Timeout support (even more fun select stuff -- this may call for
+#      twisted...).
+#   -- Parallel testing?
 
 import sys
 import os
@@ -97,7 +96,12 @@ class Runner(object):
             
     def maybe_load_and_scan_module(self, module_name):
         # __import__("foo.bar.baz") returns the foo module object:
-        mod = __import__(module_name)
+        try:
+            mod = __import__(module_name)
+        except ImportError:
+            sys.stderr.write("Error loading module: %s; skipping\n"
+                             % module_name)
+            return
         for comp in module_name.split(".")[1:]:
            mod = getattr(mod, comp) 
         if not self.thing_looks_testy(module_name, mod):
