@@ -27,6 +27,10 @@
 #   -- Timeout support (even more fun select stuff -- this may call for
 #      twisted...).
 #   -- Ability to run specific tests
+#   -- Some way to have setup that happens in the parent for multiple children
+#      (e.g. spawning Xvfb, dbus-daemon, trusting that they will reset when
+#      all their clients have been *killed off*, even if we do not trust
+#      anything less than that to work).
 #   -- Parallelized testing?
 
 import sys
@@ -71,8 +75,10 @@ class YaTest(object):
         pkg_dir, pkg_name = os.path.split(pkg_path)
         sys.path.insert(0, pkg_dir)
 
-        del os.environ["DBUS_SESSION_BUS_ADDRESS"]
-        del os.environ["DISPLAY"]
+        if "DBUS_SESSION_BUS_ADDRESS" in os.environ:
+            del os.environ["DBUS_SESSION_BUS_ADDRESS"]
+        if "DISPLAY" in os.environ:
+            del os.environ["DISPLAY"]
 
         reporter = Reporter()
         Runner(reporter, opts.capture_output).scan_pkg(pkg_path, pkg_name)
