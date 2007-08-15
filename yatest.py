@@ -21,7 +21,9 @@
 # Except, if the module or class or method has __test__ = False set, then it
 # will be ignored.
 #
-# Having the 'nose' package installed will give you more details on errors.
+# If the codespeak 'py' package or the 'nose' package are installed, then
+# yatest will take advantage of them to give more detailed information on
+# errors.  Having both installed gives the most detail.
 #
 # Desireable future enhancements:
 #   -- Timeout support (even more fun select stuff -- this may call for
@@ -81,11 +83,24 @@ class YaTest(object):
         if "DISPLAY" in os.environ:
             del os.environ["DISPLAY"]
 
-        # Go.
-        reporter = Reporter()
-        Runner(reporter, opts.capture_output).scan_pkg(pkg_path, pkg_name, test_names)
-        reporter.close()
-        
+        try:
+            import py
+            magic_invoke = py.magic.invoke
+            magic_revoke = py.magic.revoke
+        except ImportError:
+            sys.stderr.write("py package is not installed; "
+                             + "giving unnecessarily boring tracebacks")
+            magic_invoke = lambda **kwargs: None
+            magic_revoke = lambda **kwargs: None
+
+        try:
+            magic_invoke(assertion=1)
+            # Go.
+            reporter = Reporter()
+            Runner(reporter, opts.capture_output).scan_pkg(pkg_path, pkg_name, test_names)
+            reporter.close()
+        finally:
+            magic_revoke(assertion=1)
 
 class Runner(object):
     def __init__(self, reporter, capture_output):
