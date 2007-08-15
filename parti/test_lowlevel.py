@@ -1,12 +1,8 @@
 # This is quite incomplete...
 # FIXME TODO:
-#   sendClientMessage
 #   sendConfigureNotify
 #   configureAndNotify
 #   substructureRedirect
-#   send_wm_take_focus
-#   myGetSelectionOwner
-#   addXSelectInput
 
 from parti.test import *
 import parti.lowlevel as l
@@ -268,3 +264,22 @@ class TestLowlevel(TestWithSession):
         assert root_ev.format == 32
         assert root_ev.data == data
         assert not self.win_evs
+
+    def test_send_wm_take_focus(self):
+        win = self.window()
+        gtk.gdk.flush()
+        self.event = None
+        def callback(event):
+            self.event = event
+            gtk.main_quit()
+        l.selectClientMessage(win, callback)
+        l.send_wm_take_focus(win, 1234)
+        gtk.main()
+        assert self.event is not None
+        assert self.event.window is win
+        assert self.event.message_type == "WM_PROTOCOLS"
+        assert self.event.format == 32
+        assert self.event.data == (l.get_xatom(win, "WM_TAKE_FOCUS"),
+                                   1234, 0, 0, 0)
+
+    # myGetSelectionOwner gets tested in test_selection.py

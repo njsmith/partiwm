@@ -62,6 +62,7 @@ class TestSelection(TestWithSession):
         # 2 = window belonging to manager.  We just check that it really is a
         # window.
         assert parti.lowlevel.get_pywindow(root2, self.event.data[2]) is not None
+        assert parti.lowlevel.myGetSelectionOwner(root2, "WM_S0") == self.event.data[2]
         # 3, 4 = 0
         assert self.event.data[3] == 0
         assert self.event.data[4] == 0
