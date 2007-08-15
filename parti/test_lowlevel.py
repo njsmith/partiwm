@@ -147,9 +147,85 @@ class TestLowlevel(TestWithSession):
         gtk.gdk.flush()
         assert l.is_mapped(win)
 
+    def test_focus_stuff(self):
+        w1 = self.window()
+        w1.show()
+        w2 = self.window()
+        w2.show()
+        gtk.gdk.flush()
+        self.w1_got, self.w2_got = None, None
+        self.w1_lost, self.w2_lost = None, None
+        def in_callback(ev):
+            if ev.window is w1:
+                assert self.w1_got is None
+                self.w1_got = ev
+            else:
+                assert self.w2_got is None
+                self.w2_got = ev
+            gtk.main_quit()
+        def out_callback(ev):
+            if ev.window is w1:
+                assert self.w1_lost is None
+                self.w1_lost = ev
+            else:
+                assert self.w2_lost is None
+                self.w2_lost = ev
+            gtk.main_quit()
+        l.selectFocusChange(w1, in_callback, out_callback)
+        l.selectFocusChange(w2, in_callback, out_callback)
+
+        print 1
+        gtk.gdk.flush()
+        print 2
+        l.XSetInputFocus(w1)
+        print 2.5
+        gtk.gdk.flush()
+        print 3
+        gtk.main()
+        assert self.w1_got is not None
+        assert self.w1_got.window is w1
+        assert self.w1_got.mode == l.const["NotifyNormal"]
+        assert self.w1_got.detail == l.const["NotifyNonlinear"]
+        self.w1_got = None
+        assert self.w2_got is None
+        assert self.w1_lost is None
+        assert self.w2_lost is None
+
+        l.XSetInputFocus(w2)
+        print 4
+        gtk.gdk.flush()
+        print 5
+        gtk.main()
+        gtk.main()
+        assert self.w1_got is None
+        assert self.w2_got is not None
+        assert self.w2_got.window is w2
+        assert self.w2_got.mode == l.const["NotifyNormal"]
+        assert self.w2_got.detail == l.const["NotifyNonlinear"]
+        self.w2_got = None
+        assert self.w1_lost is not None
+        assert self.w1_lost.window is w1
+        assert self.w1_lost.mode == l.const["NotifyNormal"]
+        assert self.w1_lost.detail == l.const["NotifyNonlinear"]
+        self.w1_lost = None
+        assert self.w2_lost is None
+
+        l.XSetInputFocus(self.root())
+        print 6
+        gtk.gdk.flush()
+        print 7
+        gtk.main()
+        print 8
+        assert self.w1_got is None
+        assert self.w2_got is None
+        assert self.w1_lost is None
+        assert self.w2_lost is not None
+        assert self.w2_lost.window is w2
+        assert self.w2_lost.mode == l.const["NotifyNormal"]
+        assert self.w2_lost.detail == l.const["NotifyAncestor"]
+        self.w2_lost = None
+        
     # TODO:
-    #   XSetInputFocus
-    #   selectFocusChange
     #   myGetSelectionOwner
     #   sendClientMessage
     #   sendConfigureNotify

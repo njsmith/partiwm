@@ -414,7 +414,7 @@ def XSetInputFocus(pywindow, time=None):
                     get_xwindow(pywindow),
                     RevertToParent,
                     time)
-    printFocus()
+    printFocus(pywindow)
 
 def printFocus(display_source):
     # Debugging
