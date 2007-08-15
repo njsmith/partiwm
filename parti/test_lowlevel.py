@@ -242,7 +242,6 @@ class TestLowlevel(TestWithSession):
         l.selectClientMessage(win, win_callback)
         gtk.gdk.flush()
 
-        print 1
         data = (0x01020304, 0x05060708, 0x090a0b0c, 0x0d0e0f10, 0x11121314)
         l.sendClientMessage(root, False, 0, "NOMASK", *data)
         l.sendClientMessage(win, False, 0, "NOMASK", *data)
@@ -255,21 +254,12 @@ class TestLowlevel(TestWithSession):
         assert win_ev.format == 32
         assert win_ev.data == data
 
-        print 2
         self.win_evs = []
-        gtk.gdk.flush()
         l.sendClientMessage(root, False, l.const["Button1MotionMask"],
                             "BAD", *data)
-        gtk.gdk.flush()
-        print 3
         l.addXSelectInput(root, l.const["Button1MotionMask"])
-        print 3.5
-        gtk.gdk.flush()
-        print 4
         l.sendClientMessage(root, False, l.const["Button1MotionMask"],
                             "GOOD", *data)
-        gtk.gdk.flush()
-        print 5
         gtk.main()
         assert len(self.root_evs) == 1
         root_ev = self.root_evs[0]
