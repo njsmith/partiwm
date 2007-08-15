@@ -135,6 +135,9 @@ class Wm(object):
                 and parti.lowlevel.is_mapped(w)):
                 self._manage_client(w)
 
+        # Start listening for client requests
+        parti.lowlevel.selectClientMessage(self._root, _handle_root_client_message)
+
         # Start providing D-Bus api
         self._dbus = PartiDBusService(self)
 
@@ -203,8 +206,6 @@ class Wm(object):
         # want to just pass on to GTK, but some we are especially interested
         # in...
         handlers = {
-            # Client events on root window, mostly
-            gtk.gdk.CLIENT_EVENT: self._dispatch_client_event,
             # These other events are on client windows, mostly
             gtk.gdk.PROPERTY_NOTIFY: self._dispatch_property_notify,
             gtk.gdk.UNMAP: self._dispatch_unmap,
@@ -224,10 +225,6 @@ class Wm(object):
         print event.window
         if event.type == gtk.gdk.FOCUS_CHANGE:
             print event.in_
-
-    def _dispatch_client_event(self, event):
-        if event.window == self._root:
-            self._handle_root_client_message(event)
 
     def _dispatch_property_notify(self, event):
         if event.window in self._windows:

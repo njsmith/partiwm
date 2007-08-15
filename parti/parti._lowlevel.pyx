@@ -714,6 +714,11 @@ cdef GdkFilterReturn clientEventFilter(GdkXEvent * e_gdk,
         dump_exc()
         raise
         
+# One might think that this was unnecessary, because GDK already knows about
+# client messages and has machinery to expose them, and PyGtk wraps it, even.
+# The problem is PyGtk bug #466990.  PyGtk's ClientMessage stuff is not 64-bit
+# clean; it totally corrupts the client message payload on 64-bit machines.
+# (Our API is better than PyGtk's too.)
 def selectClientMessage(pywindow, callback):
     # No need to select for ClientMessage; in fact, one cannot select for
     # ClientMessages.  If they are sent with an empty mask, then they go to

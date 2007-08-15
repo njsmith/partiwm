@@ -37,35 +37,34 @@ class TestSelection(TestWithSession):
         root1 = self.display.get_default_screen().get_root_window()
         d2 = self.clone_display()
         root2 = d2.get_default_screen().get_root_window()
-        root2.set_events(gtk.gdk.ALL_EVENTS_MASK)
-        self.client_event = None
-
-        # There is probably a less brute-force way to get this, but whatever.
-        def event_handler(event):
-            if (event.type == gtk.gdk.CLIENT_EVENT
-                and event.window is root2):
-                assert self.client_event is None
-                self.client_event = event
-                gtk.gdk.event_handler_set(gtk.main_do_event)
-                gtk.main_quit()
-            gtk.main_do_event(event)
-        gtk.gdk.event_handler_set(event_handler)
+        root2.set_events(gtk.gdk.STRUCTURE_MASK)
+        def callback(event):
+            self.event = event
+            gtk.main_quit()
+        parti.lowlevel.selectClientMessage(root2, callback)
+        d2.flush()
+        self.event = None
 
         assert not m.owned()
-        assert self.client_event is None
+        assert self.event is None
         m.acquire()
         gtk.main()
-        assert self.client_event is not None
-        assert self.client_event.window is root2
-        assert self.client_event.message_type == "MANAGER"
-        assert self.client_event.data_format == 32
-        # FIXME: This is running into PyGtk bug #466990, which means that
-        # when using the PyGtk GdkEventClient binding on a 64-bit machine we
-        # can only get at ~half the client event's data.  We need to add a
-        # selectClientEvent thing to parti.lowlevel and skip this mess.
-        # (This will currently fail on 32-bit systems, just to remind us.)
-        assert (struct.unpack("@l", self.client_event.data[8:16])[0]
-                == parti.lowlevel.get_xatom(self.display, "WM_S0"))
+        assert self.event is not None
+        assert self.event.window is root2
+        assert self.event.message_type == "MANAGER"
+        assert self.event.format == 32
+        # FIXME: is there any sensible way to check data[0] (timestamp) and
+        # data[2] (window id)?
+        # 0 = timestamp
+        # FIXME: how to check this?
+        # 1 = manager atom
+        assert self.event.data[1] == parti.lowlevel.get_xatom(root2, "WM_S0")
+        # 2 = window belonging to manager.  We just check that it really is a
+        # window.
+        assert parti.lowlevel.get_pywindow(root2, self.event.data[2]) is not None
+        # 3, 4 = 0
+        assert self.event.data[3] == 0
+        assert self.event.data[4] == 0
 
     def test_conversion(self):
         m = ManagerSelection(self.display, "WM_S0")
