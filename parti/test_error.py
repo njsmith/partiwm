@@ -14,17 +14,20 @@ class TestError(TestWithSession):
                              event_mask=0)
         win.destroy()
         parti.lowlevel.XAddToSaveSet(win)
+        return 3
 
     def test_call(self):
-        trap.call(lambda: 1)
+        assert trap.call(lambda: 0) == 0
+        assert trap.call(lambda: 1) == 1
         try:
             trap.call(self.cause_badwindow)
         except XError, e:
             assert e.args == (parti.lowlevel.const["BadWindow"],)
 
     def test_swallow(self):
-        trap.swallow(lambda: 1)
-        trap.swallow(self.cause_badwindow)
+        assert trap.swallow(lambda: 0) is None
+        assert trap.swallow(lambda: 1) is None
+        assert trap.swallow(self.cause_badwindow) is None
 
     def test_assert_out(self):
         def foo():

@@ -134,7 +134,7 @@ class Runner(object):
         # __import__("foo.bar.baz") returns the foo module object:
         try:
             mod = __import__(module_name)
-        except ImportError:
+        except (ImportError, SyntaxError):
             sys.stderr.write("Error loading module: %s; skipping\n"
                              % module_name)
             return

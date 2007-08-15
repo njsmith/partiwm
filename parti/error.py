@@ -24,9 +24,9 @@
 import sys
 
 import gtk.gdk as _gdk
-import parti.lowlevel as _lowlevel
 
-XError = _lowlevel.XError
+class XError(Exception):
+    pass
 
 ### Exceptions cannot be new-style classes.  Who came up with _that_ one?
 # # Define its more precise subclasses, XBadRequest, XBadValue, etc.
@@ -59,7 +59,7 @@ class _ErrorManager(object):
             _gdk.flush()
         # This is a Xlib error constant (Success == 0)
         error = _gdk.error_trap_pop()
-        if error != _lowlevel.const["Success"]:
+        if error:
             if error in _exc_for_error:
                 raise _exc_for_error[error](error)
             else:
@@ -94,17 +94,19 @@ class _ErrorManager(object):
 
     def swallow_unsynced(self, fun, *args, **kwargs):
         try:
-            return self.call_unsynced(fun, *args, **kwargs)
+            self.call_unsynced(fun, *args, **kwargs)
         except XError, e:
             print "Ignoring X error: %s" % e
             pass
+        return None
 
     def swallow_synced(self, fun, *args, **kwargs):
         try:
-            return self.call_synced(fun, *args, **kwargs)
+            self.call_synced(fun, *args, **kwargs)
         except XError:
             print "Ignoring X error: %s" % e
             pass
+        return None
 
     swallow = swallow_unsynced
 

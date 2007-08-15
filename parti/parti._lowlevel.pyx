@@ -11,6 +11,7 @@ import gtk
 import gtk.gdk
 
 from parti.util import dump_exc
+from parti.error import trap, XError
 
 ###################################
 # Headers, python magic
@@ -207,8 +208,6 @@ cdef extern from *:
 ######
 
 # Basic utilities:
-class XError(Exception):
-    pass
 
 cdef extern from *:
     ctypedef struct cGdkWindow "GdkWindow":
@@ -557,40 +556,60 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
                                                 void * userdata):
     cdef XEvent * e
     e = <XEvent*>e_gdk
+    cu = trap.call_unsynced
     try:
         (disp, map_callback, configure_callback, circulate_callback) = <object>userdata
         if e.type == MapRequest:
             print "MapRequest"
             if map_callback is not None:
                 pyev = LameStruct()
-                pyev.parent = get_pywindow(disp, e.xmaprequest.parent)
-                pyev.window = get_pywindow(disp, e.xmaprequest.window)
-                map_callback(pyev)
+                try:
+                    pyev.parent = cu(get_pywindow,
+                                     disp, e.xmaprequest.parent)
+                    pyev.window = cu(get_pywindow,
+                                     disp, e.xmaprequest.window)
+                except XError:
+                    print "Window disappeared before MapRequest handled, ignoring"
+                else:
+                    map_callback(pyev)
             return GDK_FILTER_REMOVE
         elif e.type == ConfigureRequest:
             print "ConfigureRequest"
             if configure_callback is not None:
                 pyev = LameStruct()
-                pyev.parent = get_pywindow(disp, e.xconfigurerequest.parent)
-                pyev.window = get_pywindow(disp, e.xconfigurerequest.window)
-                pyev.x = e.xconfigurerequest.x
-                pyev.y = e.xconfigurerequest.y
-                pyev.width = e.xconfigurerequest.width
-                pyev.height = e.xconfigurerequest.height
-                pyev.border_width = e.xconfigurerequest.border_width
-                pyev.above = get_pywindow(disp, e.xconfigurerequest.above)
-                pyev.detail = e.xconfigurerequest.detail
-                pyev.value_mask = e.xconfigurerequest.value_mask
-                configure_callback(pyev)
+                try:
+                    pyev.parent = cu(get_pywindow,
+                                     disp, e.xconfigurerequest.parent)
+                    pyev.window = cu(get_pywindow,
+                                     disp, e.xconfigurerequest.window)
+                    pyev.x = e.xconfigurerequest.x
+                    pyev.y = e.xconfigurerequest.y
+                    pyev.width = e.xconfigurerequest.width
+                    pyev.height = e.xconfigurerequest.height
+                    pyev.border_width = e.xconfigurerequest.border_width
+                    pyev.above = cu(get_pywindow,
+                                    disp, e.xconfigurerequest.above)
+                    pyev.detail = e.xconfigurerequest.detail
+                    pyev.value_mask = e.xconfigurerequest.value_mask
+                except XError:
+                    print "Window disappeared before ConfigureRequest handled, ignoring"
+                else:
+                    configure_callback(pyev)
             return GDK_FILTER_REMOVE
         elif e.type == CirculateRequest:
             print "CirculateRequest"
             if circulate_callback is not None:
                 pyev = LameStruct()
-                pyev.parent = get_pywindow(disp, e.xcirculaterequest.parent)
-                pyev.window = get_pywindow(disp, e.xcirculaterequest.window)
-                pyev.place = e.xcirculaterequest.place
-                circulate_callback(pyev)
+                try:
+                    pyev.parent = cu(get_pywindow,
+                                     disp, e.xcirculaterequest.parent)
+                    pyev.window = cu(get_pywindow,
+                                     disp, e.xcirculaterequest.window)
+                    pyev.place = e.xcirculaterequest.place
+                except XError:
+                    print "Window disappeared before CirculateRequest handled, ignoring"
+                else:
+                    circulate_callback(pyev)
             return GDK_FILTER_REMOVE
         return GDK_FILTER_CONTINUE
     except:
@@ -627,7 +646,12 @@ cdef GdkFilterReturn focusFilter(GdkXEvent * e_gdk,
     try:
         (disp, focus_in_callback, focus_out_callback) = <object>userdata
         pyev = LameStruct()
-        pyev.window = get_pywindow(disp, e.xfocus.window)
+        try:
+            pyev.window = trap.call_unsynced(get_pywindow,
+                                             disp, e.xfocus.window)
+        except XError:
+            print "focus event on disappeared window, ignoring"
+            return GDK_FILTER_CONTINUE
         pyev.mode = e.xfocus.mode
         pyev.detail = e.xfocus.detail
         if e.type == FocusIn:

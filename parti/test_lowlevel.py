@@ -1,4 +1,12 @@
-# This is so incomplete...
+# This is quite incomplete...
+# FIXME TODO:
+#   sendClientMessage
+#   sendConfigureNotify
+#   configureAndNotify
+#   substructureRedirect
+#   send_wm_take_focus
+#   myGetSelectionOwner
+#   addXSelectInput
 
 from parti.test import *
 import parti.lowlevel as l
@@ -216,11 +224,3 @@ class TestLowlevel(TestWithSession):
         assert self.w2_lost.detail == l.const["NotifyAncestor"]
         self.w2_lost = None
         
-    # TODO:
-    #   sendClientMessage
-    #   sendConfigureNotify
-    #   configureAndNotify
-    #   substructureRedirect
-    #   send_wm_take_focus
-    #   myGetSelectionOwner
-    #   addXSelectInput
