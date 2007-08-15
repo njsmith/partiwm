@@ -59,12 +59,10 @@ class TestSelection(TestWithSession):
         assert self.client_event.window is root2
         assert self.client_event.message_type == "MANAGER"
         assert self.client_event.data_format == 32
-        # FIXME FILE GDK-BUG: on a 64-bit machine, when data_format==32 the
-        # underlying XClientMessageEvent.data ends up with the 5 4-byte
-        # integers dumped into 5 8-byte integers.  Then GDK appears to read
-        # them out as 20 1-byte characters (or similar), so it chops the
-        # actual data in half; in fact self.client_event.data has two and a
-        # half longs in it...
+        # FIXME: This is running into PyGtk bug #466990, which means that
+        # when using the PyGtk GdkEventClient binding on a 64-bit machine we
+        # can only get at ~half the client event's data.  We need to add a
+        # selectClientEvent thing to parti.lowlevel and skip this mess.
         # (This will currently fail on 32-bit systems, just to remind us.)
         assert (struct.unpack("@l", self.client_event.data[8:16])[0]
                 == parti.lowlevel.get_xatom(self.display, "WM_S0"))

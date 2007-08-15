@@ -174,13 +174,9 @@ class TestLowlevel(TestWithSession):
         l.selectFocusChange(w1, in_callback, out_callback)
         l.selectFocusChange(w2, in_callback, out_callback)
 
-        print 1
         gtk.gdk.flush()
-        print 2
         l.XSetInputFocus(w1)
-        print 2.5
         gtk.gdk.flush()
-        print 3
         gtk.main()
         assert self.w1_got is not None
         assert self.w1_got.window is w1
@@ -192,9 +188,7 @@ class TestLowlevel(TestWithSession):
         assert self.w2_lost is None
 
         l.XSetInputFocus(w2)
-        print 4
         gtk.gdk.flush()
-        print 5
         gtk.main()
         gtk.main()
         assert self.w1_got is None
@@ -211,11 +205,8 @@ class TestLowlevel(TestWithSession):
         assert self.w2_lost is None
 
         l.XSetInputFocus(self.root())
-        print 6
         gtk.gdk.flush()
-        print 7
         gtk.main()
-        print 8
         assert self.w1_got is None
         assert self.w2_got is None
         assert self.w1_lost is None
@@ -226,10 +217,10 @@ class TestLowlevel(TestWithSession):
         self.w2_lost = None
         
     # TODO:
-    #   myGetSelectionOwner
     #   sendClientMessage
     #   sendConfigureNotify
     #   configureAndNotify
-    #   addXSelectInput
     #   substructureRedirect
     #   send_wm_take_focus
+    #   myGetSelectionOwner
+    #   addXSelectInput
