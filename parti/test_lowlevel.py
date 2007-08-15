@@ -33,7 +33,7 @@ class TestLowlevel(TestWithSession):
         assert l.get_xwindow(r1) != l.get_xwindow(win)
         assert l.get_pywindow(r2, l.get_xwindow(r1)) is r2
 
-        assert_raises(TypeError, l.get_pywindow, self.display, 0)
+        assert_raises(l.XError, l.get_pywindow, self.display, 0)
 
     def test_get_display_for(self):
         assert l.get_display_for(self.display) is self.display
@@ -136,8 +136,10 @@ class TestLowlevel(TestWithSession):
 
     def test_is_mapped(self):
         win = self.window()
+        gtk.gdk.flush()
         assert not l.is_mapped(win)
-        win.map()
+        win.show()
+        gtk.gdk.flush()
         assert l.is_mapped(win)
 
     # TODO:

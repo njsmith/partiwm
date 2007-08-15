@@ -1,5 +1,6 @@
 import unittest
 import subprocess
+import sys
 import os
 import gtk
 import gtk.gdk
@@ -13,7 +14,8 @@ def assert_raises(exc_class, f, *args, **kwargs):
     except exc_class:
         pass
     except:
-        raise AssertionError, "unexpected exception"
+        (cls, e, tb) = sys.exc_info()
+        raise AssertionError, "unexpected exception: %s: %s" % (cls, e)
     else:
         raise AssertionError, "no exception"
 
