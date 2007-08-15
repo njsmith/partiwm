@@ -2,6 +2,7 @@ import unittest
 import subprocess
 import sys
 import os
+import traceback
 import gtk
 import gtk.gdk
 
@@ -11,14 +12,17 @@ __test__ = False
 def assert_raises(exc_class, f, *args, **kwargs):
     # exc_class can be a tuple.
     try:
-        f(*args, **kwargs)
+        value = f(*args, **kwargs)
     except exc_class:
         pass
     except:
         (cls, e, tb) = sys.exc_info()
-        raise AssertionError, "unexpected exception: %s: %s" % (cls, e)
+        raise AssertionError, (("unexpected exception: %s: %s\n"
+                               + "Original traceback:\n%s")
+                               % (cls, e, traceback.format_exc()))
     else:
-        raise AssertionError, "no exception"
+        raise AssertionError, \
+              "wanted exception, got normal return (%r)" % (value,)
 
 class TestWithSession(object):
     "A test that runs with its own isolated X11 and D-Bus session."

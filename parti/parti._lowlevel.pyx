@@ -323,11 +323,12 @@ class NoSuchProperty(PropertyError):
 def XGetWindowProperty(pywindow, property, req_type):
     # "64k is enough for anybody"
     buffer_size = 64 * 1024
-    cdef Atom actual_type
+    cdef Atom xactual_type
     cdef int actual_format
     cdef unsigned long nitems, bytes_after
     cdef unsigned char * prop
     cdef Status status
+    xreq_type = get_xatom(pywindow, req_type)
     # This is the most bloody awful API I have ever seen.  You will probably
     # not be able to understand this code fully without reading
     # XGetWindowProperty's man page at least 3 times, slowly.
@@ -339,14 +340,17 @@ def XGetWindowProperty(pywindow, property, req_type):
                                  # speaks the spec.
                                  buffer_size / 4,
                                  False,
-                                 get_xatom(pywindow, req_type), &actual_type,
+                                 xreq_type, &xactual_type,
                                  &actual_format, &nitems, &bytes_after, &prop)
+    print req_type, get_xatom(pywindow, req_type), xactual_type, get_pyatom(pywindow, xactual_type)
     if status != Success:
         raise PropertyError, "no such window"
-    if actual_type == XNone:
+    if xactual_type == XNone:
         raise NoSuchProperty, property
-    if bytes_after and not nitems:
-        raise BadPropertyType, actual_type
+    if xreq_type != xactual_type:
+        raise BadPropertyType, xactual_type
+    # This should only occur for bad property types:
+    assert not (bytes_after and not nitems)
     # actual_format is in (8, 16, 32), and is the number of bits in a logical
     # element.  However, this doesn't mean that each element is stored in that
     # many bits, oh no.  On a 32-bit machine it is, but on a 64-bit machine,
@@ -556,7 +560,7 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
                                                 void * userdata):
     cdef XEvent * e
     e = <XEvent*>e_gdk
-    cu = trap.call_unsynced
+    cu = trap.call_synced
     try:
         (disp, map_callback, configure_callback, circulate_callback) = <object>userdata
         if e.type == MapRequest:
@@ -564,9 +568,9 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
             if map_callback is not None:
                 pyev = LameStruct()
                 try:
-                    pyev.parent = cu(get_pywindow,
+                    pyev.parent = cs(get_pywindow,
                                      disp, e.xmaprequest.parent)
-                    pyev.window = cu(get_pywindow,
+                    pyev.window = cs(get_pywindow,
                                      disp, e.xmaprequest.window)
                 except XError:
                     print "MapRequest on disappeared window, ignoring"
@@ -578,16 +582,16 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
             if configure_callback is not None:
                 pyev = LameStruct()
                 try:
-                    pyev.parent = cu(get_pywindow,
+                    pyev.parent = cs(get_pywindow,
                                      disp, e.xconfigurerequest.parent)
-                    pyev.window = cu(get_pywindow,
+                    pyev.window = cs(get_pywindow,
                                      disp, e.xconfigurerequest.window)
                     pyev.x = e.xconfigurerequest.x
                     pyev.y = e.xconfigurerequest.y
                     pyev.width = e.xconfigurerequest.width
                     pyev.height = e.xconfigurerequest.height
                     pyev.border_width = e.xconfigurerequest.border_width
-                    pyev.above = cu(get_pywindow,
+                    pyev.above = cs(get_pywindow,
                                     disp, e.xconfigurerequest.above)
                     pyev.detail = e.xconfigurerequest.detail
                     pyev.value_mask = e.xconfigurerequest.value_mask
@@ -601,9 +605,9 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
             if circulate_callback is not None:
                 pyev = LameStruct()
                 try:
-                    pyev.parent = cu(get_pywindow,
+                    pyev.parent = cs(get_pywindow,
                                      disp, e.xcirculaterequest.parent)
-                    pyev.window = cu(get_pywindow,
+                    pyev.window = cs(get_pywindow,
                                      disp, e.xcirculaterequest.window)
                     pyev.place = e.xcirculaterequest.place
                 except XError:
@@ -647,8 +651,8 @@ cdef GdkFilterReturn focusFilter(GdkXEvent * e_gdk,
         (disp, focus_in_callback, focus_out_callback) = <object>userdata
         pyev = LameStruct()
         try:
-            pyev.window = trap.call_unsynced(get_pywindow,
-                                             disp, e.xfocus.window)
+            pyev.window = trap.call_synced(get_pywindow,
+                                           disp, e.xfocus.window)
         except XError:
             print "focus event on disappeared window, ignoring"
             return GDK_FILTER_CONTINUE
@@ -692,8 +696,8 @@ cdef GdkFilterReturn clientEventFilter(GdkXEvent * e_gdk,
         (disp, callback) = <object>userdata
         pyev = LameStruct()
         try:
-            pyev.window = trap.call_unsynced(get_pywindow,
-                                             disp, e.xany.window)
+            pyev.window = trap.call_synced(get_pywindow,
+                                           disp, e.xany.window)
             pyev.message_type = get_pyatom(disp, e.xclient.message_type)
             pyev.format = e.xclient.format
             # I am lazy.  Add this later if needed for some reason.

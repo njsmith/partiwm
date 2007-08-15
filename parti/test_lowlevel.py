@@ -1,4 +1,4 @@
-# This is quite incomplete...
+# This is incomplete...
 # FIXME TODO:
 #   sendConfigureNotify
 #   configureAndNotify
@@ -89,6 +89,13 @@ class TestLowlevel(TestWithSession):
                           ("GHJK", 32, "\x00" * 512 * (2 ** 10)))
         assert_raises(l.PropertyOverflow,
                       l.XGetWindowProperty, r, "ASDF", "GHJK")
+
+    def test_BadProperty_on_empty(self):
+        win = self.window()
+        l.XChangeProperty(win, "ASDF", ("GHJK", 32, ""))
+        assert l.XGetWindowProperty(win, "ASDF", "GHJK") == ""
+        assert_raises(l.BadPropertyType,
+                      l.XGetWindowProperty, win, "ASDF", "ASDF")
 
     def test_get_children_and_reparent(self):
         d2 = self.clone_display()
