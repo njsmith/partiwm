@@ -224,3 +224,57 @@ class TestLowlevel(TestWithSession):
         assert self.w2_lost.detail == l.const["NotifyAncestor"]
         self.w2_lost = None
         
+    def test_select_clientmessage_and_xselectinput(self):
+        root = self.root()
+        win = self.window()
+        gtk.gdk.flush()
+        self.root_evs = []
+        def root_callback(ev):
+            print "root!"
+            self.root_evs.append(ev)
+            gtk.main_quit()
+        self.win_evs = []
+        def win_callback(ev):
+            print "win!"
+            self.win_evs.append(ev)
+            gtk.main_quit()
+        l.selectClientMessage(root, root_callback)
+        l.selectClientMessage(win, win_callback)
+        gtk.gdk.flush()
+
+        print 1
+        data = (0x01020304, 0x05060708, 0x090a0b0c, 0x0d0e0f10, 0x11121314)
+        l.sendClientMessage(root, False, 0, "NOMASK", *data)
+        l.sendClientMessage(win, False, 0, "NOMASK", *data)
+        gtk.main()
+        assert not self.root_evs
+        assert len(self.win_evs) == 1
+        win_ev = self.win_evs[0]
+        assert win_ev.window is win
+        assert win_ev.message_type == "NOMASK"
+        assert win_ev.format == 32
+        assert win_ev.data == data
+
+        print 2
+        self.win_evs = []
+        gtk.gdk.flush()
+        l.sendClientMessage(root, False, l.const["Button1MotionMask"],
+                            "BAD", *data)
+        gtk.gdk.flush()
+        print 3
+        l.addXSelectInput(root, l.const["Button1MotionMask"])
+        print 3.5
+        gtk.gdk.flush()
+        print 4
+        l.sendClientMessage(root, False, l.const["Button1MotionMask"],
+                            "GOOD", *data)
+        gtk.gdk.flush()
+        print 5
+        gtk.main()
+        assert len(self.root_evs) == 1
+        root_ev = self.root_evs[0]
+        assert root_ev.window is root
+        assert root_ev.message_type == "GOOD"
+        assert root_ev.format == 32
+        assert root_ev.data == data
+        assert not self.win_evs

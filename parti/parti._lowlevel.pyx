@@ -433,8 +433,8 @@ def myGetSelectionOwner(display_source, pyatom):
 def sendClientMessage(target, propagate, event_mask,
                       message_type, data0, data1, data2, data3, data4):
     # data0 etc. are passed through get_xatom, so they can be integers, which
-    # are passed through directly, or else they can be any form of atom (in
-    # particular, strings), which are converted appropriately.
+    # are passed through directly, or else they can be strings, which are
+    # converted appropriately.
     cdef Display * display
     display = get_xdisplay_for(target)
     cdef Window w
@@ -569,7 +569,7 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
                     pyev.window = cu(get_pywindow,
                                      disp, e.xmaprequest.window)
                 except XError:
-                    print "Window disappeared before MapRequest handled, ignoring"
+                    print "MapRequest on disappeared window, ignoring"
                 else:
                     map_callback(pyev)
             return GDK_FILTER_REMOVE
@@ -592,7 +592,7 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
                     pyev.detail = e.xconfigurerequest.detail
                     pyev.value_mask = e.xconfigurerequest.value_mask
                 except XError:
-                    print "Window disappeared before ConfigureRequest handled, ignoring"
+                    print "ConfigureRequest on disappeared window, ignoring"
                 else:
                     configure_callback(pyev)
             return GDK_FILTER_REMOVE
@@ -607,7 +607,7 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
                                      disp, e.xcirculaterequest.window)
                     pyev.place = e.xcirculaterequest.place
                 except XError:
-                    print "Window disappeared before CirculateRequest handled, ignoring"
+                    print "CirculateRequest on disappeared window, ignoring"
                 else:
                     circulate_callback(pyev)
             return GDK_FILTER_REMOVE
@@ -680,4 +680,52 @@ def selectFocusChange(pywindow, in_callback, out_callback):
     Py_INCREF(callback_tuple)
     gdk_window_add_filter(<cGdkWindow*>unwrap(pywindow, gtk.gdk.Window),
                           focusFilter,
+                          <void*>callback_tuple)
+
+
+cdef GdkFilterReturn clientEventFilter(GdkXEvent * e_gdk,
+                                       GdkEvent * gdk_event,
+                                       void * userdata):
+    cdef XEvent * e
+    e = <XEvent*>e_gdk
+    try:
+        (disp, callback) = <object>userdata
+        pyev = LameStruct()
+        try:
+            pyev.window = trap.call_unsynced(get_pywindow,
+                                             disp, e.xany.window)
+            pyev.message_type = get_pyatom(disp, e.xclient.message_type)
+            pyev.format = e.xclient.format
+            # I am lazy.  Add this later if needed for some reason.
+            if pyev.format != 32:
+                print "Ignoring ClientMessage with format != 32"
+                return GDK_FILTER_CONTINUE
+            pieces = []
+            for i in xrange(5):
+                pieces.append(int(e.xclient.data.l[i]))
+            pyev.data = tuple(pieces)
+        except XError:
+            print "ClientMessage on disappeared window, ignoring"
+        else:
+            callback(pyev)
+        return GDK_FILTER_CONTINUE
+    except:
+        print "Exception in pyrex callback:"
+        dump_exc()
+        raise
+        
+def selectClientMessage(pywindow, callback):
+    # No need to select for ClientMessage; in fact, one cannot select for
+    # ClientMessages.  If they are sent with an empty mask, then they go to
+    # the client that owns the window they are sent to, otherwise they go to
+    # any clients that are selecting for that mask they are sent with.
+    disp = get_display_for(pywindow)
+    callback_tuple = (disp, callback)
+    # This tuple will be leaving Python-space.
+    # FIXME: LEAK: how can we get notified when the GdkWindow eventually is
+    # destructed, so we can DECREF?  (For that matter, are we sure that the
+    # GdkWindow actually will be destructed?)
+    Py_INCREF(callback_tuple)
+    gdk_window_add_filter(<cGdkWindow*>unwrap(pywindow, gtk.gdk.Window),
+                          clientEventFilter,
                           <void*>callback_tuple)
