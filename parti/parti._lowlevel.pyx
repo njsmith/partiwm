@@ -231,7 +231,7 @@ def get_display_for(obj):
                           gtk.Clipboard)):
         return obj.get_display()
     else:
-        assert False, "Don't know how to get a display from %r" % (obj,)
+        raise TypeError, "Don't know how to get a display from %r" % (obj,)
 
 cdef cGdkDisplay * get_raw_display_for(obj) except? NULL:
     return <cGdkDisplay*> unwrap(get_display_for(obj), gtk.gdk.Display)
