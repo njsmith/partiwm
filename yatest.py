@@ -81,6 +81,7 @@ class YaTest(object):
         if "DISPLAY" in os.environ:
             del os.environ["DISPLAY"]
 
+        # Go.
         reporter = Reporter()
         Runner(reporter, opts.capture_output).scan_pkg(pkg_path, pkg_name, test_names)
         reporter.close()
