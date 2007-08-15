@@ -26,8 +26,7 @@ import sys
 import gtk.gdk as _gdk
 import parti.lowlevel as _lowlevel
 
-class XError(Exception):
-    pass
+XError = _lowlevel.XError
 
 ### Exceptions cannot be new-style classes.  Who came up with _that_ one?
 # # Define its more precise subclasses, XBadRequest, XBadValue, etc.

@@ -207,6 +207,9 @@ cdef extern from *:
 ######
 
 # Basic utilities:
+class XError(Exception):
+    pass
+
 cdef extern from *:
     ctypedef struct cGdkWindow "GdkWindow":
         pass
@@ -221,7 +224,10 @@ def get_xwindow(pywindow):
 
 def get_pywindow(display_source, xwindow):
     disp = get_display_for(display_source)
-    return gtk.gdk.window_foreign_new_for_display(disp, xwindow)
+    win = gtk.gdk.window_foreign_new_for_display(disp, xwindow)
+    if win is None:
+        raise XError, BadWindow
+    return win
 
 def get_display_for(obj):
     if isinstance(obj, gtk.gdk.Display):

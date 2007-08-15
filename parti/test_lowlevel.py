@@ -14,7 +14,11 @@ class TestLowlevel(TestWithSession):
         if disp is None:
             disp = self.display
         win = gtk.gdk.Window(self.root(disp), width=10, height=10,
-                             window_type=gtk.gdk.WINDOW_TOPLEVEL,
+                             # WINDOW_CHILD is sort of bogus, but it reduces
+                             # the amount of magic that GDK will do (e.g.,
+                             # WINDOW_TOPLEVELs automatically get a child
+                             # window to be used in focus management).
+                             window_type=gtk.gdk.WINDOW_CHILD,
                              wclass=gtk.gdk.INPUT_OUTPUT,
                              event_mask=0)
         return win
@@ -28,6 +32,8 @@ class TestLowlevel(TestWithSession):
         win = self.window()
         assert l.get_xwindow(r1) != l.get_xwindow(win)
         assert l.get_pywindow(r2, l.get_xwindow(r1)) is r2
+
+        assert_raises(TypeError, l.get_pywindow, self.display, 0)
 
     def test_get_display_for(self):
         assert l.get_display_for(self.display) is self.display
@@ -75,24 +81,58 @@ class TestLowlevel(TestWithSession):
         assert_raises(PropertyOverflow,
                       l.XGetWindowProperty, r, "ASDF", "GHJK")
 
-    def test_add_to_save_set_and_get_children_and_reparent(self):
+    def test_get_children_and_reparent(self):
         d2 = self.clone_display()
         w1 = self.window(self.display)
         w2 = self.window(d2)
-        w1on2 = l.get_pywindow(w2, l.get_xwindow(w1))
-        w2on1 = l.get_pywindow(w1, l.get_xwindow(w2))
+        gtk.gdk.flush()
 
         assert not l.get_children(w1)
         children = l.get_children(self.root())
         xchildren = map(l.get_xwindow, children)
         xwins = map(l.get_xwindow, [w1, w2])
-        assert sorted(xchildren) == sorted(xwins)
+        # GDK creates an invisible child of the root window on each
+        # connection, so there are some windows we don't know about:
+        for known in xwins:
+            assert known in xchildren
 
-        w1.reparent(w2on1, 0, 0)
-        assert l.get_children(w2)[0] == w1on2
-        l.XAddToSaveSet(w1on2)
-        d2.close()
-        assert l.get_children(self.root())[0] is w1
+        w1.reparent(l.get_pywindow(w1, l.get_xwindow(w2)), 0, 0)
+        gtk.gdk.flush()
+        assert map(l.get_xwindow, l.get_children(w2)) == [l.get_xwindow(w1)]
+
+    def test_save_set(self):
+        w1 = self.window(self.display)
+        w2 = self.window(self.display)
+        gtk.gdk.flush()
+        
+        import os
+        def do_child(disp_name, xwindow1, xwindow2):
+            d2 = gtk.gdk.Display(disp_name)
+            w1on2 = l.get_pywindow(d2, xwindow1)
+            w2on2 = l.get_pywindow(d2, xwindow2)
+            mywin = self.window(d2)
+            print "mywin == %s" % l.get_xwindow(mywin)
+            w1on2.reparent(mywin, 0, 0)
+            w2on2.reparent(mywin, 0, 0)
+            gtk.gdk.flush()
+            l.XAddToSaveSet(w1on2)
+            gtk.gdk.flush()
+            # But we don't XAddToSaveSet(w2on2)
+        pid = os.fork()
+        if not pid:
+            # Child
+            try:
+                do_child(self.display.get_name(), l.get_xwindow(w1), l.get_xwindow(w2))
+            finally:
+                os._exit(0)
+        # Parent
+        os.waitpid(pid, 0)
+        # Is there a race condition here, where the child exits but the X
+        # server doesn't notice until after we send our commands?
+        print map(l.get_xwindow, [w1, w2])
+        print map(l.get_xwindow, l.get_children(self.root()))
+        assert w1 in l.get_children(self.root())
+        assert w2 not in l.get_children(self.root())
 
     def test_is_mapped(self):
         win = self.window()

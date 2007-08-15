@@ -207,8 +207,18 @@ class Runner(object):
 
     def string_for_traceback(self, exc_info):
         tb = "".join(traceback.format_exception(*exc_info))
-        details = inspect_traceback(exc_info[2])
-        return "%s\nDetails of failing source:\n%s" % (tb, details)
+        # nose's inspect_traceback blows up when run on exceptions thrown out
+        # of Pyrex.  FIXME: file nose bug
+        try:
+            details = inspect_traceback(exc_info[2])
+        except SystemExit, KeyboardInterrupt:
+            raise
+        except Exception, e:
+            details = ("(failed to extract details;\n"
+                       + "nose.inspect.inspect_traceback threw exception:\n"
+                       + traceback.format_exc()
+                       + ")")
+        return "%s\nDetails of failing source code:\n%s" % (tb, details)
 
     def marshal_one_result(self, result):
         if result is None:
