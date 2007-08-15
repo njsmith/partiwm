@@ -5,7 +5,8 @@ rm -rf build install
 python make-constants-pxi.py parti/parti._lowlevel.const.txt parti/parti._lowlevel.const.pxi
 CFLAGS=-O0 python setup.py install --home=install
 
-#gdb --args /usr/bin/python
 #/usr/bin/nosetests -w install/lib/python/parti "$@"
 #py.test install/lib/python "$@"
+#valgrind
+#gdb --args 
 python ./yatest.py install/lib/python/parti "$@"
