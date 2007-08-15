@@ -1,7 +1,5 @@
 # This is so incomplete...
 
-__test__ = False
-
 from parti.test import *
 import parti.lowlevel as l
 import gtk
@@ -19,7 +17,7 @@ class TestLowlevel(TestWithSession):
                              window_type=gtk.gdk.WINDOW_TOPLEVEL,
                              wclass=gtk.gdk.INPUT_OUTPUT,
                              event_mask=0)
-        win.set_screen(disp.get_default_screen())
+        return win
 
     def test_get_xwindow_pywindow(self):
         d2 = self.clone_display()
@@ -35,6 +33,7 @@ class TestLowlevel(TestWithSession):
         assert l.get_display_for(self.display) is self.display
         win = self.window()
         assert l.get_display_for(win) is self.display
+        assert_raises(TypeError, l.get_display_for, None)
         widg = gtk.Window()
         assert l.get_display_for(widg) is self.display
         clipboard = gtk.Clipboard(self.display, "PRIMARY")
