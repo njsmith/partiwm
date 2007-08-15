@@ -9,6 +9,7 @@ import gtk.gdk
 __test__ = False
 
 def assert_raises(exc_class, f, *args, **kwargs):
+    # exc_class can be a tuple.
     try:
         f(*args, **kwargs)
     except exc_class:
@@ -33,7 +34,7 @@ class TestWithSession(object):
         # This is not a race condition, nor do we need to sleep here, because
         # gtk.gdk.Display is smart enough to silently block until the X server
         # comes up.
-        self.display = gtk.gdk.Display(self.display_name)
+        self.display = gtk.gdk.Display("127.0.0.1" + self.display_name)
         default_display = gtk.gdk.display_manager_get().get_default_display()
         if default_display is not None:
             default_display.close()

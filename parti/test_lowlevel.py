@@ -3,6 +3,7 @@
 from parti.test import *
 import parti.lowlevel as l
 import gtk
+from parti.error import *
 
 class TestLowlevel(TestWithSession):
     def root(self, disp=None):
@@ -64,7 +65,11 @@ class TestLowlevel(TestWithSession):
         l.XChangeProperty(r, "ASDF", ("GHJK", 32, data))
         assert_raises(l.BadPropertyType,
                       l.XGetWindowProperty, r, "ASDF", "ASDF")
-        assert l.XGetWindowProperty(r, "ASDF", "GHJK") == data
+
+        for n in (8, 16, 32):
+            print n
+            l.XChangeProperty(r, "ASDF", ("GHJK", n, data))
+            assert l.XGetWindowProperty(r, "ASDF", "GHJK") == data
         
         l.XDeleteProperty(r, "ASDF")
         assert_raises(l.NoSuchProperty,
@@ -72,13 +77,13 @@ class TestLowlevel(TestWithSession):
 
         badwin = self.window()
         badwin.destroy()
-        assert_raises(l.PropertyError,
-                      l.XGetWindowProperty, badwin, "ASDF", "ASDF")
+        assert_raises((l.PropertyError, XError),
+                      trap.call, l.XGetWindowProperty, badwin, "ASDF", "ASDF")
 
         # Giant massive property
         l.XChangeProperty(r, "ASDF",
                           ("GHJK", 32, "\x00" * 512 * (2 ** 10)))
-        assert_raises(PropertyOverflow,
+        assert_raises(l.PropertyOverflow,
                       l.XGetWindowProperty, r, "ASDF", "GHJK")
 
     def test_get_children_and_reparent(self):

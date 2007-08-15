@@ -11,4 +11,4 @@ CFLAGS=-O0 python setup.py install --home=install
 export PYTHONPATH=$PWD/install/lib/python:$PYTHONPATH
 export PATH=$PWD/install/bin:$PATH
 cd install  # to get away from ./parti
-ipython
+gdb --args python /usr/bin/ipython

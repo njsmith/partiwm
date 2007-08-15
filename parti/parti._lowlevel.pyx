@@ -280,21 +280,31 @@ def get_pyatom(display_source, xatom):
 # XGetWindowProperty() directly".  In light of this, we just ignore the GDK
 # property API and use the Xlib functions directly.)
 
+def _munge_packed_ints_to_longs(data):
+    assert len(data) % sizeof(int) == 0
+    n = len(data) / sizeof(int)
+    format_from = "@" + "i" * n
+    format_to = "@" + "l" * n
+    return struct.pack(format_to, *struct.unpack(format_from, data))
+
 def XChangeProperty(pywindow, property, value):
     "Set a property on a window."
     (type, format, data) = value
-    cdef char * data_str
-    data_str = data
     assert format in (8, 16, 32)
     assert (len(data) % (format / 8)) == 0
+    nitems = len(data) / (format / 8)
+    if format == 32:
+        data = _munge_packed_ints_to_longs(data)
+    cdef char * data_str
+    data_str = data
     cXChangeProperty(get_xdisplay_for(pywindow),
                      get_xwindow(pywindow),
                      get_xatom(pywindow, property),
                      get_xatom(pywindow, type),
-                    format,
+                     format,
                      PropModeReplace,
                      <unsigned char *>data_str,
-                     len(data) / (format / 8))
+                     nitems)
 
 def _munge_packed_longs_to_ints(data):
     assert len(data) % sizeof(long) == 0
@@ -338,14 +348,12 @@ def XGetWindowProperty(pywindow, property, req_type):
         raise NoSuchProperty, property
     if bytes_after and not nitems:
         raise BadPropertyType, actual_type
-    assert actual_format > 0
-    if bytes_after:
-        raise PropertyOverflow, nbytes + bytes_after
     # actual_format is in (8, 16, 32), and is the number of bits in a logical
     # element.  However, this doesn't mean that each element is stored in that
     # many bits, oh no.  On a 32-bit machine it is, but on a 64-bit machine,
     # iff the output array contains 32-bit integers, than each one is given
     # 64-bits of space.
+    assert actual_format > 0
     if actual_format == 8:
         bytes_per_item = 1
     elif actual_format == 16:
@@ -355,6 +363,8 @@ def XGetWindowProperty(pywindow, property, req_type):
     else:
         assert False
     nbytes = bytes_per_item * nitems
+    if bytes_after:
+        raise PropertyOverflow, nbytes + bytes_after
     data = PyString_FromStringAndSize(<char *>prop, nbytes)
     XFree(prop)
     if actual_format == 32:

@@ -45,4 +45,19 @@ class TestTest(object):
         # No exception:
         assert_raises(FooError, wants_args_raises_foo, 1, 2, a=3, b=4)
         assert_raises(AssertionError, wants_args_raises_foo)
-        
+        # Tuples allowed:
+        # No exception
+        assert_raises((FooError, BarError), raises_foo)
+        assert_raises((FooError, BarError), raises_bar)
+        try:
+            # Should raise AssertionError
+            assert_raises((FooError, BarError), raises_nothing)
+            raise FooError
+        except AssertionError:
+            pass
+        try:
+            # Should raise AssertionError
+            assert_raises((FooError, TypeError), raises_bar)
+            raise FooError
+        except AssertionError:
+            pass
