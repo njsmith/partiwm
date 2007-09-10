@@ -561,7 +561,7 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
                                                 void * userdata):
     cdef XEvent * e
     e = <XEvent*>e_gdk
-    cu = trap.call_synced
+    cs = trap.call_synced
     try:
         (disp, map_callback, configure_callback) = <object>userdata
         if e.type == MapRequest:
