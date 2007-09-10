@@ -526,8 +526,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # the client to directly resize themselves.)
         parti.lowlevel.substructureRedirect(self.window,
                                            None,
-                                           self._handle_configure_request,
-                                           None)
+                                           self._handle_configure_request)
         # Give it a nice theme-defined background
         self.style.attach(self.window)
         self.style.set_background(self.window, gtk.STATE_NORMAL)

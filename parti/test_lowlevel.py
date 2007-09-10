@@ -290,3 +290,25 @@ class TestLowlevel(TestWithSession):
                                    1234, 0, 0, 0)
 
     # myGetSelectionOwner gets tested in test_selection.py
+
+    def test_substructure_redirect(self):
+        root = self.root()
+        d2 = self.clone_display()
+        w2 = self.window(d2)
+        w1 = l.get_pywindow(l.get_xwindow(w2), self.display)
+
+        self.map_ev = None
+        def map_cb(ev):
+            self.map_ev = ev
+            gtk.main_quit()
+        self.conf_ev = None
+        def conf_cb(ev):
+            self.conf_ev = ev
+            gtk.main_quit()
+        self.circ_ev = None
+        def circ_cb(ev):
+            self.circ_ev = ev
+            gtk.main_quit()
+        l.substructureRedirect(root, map_cb, conf_cb, circ_cb)
+
+        # FIXME: unfinished

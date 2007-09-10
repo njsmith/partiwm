@@ -124,8 +124,7 @@ class Wm(object):
         # the existing clients.
         parti.lowlevel.substructureRedirect(self._root,
                                             self._handle_root_map_request,
-                                            self._handle_root_configure_request,
-                                            None)
+                                            self._handle_root_configure_request)
 
         for w in parti.lowlevel.get_children(self._root):
             # Checking for FOREIGN here filters out anything that we've
@@ -136,7 +135,7 @@ class Wm(object):
                 self._manage_client(w)
 
         # Start listening for client requests
-        parti.lowlevel.selectClientMessage(self._root, _handle_root_client_message)
+        parti.lowlevel.selectClientMessage(self._root, self._handle_root_client_message)
 
         # Start providing D-Bus api
         self._dbus = PartiDBusService(self)

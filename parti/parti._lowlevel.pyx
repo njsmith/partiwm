@@ -87,9 +87,10 @@ cdef extern from *:
         pass
     ctypedef int Bool
     ctypedef int Status
-    ctypedef int Atom
-    ctypedef int Window
-    ctypedef int Time
+    ctypedef unsigned long Atom
+    ctypedef unsigned int XID
+    ctypedef XID Window
+    ctypedef unsigned long Time
 
     int XFree(void * data)
 
@@ -562,7 +563,7 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
     e = <XEvent*>e_gdk
     cu = trap.call_synced
     try:
-        (disp, map_callback, configure_callback, circulate_callback) = <object>userdata
+        (disp, map_callback, configure_callback) = <object>userdata
         if e.type == MapRequest:
             print "MapRequest"
             if map_callback is not None:
@@ -601,19 +602,7 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
                     configure_callback(pyev)
             return GDK_FILTER_REMOVE
         elif e.type == CirculateRequest:
-            print "CirculateRequest"
-            if circulate_callback is not None:
-                pyev = LameStruct()
-                try:
-                    pyev.parent = cs(get_pywindow,
-                                     disp, e.xcirculaterequest.parent)
-                    pyev.window = cs(get_pywindow,
-                                     disp, e.xcirculaterequest.window)
-                    pyev.place = e.xcirculaterequest.place
-                except XError:
-                    print "CirculateRequest on disappeared window, ignoring"
-                else:
-                    circulate_callback(pyev)
+            print "WTF, CirculateRequest?"
             return GDK_FILTER_REMOVE
         return GDK_FILTER_CONTINUE
     except:
@@ -623,16 +612,22 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
 
 def substructureRedirect(pywindow,
                          map_callback,
-                         configure_callback,
-                         circulate_callback):
+                         configure_callback):
     """Enable SubstructureRedirect on the given window, and call given
     callbacks when relevant events occur.  Callbacks may be None to ignore
     some event types.  Unfortunately, any exceptions thrown by callbacks will
-    be swallowed."""
+    be swallowed.
+
+    Selecting on SubstructureRedirect also enables the reception of
+    CirculateRequest events, but those are pretty useless.  (The circulate
+    request appears to be in the protocol just so simple window managers have
+    an easy way to implement the equivalent of alt-tab; I can't imagine how
+    it'd be useful these days.  Metacity and KWin do not support it; GTK+/GDK
+    and Qt4 provide no way to actually send it.)"""
 
     addXSelectInput(pywindow, SubstructureRedirectMask)
     disp = get_display_for(pywindow)
-    callback_tuple = (disp, map_callback, configure_callback, circulate_callback)
+    callback_tuple = (disp, map_callback, configure_callback)
     # This tuple will be leaving Python-space.
     # FIXME: LEAK: how can we get notified when the GdkWindow eventually is
     # destructed, so we can DECREF?  (For that matter, are we sure that the
