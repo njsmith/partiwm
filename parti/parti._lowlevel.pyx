@@ -85,12 +85,16 @@ include "parti._lowlevel.const.pxi"
 cdef extern from *:
     ctypedef struct Display:
         pass
+    # To make it easier to translate stuff in the X header files into
+    # appropriate pyrex declarations:
+    ctypedef unsigned int CARD32
+    ctypedef CARD32 XID
+
     ctypedef int Bool
     ctypedef int Status
-    ctypedef unsigned long Atom
-    ctypedef unsigned int XID
+    ctypedef CARD32 Atom
     ctypedef XID Window
-    ctypedef unsigned long Time
+    ctypedef CARD32 Time
 
     int XFree(void * data)
 
@@ -267,6 +271,8 @@ def get_xatom(display_source, str_or_xatom):
         )
 
 def get_pyatom(display_source, xatom):
+    if xatom > 2 ** 32:
+        raise Exception, "weirdly huge purported xatom: %s" % xatom
     cdef cGdkDisplay * disp
     disp = get_raw_display_for(display_source)
     return str(PyGdkAtom_New(gdk_x11_xatom_to_atom_for_display(disp, xatom)))
@@ -343,7 +349,6 @@ def XGetWindowProperty(pywindow, property, req_type):
                                  False,
                                  xreq_type, &xactual_type,
                                  &actual_format, &nitems, &bytes_after, &prop)
-    print req_type, get_xatom(pywindow, req_type), xactual_type, get_pyatom(pywindow, xactual_type)
     if status != Success:
         raise PropertyError, "no such window"
     if xactual_type == XNone:
