@@ -3,7 +3,7 @@
 RUNNER=
 #RUNNER="pydb --trace"
 #RUNNER="pydb --fntrace"
-#RUNNER="gdb python --args"
+#RUNNER="gdb --args python"
 
 set -e
 rm -rf build install

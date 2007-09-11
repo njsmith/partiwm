@@ -86,8 +86,10 @@ cdef extern from *:
     ctypedef struct Display:
         pass
     # To make it easier to translate stuff in the X header files into
-    # appropriate pyrex declarations:
-    ctypedef unsigned int CARD32
+    # appropriate pyrex declarations, without having to untangle the typedefs
+    # over and over again, here are some convenience typedefs.  (Yes, CARD32
+    # really is 64 bits on 64-bit systems.  Why?  I have no idea.)
+    ctypedef unsigned long CARD32
     ctypedef CARD32 XID
 
     ctypedef int Bool
@@ -691,13 +693,20 @@ cdef GdkFilterReturn clientEventFilter(GdkXEvent * e_gdk,
                                        GdkEvent * gdk_event,
                                        void * userdata):
     cdef XEvent * e
+    cdef int x
     e = <XEvent*>e_gdk
     try:
         (disp, callback) = <object>userdata
         pyev = LameStruct()
         try:
+            print e.xany.type
             pyev.window = trap.call_synced(get_pywindow,
                                            disp, e.xany.window)
+            if e.xclient.message_type > (2 ** 32):
+                print ("Xlib claims that this client event's 32-bit "
+                       + "message_type is %s.  This makes no sense, so I'm "
+                       + "going to ignore it.") % e.xclient.message_type
+                return GDK_FILTER_CONTINUE
             pyev.message_type = get_pyatom(disp, e.xclient.message_type)
             pyev.format = e.xclient.format
             # I am lazy.  Add this later if needed for some reason.
