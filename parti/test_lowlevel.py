@@ -295,7 +295,8 @@ class TestLowlevel(TestWithSession):
         root = self.root()
         d2 = self.clone_display()
         w2 = self.window(d2)
-        w1 = l.get_pywindow(l.get_xwindow(w2), self.display)
+        gtk.gdk.flush()
+        w1 = l.get_pywindow(self.display, l.get_xwindow(w2))
 
         self.map_ev = None
         def map_cb(ev):
@@ -305,10 +306,6 @@ class TestLowlevel(TestWithSession):
         def conf_cb(ev):
             self.conf_ev = ev
             gtk.main_quit()
-        self.circ_ev = None
-        def circ_cb(ev):
-            self.circ_ev = ev
-            gtk.main_quit()
-        l.substructureRedirect(root, map_cb, conf_cb, circ_cb)
+        l.substructureRedirect(root, map_cb, conf_cb)
 
         # FIXME: unfinished
