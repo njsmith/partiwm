@@ -215,7 +215,8 @@ class Runner(object):
             raise
         except Exception, e:
             details = ("(failed to extract details;\n"
-                       + "nose.inspect.inspect_traceback threw exception:\n"
+                       + "nose.inspect.inspect_traceback threw exception\n"
+                       + "(maybe because the error was in pyrex code):\n"
                        + traceback.format_exc()
                        + ")")
         return "%s\nDetails of failing source code:\n%s" % (tb, details)
