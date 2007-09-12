@@ -403,7 +403,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         net_wm_state = prop_get(self.client_window,
                                 "_NET_WM_STATE", ["atom"])
         if net_wm_state:
-            if gtk.gdk.atom_intern("_NET_WM_STATE_DEMANDS_ATTENTION"):
+            if "_NET_WM_STATE_DEMANDS_ATTENTION" in net_wm_state:
                 self.set_property("urgency-requested", True)
             self.set_property("state", sets.ImmutableSet(net_wm_state))
         else:
