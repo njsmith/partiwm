@@ -12,11 +12,10 @@ class AutoPropGObjectMixin(object):
         self._gproperties = {}
 
     def do_get_property(self, pspec):
-        return self._gproperties.get(pspec)
+        return self._gproperties.get(pspec.name)
 
     def do_set_property(self, pspec, value):
-        self._gproperties[pspec] = value
-
+        self._gproperties[pspec.name] = value
 
 def dump_exc():
     """Call this from a except: clause to print a nice traceback."""
