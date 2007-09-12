@@ -6,8 +6,13 @@ import parti.prop
 from parti.util import base
 from parti.error import trap
 
-# This file requires a very long comment, because focus management is teh
-# awesome.  The basic problems are:
+# This file defines Parti's top-level widget.  It is a magic window that
+# always and exactly covers the entire screen (possibly crossing multiple
+# screens, in the Xinerama case); it also mediates between the GTK+ and X
+# focus models.
+# 
+# This requires a very long comment, because focus management is teh awesome.
+# The basic problems are:
 #    1) X focus management sucks
 #    2) GDK/GTK know this, and sensible avoid it
 # (1) is a problem by itself, but (2) makes it worse, because we have to wedge
@@ -58,11 +63,6 @@ from parti.error import trap
 # Finally, we have to notice when the root window gets focused (as it can when
 # a client misbehaves, or perhaps exits in a weird way), and regain the
 # focus.
-
-# This window is also magic in that it is always the same size as the full X
-# root window (possibly crossing multiple xinerama screens).
-
-# FIXME: xinerama support (GdkScreen.get_n_monitors, get_monitor_geometry)
 
 class WorldWindow(gtk.Window):
     def __init__(self):
@@ -122,9 +122,9 @@ class WorldWindow(gtk.Window):
         # _give_focus_to_them_that_deserves_it in do_focus_in_event:
         if not self.get_property("has-toplevel-focus"):
             # Take initial focus upon being mapped.  Technically it is illegal
-            # to use CurrentTime in a WM_TAKE_FOCUS message, but GTK doesn't
-            # happen to care, and this guarantees that we *will* get the
-            # focus, and thus a real FocusIn event.
+            # (ICCCM violating) to use CurrentTime in a WM_TAKE_FOCUS message,
+            # but GTK doesn't happen to care, and this guarantees that we
+            # *will* get the focus, and thus a real FocusIn event.
             parti.lowlevel.send_wm_take_focus(self.window,
                                               parti.lowlevel.const["CurrentTime"])
 

@@ -9,8 +9,8 @@ import parti.selection
 import parti.lowlevel
 from parti.prop import prop_set
 
-from parti.world import WorldWindow
-from parti.viewport import Viewport
+from parti.world_window import WorldWindow
+from parti.world_organizer import WorldOrganizer
 
 from parti.windowset import WindowSet
 from parti.tray import TraySet
@@ -86,7 +86,7 @@ class Wm(object):
         self._alt_display = gtk.gdk.Display(self._display.get_name())
         self._root = self._display.get_default_screen().get_root_window()
         self._ewmh_window = None
-        self._world = None
+        self._world_window = None
         
         # Start snooping on the raw GDK event stream
         gtk.gdk.event_handler_set(self._dispatch_gdk_event)
@@ -110,15 +110,14 @@ class Wm(object):
         self._update_window_list()
 
         # Create our giant window
-        self._world = WorldWindow()
-        self._world.show_all()
-        self._viewport = Viewport(self._trays)
-        self._world.add(self._viewport)
+        self._world_window = WorldWindow()
+        self._world_organizer = WorldOrganizer(self._trays)
+        self._world_window.add(self._world_organizer)
 
         # FIXME: be less stupid
         self._trays.new(u"default", SimpleTabTray)
 
-        self._world.show_all()
+        self._world_window.show_all()
 
         # Okay, ready to select for SubstructureRedirect and then load in all
         # the existing clients.

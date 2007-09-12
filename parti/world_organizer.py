@@ -6,13 +6,14 @@ import gobject
 
 from parti.util import base
 
-# FIXME: there should be multiple logical viewports, one for each xinerama
-# screen, somehow... not clear what the best way to get that is, since GTK has
-# a widget tree, not a widget DAG.
+# FIXME: xinerama support (GdkScreen.get_n_monitors, get_monitor_geometry).
+# There should be multiple logical viewports, one for each xinerama screen,
+# somehow... not clear what the best way to get that is, since GTK has a
+# widget tree, not a widget DAG.
 
-class Viewport(gtk.Container):
+class WorldOrganizer(gtk.Container):
     def __init__(self, trayset):
-        super(Viewport, self).__init__()
+        super(WorldOrganizer, self).__init__()
         self._trayset = trayset
         self._children = []
         self._current = None
@@ -88,4 +89,4 @@ class Viewport(gtk.Container):
             child.size_allocate(allocation)
         self.forall(apply_allocation, None)
 
-gobject.type_register(Viewport)
+gobject.type_register(WorldOrganizer)
