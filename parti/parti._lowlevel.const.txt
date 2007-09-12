@@ -103,6 +103,13 @@ CWBorderWidth
 CWSibling
 CWStackMode
 
+# Stacking codes
+Above
+Below
+BottomIf
+TopIf
+Opposite
+
 # Protocol error codes
 Success
 BadRequest

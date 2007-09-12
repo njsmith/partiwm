@@ -252,8 +252,23 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # ConfigureNotify telling the client that nothing has happened.
         trap.swallow(parti.lowlevel.sendConfigureNotify,
                      event.window)
-        self.set_property("requested-position", (event.x, event.y))
-        self.geometry_constraint.requested = (event.width, event.height)
+
+        # Also potentially update our record of what the app has requested:
+        (x, y) = self.get_property("requested-position")
+        if event.value_mask & parti.lowlevel.const["CWX"]:
+            x = event.x
+        if event.value_mask & parti.lowlevel.const["CWY"]:
+            y = event.y
+        self.set_property("requested-position", (x, y))
+
+        (w, h) = self.geometry_constraint.requested
+        if event.value_mask & parti.lowlevel.const["CWWidth"]:
+            w = event.width
+        if event.value_mask & parti.lowlevel.const["CWHeight"]:
+            h = event.height
+        self.geometry_constraint.requested = (w, h)
+        self.queue_resize_no_redraw()
+
         # FIXME: consider handling attempts to change stacking order here.
 
     ################################

@@ -507,7 +507,7 @@ def sendConfigureNotify(pywindow):
     if s == 0:
         raise ValueError, "failed to serialize ConfigureNotify"
 
-def configureAndNotify(pywindow, x, y, width, height):
+def configureAndNotify(pywindow, x, y, width, height, fields=None):
     cdef Display * display
     display = get_xdisplay_for(pywindow)
     cdef Window window
@@ -516,13 +516,26 @@ def configureAndNotify(pywindow, x, y, width, height):
     # Reconfigure the window.  We have to use XConfigureWindow directly
     # instead of GdkWindow.resize, because GDK does not give us any way to
     # squash the border.
+
+    # The caller can pass an XConfigureWindow-style fields mask to turn off
+    # some of these bits; this is useful if they are pulling such a field out
+    # of a ConfigureRequest (along with the other arguments they are passing
+    # to us).  This also means we need to be careful to zero out any bits
+    # besides these, because they could be set to anything.
+    all_optional_fields_we_know = CWX | CWY | CWWidth | CWHeight
+    if fields is None:
+        fields = all_optional_fields_we_know
+    else:
+        fields = fields & all_optional_fields_we_know
+    # But we always unconditionally squash the border to zero.
+    fields = fields | CWBorderWidth
+
     cdef XWindowChanges changes
     changes.x = x
     changes.y = y
     changes.width = width
     changes.height = height
     changes.border_width = 0
-    fields = CWX | CWY | CWWidth | CWHeight | CWBorderWidth
     cXConfigureWindow(display, window, fields, &changes)
     # Tell the client.
     sendConfigureNotify(pywindow)
@@ -599,8 +612,17 @@ cdef GdkFilterReturn substructureRedirectFilter(GdkXEvent * e_gdk,
                     pyev.width = e.xconfigurerequest.width
                     pyev.height = e.xconfigurerequest.height
                     pyev.border_width = e.xconfigurerequest.border_width
-                    pyev.above = cs(get_pywindow,
-                                    disp, e.xconfigurerequest.above)
+                    try:
+                        # In principle there are two cases here: .above is
+                        # XNone (i.e. not specified in the original request),
+                        # or .above is an invalid window (i.e. it was
+                        # specified by the client, but it specified something
+                        # weird).  I don't see any reason to handle these
+                        # differently, though.
+                        pyev.above = cs(get_pywindow,
+                                        disp, e.xconfigurerequest.above)
+                    except XError:
+                        pyev.above = None
                     pyev.detail = e.xconfigurerequest.detail
                     pyev.value_mask = e.xconfigurerequest.value_mask
                 except XError:
@@ -655,8 +677,8 @@ cdef GdkFilterReturn focusFilter(GdkXEvent * e_gdk,
         try:
             pyev.window = trap.call_synced(get_pywindow,
                                            disp, e.xfocus.window)
-        except XError:
-            print "focus event on disappeared window, ignoring"
+        except XError, err:
+            print "focus event on disappeared window, ignoring (error = %s)" % (err,)
             return GDK_FILTER_CONTINUE
         pyev.mode = e.xfocus.mode
         pyev.detail = e.xfocus.detail

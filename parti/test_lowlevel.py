@@ -1,9 +1,3 @@
-# This is incomplete...
-# FIXME TODO:
-#   sendConfigureNotify
-#   configureAndNotify
-#   substructureRedirect
-
 from parti.test import *
 import parti.lowlevel as l
 import gtk
@@ -300,12 +294,125 @@ class TestLowlevel(TestWithSession):
 
         self.map_ev = None
         def map_cb(ev):
+            print "got map"
             self.map_ev = ev
             gtk.main_quit()
         self.conf_ev = None
         def conf_cb(ev):
+            print "got conf"
             self.conf_ev = ev
             gtk.main_quit()
         l.substructureRedirect(root, map_cb, conf_cb)
+        gtk.gdk.flush()
 
-        # FIXME: unfinished
+        # gdk_window_show does both a map and a configure (to raise the
+        # window)
+        print "showing w2"
+        w2.show()
+        # Can't just call gtk.main() twice, the two events may be delivered
+        # together and processed in a single mainloop iteration.
+        while None in (self.map_ev, self.conf_ev):
+            gtk.main()
+
+        assert self.map_ev.parent is root
+        assert self.map_ev.window is w1
+
+        assert self.conf_ev.parent is root
+        assert self.conf_ev.window is w1
+        for field in ("x", "y", "width", "height",
+                      "border_width", "above", "detail", "value_mask"):
+            print field
+            assert hasattr(self.conf_ev, field)
+
+        self.map_ev = None
+        self.conf_ev = None
+        w2.move_resize(1, 2, 3, 4)
+        gtk.main()
+        assert self.map_ev is None
+        assert self.conf_ev is not None
+        assert self.conf_ev.parent is root
+        assert self.conf_ev.window is w1
+        assert self.conf_ev.x == 1
+        assert self.conf_ev.y == 2
+        assert self.conf_ev.width == 3
+        assert self.conf_ev.height == 4
+        assert self.conf_ev.value_mask == (l.const["CWX"]
+                                           | l.const["CWY"]
+                                           | l.const["CWWidth"]
+                                           | l.const["CWHeight"])
+
+        self.map_ev = None
+        self.conf_ev = None
+        w2.move(5, 6)
+        gtk.main()
+        assert self.map_ev is None
+        assert self.conf_ev.x == 5
+        assert self.conf_ev.y == 6
+        assert self.conf_ev.value_mask == (l.const["CWX"] | l.const["CWY"])
+        
+        self.map_ev = None
+        self.conf_ev = None
+        w2.raise_()
+        gtk.main()
+        assert self.map_ev is None
+        assert self.conf_ev.detail == l.const["Above"]
+        assert self.conf_ev.value_mask == l.const["CWStackMode"]
+        
+    def test_sendConfigureNotify(self):
+        # GDK discards ConfigureNotify's sent to child windows, so we can't
+        # use self.window():
+        w1 = gtk.gdk.Window(self.root(), width=10, height=10,
+                            window_type=gtk.gdk.WINDOW_TOPLEVEL,
+                            wclass=gtk.gdk.INPUT_OUTPUT,
+                            event_mask=gtk.gdk.ALL_EVENTS_MASK)
+        self.ev = None
+        def myfilter(ev, data=None):
+            print "ev %s" % (ev.type,)
+            if ev.type == gtk.gdk.CONFIGURE:
+                self.ev = ev
+                gtk.main_quit()
+            gtk.main_do_event(ev)
+        gtk.gdk.event_handler_set(myfilter)
+
+        w1.show()
+        gtk.gdk.flush()
+        l.sendConfigureNotify(w1)
+        gtk.main()
+        
+        assert self.ev is not None
+        assert self.ev.type == gtk.gdk.CONFIGURE
+        assert self.ev.window == w1
+        assert self.ev.send_event
+        assert self.ev.x == 0
+        assert self.ev.y == 0
+        assert self.ev.width == 10
+        assert self.ev.height == 10
+        
+        # We have to create w2 on a separate connection, because if we just
+        # did w1.reparent(w2, ...), then GDK would magically convert w1 from a
+        # TOPLEVEL window into a CHILD window.
+        w2 = self.window(self.clone_display())
+        gtk.gdk.flush()
+        w2on1 = l.get_pywindow(w1, l.get_xwindow(w2))
+        # Doesn't generate an event, because event mask is zeroed out.
+        w2.move(11, 12)
+        # Reparenting doesn't trigger a ConfigureNotify.
+        w1.reparent(w2on1, 13, 14)
+        # To double-check that it's still a TOPLEVEL:
+        print w1.get_window_type()
+        w1.resize(15, 16)
+        gtk.main()
+
+        # w1 in root coordinates is now at (24, 26)
+        self.ev = None
+        l.sendConfigureNotify(w1)
+        gtk.main()
+
+        assert self.ev is not None
+        assert self.ev.type == gtk.gdk.CONFIGURE
+        assert self.ev.window == w1
+        assert self.ev.send_event
+        assert self.ev.x == 24
+        assert self.ev.y == 26
+        assert self.ev.width == 15
+        assert self.ev.height == 16

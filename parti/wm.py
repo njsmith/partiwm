@@ -63,14 +63,46 @@ class Wm(object):
 
         "_NET_WM_WINDOW_TYPE",
         "_NET_WM_WINDOW_TYPE_NORMAL",
+        # "_NET_WM_WINDOW_TYPE_DESKTOP",
+        # "_NET_WM_WINDOW_TYPE_DOCK",
+        # "_NET_WM_WINDOW_TYPE_TOOLBAR",
+        # "_NET_WM_WINDOW_TYPE_MENU",
+        # "_NET_WM_WINDOW_TYPE_UTILITY",
+        # "_NET_WM_WINDOW_TYPE_SPLASH",
+        # "_NET_WM_WINDOW_TYPE_DIALOG",
+        # "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU",
+        # "_NET_WM_WINDOW_TYPE_POPUP_MENU",
+        # "_NET_WM_WINDOW_TYPE_TOOLTIP",
+        # "_NET_WM_WINDOW_TYPE_NOTIFICATION",
+        # "_NET_WM_WINDOW_TYPE_COMBO",
+        # "_NET_WM_WINDOW_TYPE_DND",
+        # "_NET_WM_WINDOW_TYPE_NORMAL",
 
         "_NET_WM_STATE",
         "_NET_WM_STATE_DEMANDS_ATTENTION",
+        # More states to support:
+        # _NET_WM_STATE_MODAL,
+        # _NET_WM_STATE_STICKY,
+        # _NET_WM_STATE_MAXIMIZED_VERT,
+        # _NET_WM_STATE_MAXIMIZED_HORZ,
+        # _NET_WM_STATE_SHADED,
+        # _NET_WM_STATE_SKIP_TASKBAR,
+        # _NET_WM_STATE_SKIP_PAGER,
+        # _NET_WM_STATE_HIDDEN,
+        # _NET_WM_STATE_FULLSCREEN,
+        # _NET_WM_STATE_ABOVE,
+        # _NET_WM_STATE_BELOW,
 
         # Not at all yet:
         #"_NET_WM_STRUT", "_NET_WM_STRUT_PARTIAL"
         #"_NET_WM_ICON",
+        #"_NET_REQUEST_FRAME_EXTENTS",
         #"_NET_FRAME_EXTENTS",
+        #"_NET_CLOSE_WINDOW",
+        #"_NET_ACTIVE_WINDOW",
+        #"_NET_CURRENT_DESKTOP",
+        #"_NET_RESTACK_WINDOW",
+        #"_NET_WM_DESKTOP",
         ]
 
     def __init__(self, display=None):
@@ -193,11 +225,14 @@ class Wm(object):
         # anyway, no harm in letting them move existing ones around), and it
         # means that when the window actually gets mapped, we have more
         # accurate info on what the app is actually requesting.
+        assert event.window not in self._windows
+
         if event.window not in self._windows:
             print "Reconfigure on withdrawn window"
             parti.lowlevel.configureAndNotify(event.window,
-                                             event.x, event.y,
-                                             event.width, event.height)
+                                              event.x, event.y,
+                                              event.width, event.height,
+                                              event.value_mask)
 
     def _dispatch_gdk_event(self, event):
         # This function is called for every event GDK sees.  Most of them we
