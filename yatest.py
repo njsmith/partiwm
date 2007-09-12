@@ -190,12 +190,15 @@ class Runner(object):
                                   class_name, cls, name, readable, output):
         method_name = ".".join([class_name, name])
         try:
-            result = load(readable)
+            try:
+                result = load(readable)
+            finally:
+                # Kill off children, even on control-C etc.
+                os.kill(-child_pid, signal.SIGTERM)
         except EOFError:
             one_result = (FAILURE, "?? (child blew up before reporting back)")
             result = (one_result, one_result, one_result)
         readable.close()
-        os.kill(-child_pid, signal.SIGTERM)
         os.waitpid(child_pid, 0)
         if output is not None:
             output.seek(0)
