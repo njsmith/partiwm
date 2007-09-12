@@ -416,3 +416,44 @@ class TestLowlevel(TestWithSession):
         assert self.ev.y == 26
         assert self.ev.width == 15
         assert self.ev.height == 16
+
+    def test_configureAndNotify(self):
+        self.ev = None
+        def cb(ev):
+            print "got ConfigureRequest"
+            self.ev = ev
+            gtk.main_quit()
+        l.substructureRedirect(self.root(), None, cb)
+        w1_client = self.window(self.clone_display())
+        gtk.gdk.flush()
+        w1_wm = l.get_pywindow(self.display, l.get_xwindow(w1_client))
+
+        l.configureAndNotify(w1_client, 11, 12, 13, 14)
+        gtk.main()
+
+        assert self.ev is not None
+        assert self.ev.parent is self.root()
+        assert self.ev.window is w1_wm
+        assert self.ev.x == 11
+        assert self.ev.y == 12
+        assert self.ev.width == 13
+        assert self.ev.height == 14
+        assert self.ev.border_width == 0
+        assert self.ev.value_mask == (l.const["CWX"]
+                                      | l.const["CWY"]
+                                      | l.const["CWWidth"]
+                                      | l.const["CWHeight"]
+                                      | l.const["CWBorderWidth"])
+        
+        partial_mask = l.const["CWWidth"] | l.const["CWStackMode"]
+        l.configureAndNotify(w1_client, 11, 12, 13, 14, partial_mask)
+        gtk.main()
+        
+        assert self.ev is not None
+        assert self.ev.parent is self.root()
+        assert self.ev.window is w1_wm
+        assert self.ev.width == 13
+        assert self.ev.border_width == 0
+        assert self.ev.value_mask == (l.const["CWWidth"]
+                                      | l.const["CWBorderWidth"])
+        
