@@ -693,19 +693,18 @@ cdef GdkFilterReturn clientEventFilter(GdkXEvent * e_gdk,
                                        GdkEvent * gdk_event,
                                        void * userdata):
     cdef XEvent * e
-    cdef int x
     e = <XEvent*>e_gdk
     try:
         (disp, callback) = <object>userdata
         pyev = LameStruct()
         try:
-            print e.xany.type
             pyev.window = trap.call_synced(get_pywindow,
                                            disp, e.xany.window)
             if e.xclient.message_type > (2 ** 32):
-                print ("Xlib claims that this client event's 32-bit "
-                       + "message_type is %s.  This makes no sense, so I'm "
-                       + "going to ignore it.") % e.xclient.message_type
+                print ("Xlib claims that this ClientEvent's 32-bit "
+                       + "message_type is %s.  Note that this is >2^32.  "
+                       + "This makes no sense, so I'm going to ignore it."
+                       ) % e.xclient.message_type
                 return GDK_FILTER_CONTINUE
             pyev.message_type = get_pyatom(disp, e.xclient.message_type)
             pyev.format = e.xclient.format
