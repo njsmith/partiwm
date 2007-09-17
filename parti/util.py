@@ -15,7 +15,15 @@ class AutoPropGObjectMixin(object):
         return self._gproperties.get(pspec.name)
 
     def do_set_property(self, pspec, value):
-        self._gproperties[pspec.name] = value
+        self._internal_set_property(pspec.name, value)
+
+    # Exposed for subclasses that wish to set readonly properties --
+    # .set_property (the public api) will fail, but the property can still be
+    # modified via this method.
+    def _internal_set_property(self, name, value):
+        self._gproperties[name] = value
+        self.notify(name)
+
 
 def dump_exc():
     """Call this from a except: clause to print a nice traceback."""
