@@ -61,6 +61,9 @@ class Wm(object):
         "WM_NORMAL_HINTS",
         "WM_TRANSIENT_FOR",
 
+        # This isn't supported in any particularly meaningful way, but hey.
+        "_NET_REQUEST_FRAME_EXTENTS",
+
         "_NET_WM_WINDOW_TYPE",
         "_NET_WM_WINDOW_TYPE_NORMAL",
         # "_NET_WM_WINDOW_TYPE_DESKTOP",
@@ -96,7 +99,6 @@ class Wm(object):
         # Not at all yet:
         #"_NET_WM_STRUT", "_NET_WM_STRUT_PARTIAL"
         #"_NET_WM_ICON",
-        #"_NET_REQUEST_FRAME_EXTENTS",
         #"_NET_FRAME_EXTENTS",
         #"_NET_CLOSE_WINDOW",
         #"_NET_ACTIVE_WINDOW",

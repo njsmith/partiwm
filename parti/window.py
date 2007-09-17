@@ -63,63 +63,68 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     __gproperties__ = {
         # Interesting properties of the client window, that will be
         # automatically kept up to date:
+        "attention-requested": (gobject.TYPE_BOOLEAN,
+                                "Urgency hint from client, or us", "",
+                                False,
+                                gobject.PARAM_READWRITE),
+        "fullscreen": (gobject.TYPE_BOOLEAN,
+                       "Fullscreen-ness of window", "",
+                       False,
+                       gobject.PARAM_READWRITE),
+
         "client-window": (gobject.TYPE_PYOBJECT,
                           "GdkWindow representing the client toplevel", "",
-                          gobject.PARAM_READWRITE),
+                          gobject.PARAM_READABLE),
         "actual-size": (gobject.TYPE_PYOBJECT,
                         "Size of client window (actual (width,height))", "",
-                        gobject.PARAM_READWRITE),
+                        gobject.PARAM_READABLE),
         "user-friendly-size": (gobject.TYPE_PYOBJECT,
                                "Description of client window size for user", "",
-                               gobject.PARAM_READWRITE),
+                               gobject.PARAM_READABLE),
         "requested-position": (gobject.TYPE_PYOBJECT,
                                "Client-requested position on screen", "",
-                               gobject.PARAM_READWRITE),
+                               gobject.PARAM_READABLE),
         "class": (gobject.TYPE_STRING,
                   "Classic X 'class'", "",
                   "",
-                  gobject.PARAM_READWRITE),
+                  gobject.PARAM_READABLE),
         "instance": (gobject.TYPE_STRING,
                      "Classic X 'instance'", "",
                      "",
-                     gobject.PARAM_READWRITE),
+                     gobject.PARAM_READABLE),
         "transient-for": (gobject.TYPE_PYOBJECT,
                           "Transient for (or None)", "",
-                          gobject.PARAM_READWRITE),
+                          gobject.PARAM_READABLE),
         "protocols": (gobject.TYPE_PYOBJECT,
                       "Supported WM protocols", "",
-                      gobject.PARAM_READWRITE),
+                      gobject.PARAM_READABLE),
         "window-type": (gobject.TYPE_PYOBJECT,
                         "Window type",
                         "NB, most preferred comes first, then fallbacks",
-                        gobject.PARAM_READWRITE),
+                        gobject.PARAM_READABLE),
         "pid": (gobject.TYPE_INT,
                 "PID of owning process", "",
                 -1, 65535, -1,
-                gobject.PARAM_READWRITE),
+                gobject.PARAM_READABLE),
         "client-machine": (gobject.TYPE_PYOBJECT,
                            "Host where client process is running", "",
-                           gobject.PARAM_READWRITE),
+                           gobject.PARAM_READABLE),
         "group-leader": (gobject.TYPE_PYOBJECT,
                          "Window group leader", "",
-                         gobject.PARAM_READWRITE),
-        "urgency-requested": (gobject.TYPE_BOOLEAN,
-                              "Urgency hint from client", "",
-                              False,
-                              gobject.PARAM_READWRITE),
+                         gobject.PARAM_READABLE),
         "iconic": (gobject.TYPE_BOOLEAN,
                    "ICCCM 'iconic' state -- any sort of 'not on desktop'.", "",
                    False,
-                   gobject.PARAM_READWRITE),
+                   gobject.PARAM_READABLE),
         "state": (gobject.TYPE_PYOBJECT,
                   "State, as per _NET_WM_STATE", "",
-                  gobject.PARAM_READWRITE),
+                  gobject.PARAM_READABLE),
         "title": (gobject.TYPE_PYOBJECT,
                   "Window title (unicode or None)", "",
-                  gobject.PARAM_READWRITE),
+                  gobject.PARAM_READABLE),
         "icon-title": (gobject.TYPE_PYOBJECT,
                        "Icon title (unicode or None)", "",
-                       gobject.PARAM_READWRITE),
+                       gobject.PARAM_READABLE),
         }
     __gsignals__ = {
         "client-unmap-event": (gobject.SIGNAL_RUN_LAST,
@@ -154,7 +159,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # that buffer window, and self.client_window for the actual client
         # window.
         self.client_window = gdkwindow
-        self.set_property("client-window", gdkwindow)
+        self._internal_set_property("client-window", gdkwindow)
 
         # We count how many times we have asked that the child be unmapped, so
         # that when the server tells us that the child has been unmapped, we
@@ -195,7 +200,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
             self._write_initial_properties_and_setup()
             # Everything starts out at least temporarily in IconicState, until
             # we get it mapped etc.
-            self.set_property("iconic", True)
+            self._internal_set_property("iconic", True)
         try:
             trap.call_unsynced(setup_client)
         except XError, e:
@@ -242,8 +247,8 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         (base_x, base_y, allocated_w, allocated_h) = allocation
         (x, y, w, h, wvis, hvis) = self.geometry_constraint.fit(allocated_w,
                                                                 allocated_h)
-        self.set_property("actual-size", (w, h))
-        self.set_property("user-friendly-size", (wvis, hvis))
+        self._internal_set_property("actual-size", (w, h))
+        self._internal_set_property("user-friendly-size", (wvis, hvis))
         trap.swallow(parti.lowlevel.configureAndNotify,
                      self.client_window, x, y, w, h)
 
@@ -259,7 +264,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
             x = event.x
         if event.value_mask & parti.lowlevel.const["CWY"]:
             y = event.y
-        self.set_property("requested-position", (x, y))
+        self._internal_set_property("requested-position", (x, y))
 
         (w, h) = self.geometry_constraint.requested
         if event.value_mask & parti.lowlevel.const["CWWidth"]:
@@ -290,11 +295,11 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                             "WM_HINTS", "wm-hints")
         if wm_hints is not None:
             # GdkWindow or None
-            self.set_property("group-leader", wm_hints.group_leader)
+            self._internal_set_property("group-leader", wm_hints.group_leader)
             # FIXME: extract state and input hint
 
             if wm_hints.urgency:
-                self.set_property("urgency-requested", True)
+                self._internal_set_property("attention-requested", True)
 
     _property_handlers["WM_HINTS"] = _handle_wm_hints
 
@@ -302,10 +307,10 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         wm_name = prop_get(self.client_window, "WM_NAME", "latin1")
         net_wm_name = prop_get(self.client_window, "_NET_WM_NAME", "utf8")
         if net_wm_name is not None:
-            self.set_property("title", net_wm_name)
+            self._internal_set_property("title", net_wm_name)
         else:
             # may be None
-            self.set_property("title", wm_name)
+            self._internal_set_property("title", wm_name)
 
     _property_handlers["WM_NAME"] = _handle_title_change
     _property_handlers["_NET_WM_NAME"] = _handle_title_change
@@ -314,10 +319,10 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         wm_icon_name = prop_get(self.client_window, "WM_ICON_NAME", "latin1")
         net_wm_icon_name = prop_get(self.client_window, "_NET_WM_ICON_NAME", "utf8")
         if net_wm_icon_name is not None:
-            self.set_property("icon-title", net_wm_icon_name)
+            self._internal_set_property("icon-title", net_wm_icon_name)
         else:
             # may be None
-            self.set_property("icon-title", wm_icon_name)
+            self._internal_set_property("icon-title", wm_icon_name)
 
     _property_handlers["WM_ICON_NAME"] = _handle_icon_title_change
     _property_handlers["_NET_WM_ICON_NAME"] = _handle_icon_title_change
@@ -338,7 +343,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     def _read_initial_properties(self):
         # Things that don't change:
         geometry = self.client_window.get_geometry()
-        self.set_property("requested-position", (geometry[0], geometry[1]))
+        self._internal_set_property("requested-position", (geometry[0], geometry[1]))
         requested_size = (geometry[2], geometry[3])
 
         size_hints = prop_get(self.client_window,
@@ -361,24 +366,24 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
             except ValueError:
                 print "Malformed WM_CLASS, ignoring"
             else:
-                self.set_property("class", c)
-                self.set_property("instance", i)
+                self._internal_set_property("class", c)
+                self._internal_set_property("instance", i)
 
         transient_for = prop_get(self.client_window,
                                  "WM_TRANSIENT_FOR", "window")
         # May be None
-        self.set_property("transient-for", transient_for)
+        self._internal_set_property("transient-for", transient_for)
 
         protocols = prop_get(self.client_window,
                              "WM_PROTOCOLS", ["atom"])
         if protocols is None:
             protocols = []
-        self.set_property("protocols", protocols)
+        self._internal_set_property("protocols", protocols)
 
         window_types = prop_get(self.client_window,
                                 "_NET_WM_WINDOW_TYPE", ["atom"])
         if window_types:
-            self.set_property("window-type", window_types)
+            self._internal_set_property("window-type", window_types)
         else:
             if self.get_property("transient-for"):
                 # EWMH says that even if it's transient-for, we MUST check to
@@ -387,27 +392,29 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                 assume_type = "_NET_WM_TYPE_DIALOG"
             else:
                 assume_type = "_NET_WM_WINDOW_TYPE_NORMAL"
-            self.set_property("window-type",
+            self._internal_set_property("window-type",
                               [gtk.gdk.atom_intern(assume_type)])
 
         pid = prop_get(self.client_window,
                        "_NET_WM_PID", "u32")
         if pid is not None:
-            self.set_property("pid", pid)
+            self._internal_set_property("pid", pid)
 
         client_machine = prop_get(self.client_window,
                                   "WM_CLIENT_MACHINE", "latin1")
         # May be None
-        self.set_property("client-machine", client_machine)
+        self._internal_set_property("client-machine", client_machine)
         
         net_wm_state = prop_get(self.client_window,
                                 "_NET_WM_STATE", ["atom"])
         if net_wm_state:
+            self._internal_set_property("state", sets.ImmutableSet(net_wm_state))
             if "_NET_WM_STATE_DEMANDS_ATTENTION" in net_wm_state:
-                self.set_property("urgency-requested", True)
-            self.set_property("state", sets.ImmutableSet(net_wm_state))
+                self.set_property("attention-requested", True)
+            if "_NET_WM_STATE_FULLSCREEN" in net_wm_state:
+                self.set_property("fullscreen", True)
         else:
-            self.set_property("state", sets.ImmutableSet())
+            self._internal_set_property("state", sets.ImmutableSet())
 
         for mutable in ["WM_HINTS",
                         "WM_NAME", "_NET_WM_NAME",
@@ -420,27 +427,22 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     # Property setting
     ################################
     
-    def state_add(self, state_name):
+    def _state_add(self, state_name):
         atom = gtk.gdk.atom_intern(state_name)
         curr = set(self.get_property("state"))
         curr.add(atom)
-        self.set_property("state", sets.ImmutableSet(curr))
+        self._internal_set_property("state", sets.ImmutableSet(curr))
 
-    def state_remove(self, state_name):
+    def _state_remove(self, state_name):
         atom = gtk.gdk.atom_intern(state_name)
         curr = set(self.get_property("state"))
         curr.discard(atom)
-        self.set_property("state", sets.ImmutableSet(curr))
+        self._internal_set_property("state", sets.ImmutableSet(curr))
 
-    def state_isset(self, state_name):
+    def _state_isset(self, state_name):
         return gtk.gdk.atom_intern(state_name) in self.get_property("state")
 
     def _handle_iconic_update(self, *args):
-        # FIXME: Need to think carefully about how this should be handled.
-        # ATM you cannot _put_ a client into iconic/non-iconic state by
-        # setting this property, only by showing/hiding the widget (which will
-        # also update this property as a side effect).  Perhaps that is as it
-        # should be.
         if self.get_property("iconic"):
             trap.swallow(prop_set, self.client_window, "WM_STATE",
                          "u32", parti.lowlevel.const["IconicState"])
@@ -450,6 +452,11 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                          "u32", parti.lowlevel.const["NormalState"])
             self.state_remove("_NET_WM_STATE_HIDDEN")
 
+    def _handle_state_changed(self, *args):
+        # Sync changes to "state" property out to X property.
+        prop_set(self.client_window, "_NET_WM_STATE",
+                 ["atom"], self.get_property("state"))
+
     # There are four ways a window can get urgency = True:
     #   1) _NET_WM_STATE_DEMANDS_ATTENTION in the _initial_ state hints
     #   2) setting the bit WM_HINTS, at _any_ time
@@ -457,29 +464,32 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     #      _NET_WM_STATE_DEMANDS_ATTENTION to their state hints (FIXME, grok
     #      this)
     #   4) if we (the wm) decide they should be and set it
-    def _handle_urgency_requested(self, *args):
-        if self.get_property("urgency-requested"):
-            self.state_add("_NET_WM_STATE_DEMANDS_ATTENTION")
+    def _handle_attention_requested(self, *args):
+        if self.get_property("attention-requested"):
+            self._state_add("_NET_WM_STATE_DEMANDS_ATTENTION")
         else:
-            self.state_remove("_NET_WM_STATE_DEMANDS_ATTENTION")
+            self._state_remove("_NET_WM_STATE_DEMANDS_ATTENTION")
 
-    def _handle_state(self, *args):
-        prop_set(self.client_window, "_NET_WM_STATE",
-                 ["atom"], self.get_property("state"))
+    def _handle_fullscreen(self, *args):
+        if self.get_property("fullscreen"):
+            self._state_add("_NET_WM_STATE_FULLSCREEN")
+        else:
+            self._state_remove("_NET_WM_STATE_FULLSCREEN")
 
     def _write_initial_properties_and_setup(self):
         # Things that don't change:
         prop_set(self.client_window, "_NET_WM_ALLOWED_ACTIONS",
                  ["atom"], self._NET_WM_ALLOWED_ACTIONS)
-        # FIXME: should set _NET_FRAME_EXTENTS, but to what?
-        #prop_set(self.client_window, "_NET_FRAME_EXTENTS",
-        #         ["u32"], [0, 0, 0, 0])
+        prop_set(self.client_window, "_NET_FRAME_EXTENTS",
+                 ["u32"], [0, 0, 0, 0])
 
-        self.connect("notify::urgency-requested",
-                     self._handle_urgency_requested)
+        self.connect("notify::state", self._handle_state_changed)
+        self.connect("notify::attention-requested",
+                     self._handle_attention_requested)
+        self.connect("notify::fullscreen", self._handle_fullscreen)
         # Flush things:
-        self._handle_state()
-        self._handle_urgency_requested()
+        self._handle_state_changed()
+        self._handle_attention_requested()
 
     def _scrub_withdrawn_window(self):
         remove = ["WM_STATE",
@@ -502,7 +512,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         print "Unmapping"
         self.unset_flags(gtk.MAPPED)
         self.pending_unmaps += 1
-        self.set_property("iconic", True)
+        self._internal_set_property("iconic", True)
         self.window.hide()
         self.client_window.hide()
         print "Unmapped"
@@ -514,7 +524,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         print "Mapping"
         self.set_flags(gtk.MAPPED)
         self._set_client_geometry(self.allocation)
-        self.set_property("iconic", False)
+        self._internal_set_property("iconic", False)
         self.window.show_unraised()
         self.client_window.show_unraised()
         print "Mapped"
