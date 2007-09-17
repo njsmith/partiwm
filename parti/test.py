@@ -40,8 +40,11 @@ def assert_emits(f, obj, signal, slot=None):
                 slot(*args, **kwargs)
             except:
                 backchannel["slot_exc"] = sys.exc_info()
-    obj.connect(signal, real_slot)
-    f(obj)
+    connection = obj.connect(signal, real_slot)
+    try:
+        f(obj)
+    finally:
+        obj.disconnect(connection)
     assert backchannel["signal_was_emitted"]
     if backchannel["slot_exc"] is not None:
         exc = backchannel["slot_exc"]

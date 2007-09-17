@@ -88,3 +88,28 @@ class TestTest(object):
         assert_emits(do_emit, c, "foo", slot_wants_asdf)
         assert_raises(AssertionError,
                       assert_emits, do_emit, c, "foo", slot_wants_hjkl)
+
+        # Make sure that assert_emits disconnects after itself.
+        self.gotcalled = False
+        def f(*args):
+            self.gotcalled = True
+        assert_emits(do_emit, c, "foo", f)
+        assert self.gotcalled
+        self.gotcalled = False
+        do_emit(c)
+        assert not self.gotcalled
+
+        # ...even if there was an error.
+        # Errors can come from emission failure...
+        assert_raises(AssertionError,
+                      assert_emits, dont_emit, c, "foo", f)
+        # ..and from slots raising errors.
+        def g(*args):
+            assert False
+            self.gotcalled = True
+        assert_raises(AssertionError,
+                      assert_emits, do_emit, c, "foo", g)
+        # In neither case should a handler be left around:
+        self.gotcalled = False
+        do_emit(c)
+        assert not self.gotcalled
