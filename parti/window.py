@@ -446,11 +446,11 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         if self.get_property("iconic"):
             trap.swallow(prop_set, self.client_window, "WM_STATE",
                          "u32", parti.lowlevel.const["IconicState"])
-            self.state_add("_NET_WM_STATE_HIDDEN")
+            self._state_add("_NET_WM_STATE_HIDDEN")
         else:
             trap.swallow(prop_set, self.client_window, "WM_STATE",
                          "u32", parti.lowlevel.const["NormalState"])
-            self.state_remove("_NET_WM_STATE_HIDDEN")
+            self._state_remove("_NET_WM_STATE_HIDDEN")
 
     def _handle_state_changed(self, *args):
         # Sync changes to "state" property out to X property.
