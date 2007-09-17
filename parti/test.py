@@ -24,6 +24,30 @@ def assert_raises(exc_class, f, *args, **kwargs):
         raise AssertionError, \
               "wanted exception, got normal return (%r)" % (value,)
 
+
+def assert_emits(f, obj, signal, slot=None):
+    """Call f(obj), and assert that 'signal' is emitted.  Optionally, also
+    passes signaled data to 'slot', which may make its own assertions."""
+    backchannel = {
+        "signal_was_emitted": False,
+        "slot_exc": None,
+        }
+    signal_was_emitted = False
+    def real_slot(*args, **kwargs):
+        backchannel["signal_was_emitted"] = True
+        if slot is not None:
+            try:
+                slot(*args, **kwargs)
+            except:
+                backchannel["slot_exc"] = sys.exc_info()
+    obj.connect(signal, real_slot)
+    f(obj)
+    assert backchannel["signal_was_emitted"]
+    if backchannel["slot_exc"] is not None:
+        exc = backchannel["slot_exc"]
+        raise exc[0], exc[1], exc[2]
+
+
 class TestWithSession(object):
     "A test that runs with its own isolated X11 and D-Bus session."
     display_name = ":13"
@@ -36,8 +60,8 @@ class TestWithSession(object):
                                       "+extension", "Composite"],
                                      executable="Xvfb")
         # This is not a race condition, nor do we need to sleep here, because
-        # gtk.gdk.Display is smart enough to silently block until the X server
-        # comes up.
+        # gtk.gdk.Display.__init__ is smart enough to silently block until the
+        # X server comes up.
         self.display = gtk.gdk.Display("127.0.0.1" + self.display_name)
         default_display = gtk.gdk.display_manager_get().get_default_display()
         if default_display is not None:

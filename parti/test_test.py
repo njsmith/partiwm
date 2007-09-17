@@ -1,4 +1,5 @@
 import os
+import gobject
 import gtk
 from parti.test import *
 
@@ -61,3 +62,29 @@ class TestTest(object):
             raise FooError
         except AssertionError:
             pass
+
+    def test_assert_emits(self):
+        class C(gobject.GObject):
+            __gsignals__ = { "foo":
+                             (gobject.SIGNAL_RUN_LAST,
+                              gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
+                             }
+        gobject.type_register(C)
+        def do_emit(obj):
+            obj.emit("foo", "asdf")
+        def dont_emit(obj):
+            pass
+        c = C()
+        assert_emits(do_emit, c, "foo")
+        assert_raises(AssertionError, assert_emits, dont_emit, c, "foo")
+
+        def slot_wants_asdf(obj, arg):
+            assert isinstance(obj, C)
+            assert arg == "asdf"
+        def slot_wants_hjkl(obj, arg):
+            assert isinstance(obj, C)
+            assert arg == "hjkl"
+            
+        assert_emits(do_emit, c, "foo", slot_wants_asdf)
+        assert_raises(AssertionError,
+                      assert_emits, do_emit, c, "foo", slot_wants_hjkl)
