@@ -44,3 +44,28 @@ class TestAutoPropMixin(object):
             o._internal_set_property("readonly", "blah")
         assert_emits(setit, obj, "notify::readonly")
         assert obj.get_property("readonly") == "blah"
+
+    def test_custom_getset(self):
+        class C(APTestClass):
+            def __init__(self):
+                APTestClass.__init__(self)
+                self.custom = 10
+            def do_set_property_readwrite(self, name, value):
+                assert name == "readwrite"
+                self.custom = value
+            def do_get_property_readwrite(self, name):
+                assert name == "readwrite"
+                return self.custom
+        gobject.type_register(C)
+
+        c = C()
+        assert c.get_property("readwrite") == 10
+        c.set_property("readwrite", 3)
+        assert c.custom == 3
+        assert c.get_property("readwrite") == 3
+        def setit(obj):
+            obj._internal_set_property("readwrite", 12)
+        assert_emits(setit, c, "notify::readwrite")
+        assert c.get_property("readwrite") == 12
+        c.custom = 15
+        assert c.get_property("readwrite") == 15

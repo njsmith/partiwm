@@ -11,7 +11,13 @@ class AutoPropGObjectMixin(object):
         super(AutoPropGObjectMixin, self).__init__()
         self._gproperties = {}
 
+    def _munge_property_name(self, name):
+        return name.replace("-", "_")
+
     def do_get_property(self, pspec):
+        getter = "do_get_property_" + self._munge_property_name(pspec.name)
+        if hasattr(self, getter):
+            return getattr(self, getter)(pspec.name)
         return self._gproperties.get(pspec.name)
 
     def do_set_property(self, pspec, value):
@@ -21,7 +27,11 @@ class AutoPropGObjectMixin(object):
     # .set_property (the public api) will fail, but the property can still be
     # modified via this method.
     def _internal_set_property(self, name, value):
-        self._gproperties[name] = value
+        setter = "do_set_property_" + self._munge_property_name(name)
+        if hasattr(self, setter):
+            getattr(self, setter)(name, value)
+        else:
+            self._gproperties[name] = value
         self.notify(name)
 
 
