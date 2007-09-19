@@ -12,6 +12,8 @@ from parti.util import AutoPropGObjectMixin
 from parti.error import *
 from parti.prop import prop_get, prop_set
 
+# Things to worry about:
+# 
 # Map
 # Withdraw
 # Store properties for everyone else
