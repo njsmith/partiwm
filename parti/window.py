@@ -8,7 +8,7 @@ import gobject
 import gtk
 import gtk.gdk
 import parti.lowlevel
-import parti.util
+from parti.util import AutoPropGObjectMixin
 from parti.error import *
 from parti.prop import prop_get, prop_set
 
@@ -50,7 +50,7 @@ from parti.prop import prop_get, prop_set
 class Unmanageable(Exception):
     pass
 
-class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
+class Window(AutoPropGObjectMixin, gtk.Widget):
     """This represents a managed client window.
 
     It can be used as a GTK Widget, whose contents are the client window's
@@ -299,7 +299,7 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
             # FIXME: extract state and input hint
 
             if wm_hints.urgency:
-                self._internal_set_property("attention-requested", True)
+                self.set_property("attention-requested", True)
 
     _property_handlers["WM_HINTS"] = _handle_wm_hints
 
@@ -405,14 +405,25 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
         # May be None
         self._internal_set_property("client-machine", client_machine)
         
+        # WARNING: have to handle _NET_WM_STATE before we look at WM_HINTS;
+        # WM_HINTS assumes that our "state" property is already set.  This is
+        # because there are four ways a window can get its urgency
+        # ("attention-requested") bit set:
+        #   1) _NET_WM_STATE_DEMANDS_ATTENTION in the _initial_ state hints
+        #   2) setting the bit WM_HINTS, at _any_ time
+        #   3) sending a request to the root window to add
+        #      _NET_WM_STATE_DEMANDS_ATTENTION to their state hints
+        #   4) if we (the wm) decide they should be and set it
+        # To implement this, we generally track the urgency bit via
+        # _NET_WM_STATE (since that is under our sole control during normal
+        # operation).  Then (1) is accomplished through the normal rule that
+        # initial states are read off from the client, and (2) is accomplished
+        # by having WM_HINTS affect _NET_WM_STATE.  But this means that
+        # WM_HINTS and _NET_WM_STATE handling become intertangled.
         net_wm_state = prop_get(self.client_window,
                                 "_NET_WM_STATE", ["atom"])
         if net_wm_state:
             self._internal_set_property("state", sets.ImmutableSet(net_wm_state))
-            if "_NET_WM_STATE_DEMANDS_ATTENTION" in net_wm_state:
-                self.set_property("attention-requested", True)
-            if "_NET_WM_STATE_FULLSCREEN" in net_wm_state:
-                self.set_property("fullscreen", True)
         else:
             self._internal_set_property("state", sets.ImmutableSet())
 
@@ -427,6 +438,22 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     # Property setting
     ################################
     
+    # A few words about _NET_WM_STATE are in order.  Basically, it is a set of
+    # flags.  Clients are allowed to set the initial value of this X property
+    # to anything they like, when their window is first mapped; after that,
+    # though, only the window manager is allowed to touch this property.  So
+    # we store its value (our at least, our idea as to its value, the X server
+    # in principle could disagree) as the "state" property.  There are
+    # basically two things we need to accomplish:
+    #   1) Whenever our property is modified, we mirror that modification into
+    #      the X server.  This is done by connecting to our own notify::state
+    #      signal.
+    #   2) As a more user-friendly interface to these state flags, we provide
+    #      several boolean properties like "attention-requested".
+    #      These are virtual boolean variables; they are actually backed
+    #      directly by the "state" property, and reading/writing them in fact
+    #      accesses the "state" set directly.  This is done by overriding
+    #      do_set_property and do_get_property.
     def _state_add(self, state_name):
         atom = gtk.gdk.atom_intern(state_name)
         curr = set(self.get_property("state"))
@@ -442,6 +469,32 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
     def _state_isset(self, state_name):
         return gtk.gdk.atom_intern(state_name) in self.get_property("state")
 
+    def _handle_state_changed(self, *args):
+        # Sync changes to "state" property out to X property.
+        prop_set(self.client_window, "_NET_WM_STATE",
+                 ["atom"], self.get_property("state"))
+
+    _state_properties = {
+        "attention-requested": "_NET_WM_STATE_DEMANDS_ATTENTION",
+        "fullscreen": "_NET_WM_STATE_FULLSCREEN",
+        }
+    def do_set_property(self, pspec, value):
+        if pspec.name in self._state_properties:
+            state = self._state_properties[pspec.name]
+            if value:
+                self._state_add(state)
+            else:
+                self._state_remove(state)
+        else:
+            AutoPropGObjectMixin.do_set_property(self, pspec, value)
+
+    def do_get_property(self, pspec):
+        if pspec.name in self._state_properties:
+            return self._state_isset(self._state_properties[pspec.name])
+        else:
+            return AutoPropGObjectMixin.do_get_property(self, pspec)
+
+
     def _handle_iconic_update(self, *args):
         if self.get_property("iconic"):
             trap.swallow(prop_set, self.client_window, "WM_STATE",
@@ -452,30 +505,6 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                          "u32", parti.lowlevel.const["NormalState"])
             self._state_remove("_NET_WM_STATE_HIDDEN")
 
-    def _handle_state_changed(self, *args):
-        # Sync changes to "state" property out to X property.
-        prop_set(self.client_window, "_NET_WM_STATE",
-                 ["atom"], self.get_property("state"))
-
-    # There are four ways a window can get urgency = True:
-    #   1) _NET_WM_STATE_DEMANDS_ATTENTION in the _initial_ state hints
-    #   2) setting the bit WM_HINTS, at _any_ time
-    #   3) sending a request to the root window to add
-    #      _NET_WM_STATE_DEMANDS_ATTENTION to their state hints (FIXME, grok
-    #      this)
-    #   4) if we (the wm) decide they should be and set it
-    def _handle_attention_requested(self, *args):
-        if self.get_property("attention-requested"):
-            self._state_add("_NET_WM_STATE_DEMANDS_ATTENTION")
-        else:
-            self._state_remove("_NET_WM_STATE_DEMANDS_ATTENTION")
-
-    def _handle_fullscreen(self, *args):
-        if self.get_property("fullscreen"):
-            self._state_add("_NET_WM_STATE_FULLSCREEN")
-        else:
-            self._state_remove("_NET_WM_STATE_FULLSCREEN")
-
     def _write_initial_properties_and_setup(self):
         # Things that don't change:
         prop_set(self.client_window, "_NET_WM_ALLOWED_ACTIONS",
@@ -484,12 +513,8 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
                  ["u32"], [0, 0, 0, 0])
 
         self.connect("notify::state", self._handle_state_changed)
-        self.connect("notify::attention-requested",
-                     self._handle_attention_requested)
-        self.connect("notify::fullscreen", self._handle_fullscreen)
         # Flush things:
         self._handle_state_changed()
-        self._handle_attention_requested()
 
     def _scrub_withdrawn_window(self):
         remove = ["WM_STATE",
@@ -631,21 +656,6 @@ class Window(parti.util.AutoPropGObjectMixin, gtk.Widget):
             print "... using XSetInputFocus"
             trap.swallow(parti.lowlevel.XSetInputFocus,
                          self.client_window, now)
-
-# This is necessary to inform GObject about the new subclass; if it doesn't
-# know about the subclass, then it thinks we are trying to instantiate
-# GtkWidget directly, which is an abstract base class.
-# FIXME: is this necessary?  GObjectMeta claims to take care of that... but
-# >>> B
-# <class '__main__.B'>
-# >>> B()
-# Traceback (most recent call last):
-#   File "<stdin>", line 1, in ?
-# TypeError: cannot create instance of abstract (non-instantiable) type `GtkWidget'
-# >>> gobject.type_register(B)
-# <class '__main__.B'>
-# >>> B()
-# <B object (__main__+B) at 0x2ad124756fa0>
 
 gobject.type_register(Window)
 
