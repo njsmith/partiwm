@@ -554,10 +554,12 @@ class Window(AutoPropGObjectMixin, gtk.Widget):
             return
         print "Mapping"
         self.set_flags(gtk.MAPPED)
-        self._set_client_geometry(self.allocation)
-        self._internal_set_property("iconic", False)
-        self.window.show_unraised()
-        self.client_window.show_unraised()
+        def mapit():
+            self._set_client_geometry(self.allocation)
+            self._internal_set_property("iconic", False)
+            self.window.show_unraised()
+            self.client_window.show_unraised()
+        trap.swallow(mapit)
         print "Mapped"
 
     def do_realize(self):
