@@ -538,10 +538,14 @@ class Window(AutoPropGObjectMixin, gtk.Widget):
             return
         print "Unmapping"
         self.unset_flags(gtk.MAPPED)
-        self.pending_unmaps += 1
-        self._internal_set_property("iconic", True)
-        self.window.hide()
-        self.client_window.hide()
+        def unmapit():
+            self.pending_unmaps += 1
+            self._internal_set_property("iconic", True)
+            self.window.hide()
+            # This call can actually trigger an unhandled X error -- GDK does
+            # not trap errors in .hide()
+            self.client_window.hide()
+        trap.swallow(unmapit)
         print "Unmapped"
             
     def do_map(self):
