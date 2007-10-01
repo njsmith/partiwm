@@ -32,7 +32,12 @@ def pkgconfig(*packages, **kw):
 setup(
   name = 'parti',
   author="Nathaniel Smith",
-  author_email="njs@pobox.com",
+  author_email="parti-discuss@partiwm.org",
+  version="0.0.1",
+  url="http://partiwm.org",
+  description="A tabbing/tiling window manager using GTK+",
+  download_url="http://partiwm.org/static/downloads/",
+  
   scripts=["scripts/parti", "scripts/parti-repl"],
   packages=["parti", "parti.trays", "parti.addons", "parti.scripts"],
   ext_modules=[ 

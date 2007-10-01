@@ -2,3 +2,5 @@
 ^install
 ^parti/parti._lowlevel.c$
 ^parti/parti._lowlevel.const.pxi$
+^MANIFEST$
+^dist

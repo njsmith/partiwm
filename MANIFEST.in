@@ -1,0 +1,7 @@
+include COPYING NEWS try 
+include run-*
+recursive-include doc/*
+global-include *.py *.txt
+global-exclude *~
+prune build
+prune dist
