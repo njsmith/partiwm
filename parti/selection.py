@@ -7,8 +7,8 @@
 # detection/stealing stuff, and we totally ignore it, because G[TD]K don't
 # make it convenient to 1) ask directly whether a selection is owned, 2) wait
 # for a window to be destroyed.  So instead, we detect if the selection is
-# owned by trying to convert it, and we don't even try to kick out another WM
-# if it seems to exist.
+# owned by trying to convert it, and if it is we either abort or simply steal
+# the selection and assume things will work out.
 
 import gobject
 import gtk
@@ -48,7 +48,8 @@ class ManagerSelection(gobject.GObject):
         # (ICCCM 2.8, still).  The details here probably don't matter too
         # much; I've never heard of an app that cares about these messages,
         # and metacity actually gets the format wrong in several ways (no
-        # MANAGER or owner_window atoms).  But might as well get it right.
+        # MANAGER or owner_window atoms).  But might as well get it as right
+        # as possible.
 
         # To announce our existence, we need:
         #   -- the timestamp we arrived at
