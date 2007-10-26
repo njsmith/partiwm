@@ -1,7 +1,7 @@
 include COPYING NEWS try 
 include run-*
-recursive-include doc/*
+recursive-include doc *
 global-include *.py *.txt
-global-exclude *~
+global-exclude *~ #*
 prune build
 prune dist

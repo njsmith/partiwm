@@ -33,7 +33,7 @@ setup(
   name = 'parti',
   author="Nathaniel Smith",
   author_email="parti-discuss@partiwm.org",
-  version="0.0.1",
+  version="0.0.2",
   url="http://partiwm.org",
   description="A tabbing/tiling window manager using GTK+",
   download_url="http://partiwm.org/static/downloads/",

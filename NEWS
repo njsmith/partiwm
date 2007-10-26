@@ -1,3 +1,11 @@
+Parti 0.0.2 (2007-10-26)
+========================
+
+This release adds a mostly comprehensive test suite, plus fixes a lot
+of bugs.  Still only useful for experimentation and hacking.
+
+'python setup.py sdist' sort of works now.
+
 Parti 0.0.1 (2007-08-10)
 ========================
 
