@@ -27,6 +27,7 @@ class Wm(object):
         "_NET_SUPPORTED", # a bit redundant, perhaps...
         "_NET_SUPPORTING_WM_CHECK",
         "_NET_WM_FULL_PLACEMENT",
+        "_PARTI_WM_HAS_TABS",
         "_NET_WM_HANDLED_ICONS",
         "_NET_CLIENT_LIST",
         "_NET_CLIENT_LIST_STACKING",
@@ -92,7 +93,7 @@ class Wm(object):
         # _NET_WM_STATE_SKIP_TASKBAR,
         # _NET_WM_STATE_SKIP_PAGER,
         # _NET_WM_STATE_HIDDEN,
-        # _NET_WM_STATE_FULLSCREEN,
+        "_NET_WM_STATE_FULLSCREEN",
         # _NET_WM_STATE_ABOVE,
         # _NET_WM_STATE_BELOW,
 
