@@ -391,7 +391,10 @@ class TestLowlevel(TestWithSession):
         # We have to create w2 on a separate connection, because if we just
         # did w1.reparent(w2, ...), then GDK would magically convert w1 from a
         # TOPLEVEL window into a CHILD window.
-        w2 = self.window(self.clone_display())
+        # Have to hold onto a reference to d2, so it doesn't get garbage
+        # collected and kill the connection:
+        d2 = self.clone_display()
+        w2 = self.window(d2)
         gtk.gdk.flush()
         w2on1 = l.get_pywindow(w1, l.get_xwindow(w2))
         # Doesn't generate an event, because event mask is zeroed out.
@@ -424,7 +427,10 @@ class TestLowlevel(TestWithSession):
             self.ev = ev
             gtk.main_quit()
         l.substructureRedirect(self.root(), None, cb)
-        w1_client = self.window(self.clone_display())
+        # Need to hold onto a handle to this, so connection doesn't get
+        # dropped:
+        client = self.clone_display()
+        w1_client = self.window(client)
         gtk.gdk.flush()
         w1_wm = l.get_pywindow(self.display, l.get_xwindow(w1_client))
 
