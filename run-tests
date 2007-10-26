@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -e
+rm -rf build install
+python make-constants-pxi.py parti/parti._lowlevel.const.txt parti/parti._lowlevel.const.pxi
+CFLAGS=-O0 python setup.py install --home=install
+
+#/usr/bin/nosetests -w install/lib/python/parti "$@"
+#py.test install/lib/python "$@"
+#RUNNER="valgrind python"
+#RUNNER="gdb --args python"
+#RUNNER="pydb --trace"
+RUNNER=python
+$RUNNER ./yatest.py install/lib/python/parti "$@"

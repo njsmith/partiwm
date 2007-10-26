@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -e
+rm -rf build install
+python make-constants-pxi.py parti/parti._lowlevel.const.txt parti/parti._lowlevel.const.pxi
+CFLAGS=-O0 python setup.py install --home=install
+
+#gdb --args /usr/bin/python
+#/usr/bin/nosetests -w install/lib/python/parti "$@"
+#py.test install/lib/python "$@"
+export PYTHONPATH=$PWD/install/lib/python:$PYTHONPATH
+export PATH=$PWD/install/bin:$PATH
+cd install  # to get away from ./parti
+python /usr/bin/ipython
