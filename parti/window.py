@@ -455,19 +455,17 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     #      accesses the "state" set directly.  This is done by overriding
     #      do_set_property and do_get_property.
     def _state_add(self, state_name):
-        atom = gtk.gdk.atom_intern(state_name)
         curr = set(self.get_property("state"))
-        curr.add(atom)
+        curr.add(state_name)
         self._internal_set_property("state", sets.ImmutableSet(curr))
 
     def _state_remove(self, state_name):
-        atom = gtk.gdk.atom_intern(state_name)
         curr = set(self.get_property("state"))
-        curr.discard(atom)
+        curr.discard(state_name)
         self._internal_set_property("state", sets.ImmutableSet(curr))
 
     def _state_isset(self, state_name):
-        return gtk.gdk.atom_intern(state_name) in self.get_property("state")
+        return state_name in self.get_property("state")
 
     def _handle_state_changed(self, *args):
         # Sync changes to "state" property out to X property.
