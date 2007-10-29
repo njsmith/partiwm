@@ -16,6 +16,12 @@ have to read:
      ftp://ftp.x.org/pub/X11R7.0/doc/PDF/proto.pdf
      http://en.wikipedia.org/wiki/X_Window_core_protocol
 
+     There appears to be a (illegal?) copy of the O'Reilly Xlib
+     programming manual at:
+       http://www.sbin.org/doc/Xlib/
+     This book does not seem to be available through O'Reilly Safari.
+     It has more detailed explanations of various concepts.
+
      You should understand the basic ideas of events, requests,
      errors, windows, event masks, atoms, properties, and
      SubstructureRedirect (the one key piece of magic around which the

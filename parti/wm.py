@@ -150,7 +150,9 @@ class Wm(object):
         self._world_window.add(self._world_organizer)
 
         # FIXME: be less stupid
-        self._trays.new(u"default", SimpleTabTray)
+        #self._trays.new(u"default", SimpleTabTray)
+        from parti.trays.compositetest import CompositeTest
+        self._trays.new(u"default", CompositeTest)
 
         self._world_window.show_all()
 

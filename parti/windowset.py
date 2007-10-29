@@ -1,6 +1,7 @@
+import gtk
 import gobject
 
-from parti.window import Window, Unmanageable
+from parti.window import WindowModel, Unmanageable
 
 class WindowSet(gobject.GObject):
     __gsignals__ = {
@@ -16,7 +17,7 @@ class WindowSet(gobject.GObject):
     def manage(self, gdkwindow, tray_hint):
         assert not gdkwindow in self
         try:
-            window = Window(gdkwindow, tray_hint)
+            window = WindowModel(gtk.gdk.get_default_root_window(), gdkwindow, tray_hint)
         except Unmanageable:
             return
         window.connect("unmanaged", self._handle_removed)

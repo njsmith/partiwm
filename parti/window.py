@@ -7,6 +7,7 @@ import sets
 import gobject
 import gtk
 import gtk.gdk
+import cairo
 import parti.lowlevel
 from parti.util import AutoPropGObjectMixin
 from parti.error import *
@@ -54,6 +55,91 @@ from parti.prop import prop_get, prop_set
 #   struts
 #   icons
 
+# Okay, we need a block comment to explain the window arrangement that this
+# file is working with.
+#
+#                +--------+
+#                | widget |
+#                +--------+
+#                  /    \
+#  <- top         /     -\-        bottom ->
+#                /        \
+#          +-------+   +---------+
+#          | image |   | expose  |
+#          +-------+   | catcher |
+#                      +---------+
+#                           |
+#                      +---------+
+#                      | corral  |
+#                      +---------+
+#                           |
+#                      +---------+
+#                      | client  |
+#                      +---------+
+#
+# Each box in this diagram represents one X/GDK window.  In the common case,
+# every window here takes up exactly the same space on the screen (!).  In
+# fact, the bottom 4 windows (everything except the one labeled 'widget')
+# *always* have exactly the same size, and the three on the right branch
+# ('expose catcher', 'corral', 'client') *always* have exactly the same
+# position as well.  However, each window in the diagram plays a subtly
+# different role.
+#
+# The client window is obvious -- this is the window owned by the client,
+# which they created and which we have various ICCCM/EWMH-mandated
+# responsibilities towards.
+#
+# The purpose of the 'corral' is to keep the client window maintained -- we
+# select for SubstructureRedirect on it, so that the client cannot resize
+# etc. without going through the WM.  The corral is also the window that is
+# composited (i.e., gdk_window_set_composited is called on it).  One might
+# think that one could just make the client composited, and indeed, this would
+# work fine in theory, but gtk bug #491309 means that compositing only works
+# properly on GDK windows of type GDK_WINDOW_CHILD, and the client window is a
+# GDK_WINDOW_FOREIGN.
+#
+# The way GDK's compositing API works, the parent window of a composited
+# window is the one that receives information about drawing into the
+# composited window.  Since the corral is composited, it needs a parent to
+# recieve these events; this is the purpose of the 'expose catcher'.
+#
+# These first three windows are always managed together, as a unit; an
+# invariant of the code is that they always take up exactly the same space on
+# the screen.  They get reparented back and forth between widgets, and when
+# there are no widgets, they get reparented to a "parking area".  For now,
+# we're just using the root window as a parking area, so we also map/unmap the
+# expose window depending on whether we are parked or not; the corral and
+# client windows are left mapped at all times.
+#
+# When a particular WindowView controls the underlying client window, then two
+# things happen:
+#   -- Its size determines the size of the client window.  Ideally they are
+#      the same size -- but this is not always the case, because the client
+#      may have specified sizing constraints, in which case the client window
+#      is the "best fit" to the controlling widget window.
+#   -- The stack of client windows is reparented under the widget window, as
+#      in the diagram above.  This is necessary to allow mouse events to work
+#      -- a WindowView widget can always *look* like the client window is
+#      there, through the magic of Composite, but in order for it to *act*
+#      like the client window is there in terms of receiving mouse events, it
+#      has to actually be there.
+#
+# Finally, there is the 'image' window.  This is a window that always remains
+# in the widget window, and is used to draw what the client currently looks
+# like.  It always changes in size to track the client window.  If the widget
+# is controlling the client, then the image window is directly on top of the
+# client window; otherwise, the client window is not there, but the image
+# window remains directly on top of where the client window *would* be if it
+# *were* there.  Why don't we just draw onto the widget window?  Two reasons.
+# # e main one is that there is no way to ask Cairo to use IncludeInferiors
+# # awing mode -- so if we were drawing onto the widget window, and the client
+# were present in the widget window, then the 'expose catcher' window would
+# obscure the image of the client.  That's the main reason -- the other reason
+# is that it makes various calculations easier that the client and image
+# windows have matching coordinate systems.
+#
+# All clear?
+
 class Unmanageable(Exception):
     pass
 
@@ -73,14 +159,14 @@ class _ExposeListenerWidget(gtk.Widget):
         self.window.set_user_data(self)
 
     def do_expose_event(self, event):
+        print "expose event!"
         self.recipient._handle_expose_event(event)
 
     def do_destroy(self):
-        # FIXME: wth am I actually supposed to do here?
-        gtk.Widget.do_destroy(self)
         self.window.set_user_data(None)
         self.window = None
         self.recipient = None
+        gtk.Widget.do_destroy(self)
 
 gobject.type_register(_ExposeListenerWidget)
 
@@ -181,7 +267,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         managed, for whatever reason.  ATM, this mostly means that the window
         died somehow before we could do anything with it."""
 
-        parti.lowlevel.printFocus(gdkwindow)
+        parti.lowlevel.printFocus(client_window)
 
         super(WindowModel, self).__init__()
         self.parking_window = parking_window
@@ -209,29 +295,30 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         self.views = set()
         self.controlling_view = None
 
-        # This window is not visible; it contains the client window and is
-        # always exactly the same size as it.  It serves two purposes:
-        #   -- we can select SubstructureRedirect on it, and thus prevent the
-        #      client window from getting fiesty (e.g., by resizing
-        #      itself)
-        #   -- when we enable GDK's XComposite support on the client window,
-        #      this window will receive Expose events for changes in the
-        #      client window
-        # We also enable PROPERTY_CHANGE_MASK so that we can call
+        # We enable PROPERTY_CHANGE_MASK so that we can call
         # x11_get_server_time on this window.
-        self.frame_window = gtk.gdk.Window(self.parking_window,
-                                           width=100,
-                                           height=100,
-                                           window_type=gtk.gdk.WINDOW_CHILD,
-                                           wclass=gtk.gdk.INPUT_OUTPUT,
-                                           event_mask=gtk.gdk.EXPOSURE_MASK
-                                                      | gtk.gdk.PROPERTY_CHANGE_MASK)
-        self.frame_listener = _ExposeListenerWidget(self.frame_window, self)
-        
-        parti.lowlevel.substructureRedirect(self.frame_window,
+        self.expose_window = gtk.gdk.Window(self.parking_window,
+                                            width=100,
+                                            height=100,
+                                            window_type=gtk.gdk.WINDOW_CHILD,
+                                            wclass=gtk.gdk.INPUT_OUTPUT,
+                                            event_mask=gtk.gdk.PROPERTY_CHANGE_MASK
+                                                     | gtk.gdk.EXPOSURE_MASK)
+        self.expose_listener = _ExposeListenerWidget(self.expose_window,
+                                                     self)
+
+        self.corral_window = gtk.gdk.Window(self.expose_window,
+                                            width=100,
+                                            height=100,
+                                            window_type=gtk.gdk.WINDOW_CHILD,
+                                            wclass=gtk.gdk.INPUT_OUTPUT,
+                                            event_mask=0)
+        parti.lowlevel.substructureRedirect(self.corral_window,
                                             None, # FIXME: surely we need
                                             #       MapRequest handling?
                                             self._handle_configure_request)
+        self.corral_window.set_composited(True)
+        self.corral_window.show_unraised()
 
         def setup_client():
             # Start listening for important property changes
@@ -255,11 +342,13 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             self._internal_set_property("iconic", False)
 
             parti.lowlevel.XAddToSaveSet(self.client_window)
-            self.client_window.reparent(self.frame_window, 0, 0)
-            self.frame_window.resize(*self.client_window.get_geometry()[2:4])
+            self.client_window.reparent(self.corral_window, 0, 0)
+            client_size = self.client_window.get_geometry()[2:4]
+            self.corral_window.resize(*client_size)
+            self.expose_window.resize(*client_size)
             self.client_window.show_unraised()
         try:
-            trap.call_unsynced(setup_client)
+            trap.call(setup_client)
         except XError, e:
             raise Unmanageable, e
 
@@ -308,17 +397,23 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         self.destroy()
 
     def _set_controlling_view(self, view):
-        assert view in self.views
+        assert view is None or view in self.views
         if self.controlling_view is view:
             return
         if self.controlling_view is not None:
-            self.frame_window.reparent(self.parking_window, 0, 0)
-            trap.swallow(parti.lowlevel.sendConfigureNotify, self.client_window)
+            self.expose_window.hide()
+            self.expose_window.reparent(self.parking_window, 0, 0)
         self.controlling_view = view
         if self.controlling_view is not None:
             assert self.controlling_view.flags() & gtk.REALIZED
-            self.frame_window.reparent(self.controlling_view.window, 0, 0)
+            # We can reparent to (0, 0), even though that's probably not the
+            # right place, because _update_client_geometry will move us to the
+            # proper location.
+            self.expose_window.reparent(self.controlling_view.window, 0, 0)
             self._update_client_geometry()
+            self.expose_window.lower()
+            self.expose_window.show_unraised()
+        trap.swallow(parti.lowlevel.sendConfigureNotify, self.client_window)
 
     def _unregister_view(self, view):
         if view.flags() & gtk.MAPPED:
@@ -362,14 +457,18 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
 
     def _update_client_geometry(self):
         if self.controlling_view is not None:
-            self.frame_window.move_resize(*self.controlling_view.allocation)
             (base_x, base_y, allocated_w, allocated_h) = self.controlling_view.allocation
-            (x, y, w, h, wvis, hvis) = self.geometry_constraint.fit(allocated_w,
+            (w, h, wvis, hvis) = self.geometry_constraint.fit(allocated_w,
                                                                     allocated_h)
             self._internal_set_property("actual-size", (w, h))
             self._internal_set_property("user-friendly-size", (wvis, hvis))
+            for view in self.views:
+                view._handle_new_size(w, h)
+            (x, y) = self.controlling_view._get_offset()
+            self.expose_window.move_resize(x, y, w, h)
+            self.corral_window.resize(w, h)
             trap.swallow(parti.lowlevel.configureAndNotify,
-                         self.client_window, x, y, w, h)
+                         self.client_window, 0, 0, w, h)
 
     def _handle_configure_request(self, event):
         # Ignore the request, but as per ICCCM 4.1.5, send back a synthetic
@@ -392,10 +491,15 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             h = event.height
         self.geometry_constraint.requested = (w, h)
         self._update_client_geometry()
-        if self.controlling_view is not None:
-            self.controlling_view.queue_resize_no_redraw()
 
         # FIXME: consider handling attempts to change stacking order here.
+
+    def _handle_expose_event(self, event):
+        print ("received composited expose event: (%s, %s, %s, %s)" %
+               (event.area.x, event.area.y, event.area.width, event.area.height))
+        for view in self.views:
+            if view.flags() & gtk.MAPPED:
+                view.emit("expose-event", event)
 
     ################################
     # Property reading
@@ -667,7 +771,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         # genuine race conditions here (e.g. suppose the client does not
         # actually get around to requesting the focus until after we have
         # already changed our mind and decided to give it to someone else).
-        now = gtk.gdk.x11_get_server_time(self.window)
+        now = gtk.gdk.x11_get_server_time(self.expose_window)
         if "WM_TAKE_FOCUS" in self.get_property("protocols"):
             print "... using WM_TAKE_FOCUS"
             trap.swallow(parti.lowlevel.send_wm_take_focus,
@@ -705,6 +809,9 @@ class WindowView(gtk.Widget):
     def __init__(self, model):
         super(WindowView, self).__init__()
         
+        self._size = (1, 1)
+        self._offset = (0, 0)
+        self._image_window = None
         self.model = model
 
         # FIXME: make this dependent on whether the client accepts input focus
@@ -712,13 +819,50 @@ class WindowView(gtk.Widget):
 
         self.model._register_view(self)
 
-    def steal_control(self):
-        self.model._set_controlling_view(self)
-
     def do_destroy(self):
         self.model._unregister_view(self)
         self.model = None
         gtk.Widget.destroy(self)
+
+    def steal_control(self):
+        self.model._set_controlling_view(self)
+
+    def do_expose_event(self, event):
+        # If we are unmapped, also no need to do anything
+        if not self.flags() & gtk.MAPPED:
+            return
+        # But if we are mapped, we have to blit the child window in as our
+        # image of ourself.
+        cr = self._image_window.cairo_create()
+        print event.area.x, event.area.y, event.area.width, event.area.height
+        cr.rectangle(event.area)
+        cr.clip()
+        
+        # FIXME: it seems like this whole thing should just be:
+        #   cr.set_source_surface()
+        #   cr.set_operator(cairo.OPERATOR_SOURCE)
+        #   cr.paint()
+        # But for some reason that just gives a black rectangle.  Also, if I
+        # do paint_with_alpha(1), that also gives a black rectangle.  But
+        # paint_with_alpha(0.99) is *almost* indistinguishable from a
+        # bit-for-bit copy... the colors are very slightly faded, but I can't
+        # see it with the naked eye, only by actually querying pixel values.
+        
+        cr.set_operator(cairo.OPERATOR_SOURCE)
+        cr.set_source_rgb(1, 1, 1)
+        cr.paint()
+        
+        # FIXME: This doesn't work, because of pygtk bug #491256:
+        #cr.set_source_pixmap(self.model.client_window, 0, 0)
+        # Hacky workaround:
+        cr.set_source_surface(self.model.corral_window.cairo_create().get_target(),
+                              0, 0)
+
+        cr.set_operator(cairo.OPERATOR_OVER)
+        cr.paint_with_alpha(0.99)
+        #cr.paint()
+        
+        return False
 
     def do_size_request(self, requisition):
         # FIXME if we ever need to do automatic layout of these sorts of
@@ -732,6 +876,7 @@ class WindowView(gtk.Widget):
         print "New allocation = %r" % (tuple(self.allocation),)
         if self.flags() & gtk.REALIZED:
             self.window.move_resize(*allocation)
+            self._refresh_image_window()
         self.model._view_reallocated(self)
     
     def do_realize(self):
@@ -749,9 +894,17 @@ class WindowView(gtk.Widget):
         self.window.set_user_data(self)
 
         # Give it a nice theme-defined background
-        self.style.attach(self.window)
-        self.style.set_background(self.window, gtk.STATE_NORMAL)
+        #self.style.attach(self.window)
+        #self.style.set_background(self.window, gtk.STATE_NORMAL)
         self.window.move_resize(*self.allocation)
+
+        self._image_window = gtk.gdk.Window(self.window,
+                                            width=100, height=100,
+                                            window_type=gtk.gdk.WINDOW_CHILD,
+                                            wclass=gtk.gdk.INPUT_OUTPUT,
+                                            event_mask=0)
+        self._refresh_image_window()
+        self._image_window.show()
 
         print "Realized"
 
@@ -763,6 +916,7 @@ class WindowView(gtk.Widget):
         self.set_flags(gtk.MAPPED)
         self.model._view_mapped(self)
         self.window.show_unraised()
+        self.window.queue_draw()
         print "Mapped"
 
     def do_unmap(self):
@@ -784,7 +938,27 @@ class WindowView(gtk.Widget):
         self.unset_flags(gtk.REALIZED)
         # Break circular reference
         self.window.set_user_data(None)
+        self.window = None
+        self._image_window = None
         print "Unrealized"
+
+    def _refresh_image_window(self):
+        if self.flags() & gtk.REALIZED:
+            # These can come out negative; that's okay.
+            self._offset = ((self.allocation.width - self._size[0]) // 2,
+                            (self.allocation.height - self._size[1]) // 2)
+            self._image_window.move_resize(*(self._offset + self._size))
+            self._image_window.input_shape_combine_region(gtk.gdk.Region(),
+                                                          0, 0)
+            
+
+    def _handle_new_size(self, width, height):
+        self._size = (width, height)
+        self._refresh_image_window()
+
+    def _get_offset(self):
+        assert self.flags() & gtk.REALIZED
+        return self._offset
 
 gobject.type_register(WindowView)
 
@@ -794,7 +968,7 @@ class GeometryFree(object):
         self.requested = requested
 
     def fit(self, width, height):
-        return (0, 0, width, height, width, height)
+        return (width, height, width, height)
 
 class GeometryFixed(object):
     def __init__(self, size):
@@ -802,11 +976,7 @@ class GeometryFixed(object):
         self.x, self.y = size
 
     def fit(self, width, height):
-        def center(size, space):
-            # This can be negative; that's all right.
-            return (space - size) // 2
-        return (center(self.x, width), center(self.y, height),
-                self.x, self.y, self.x, self.y)
+        return (self.x, self.y, self.x, self.y)
 
 class GeometryInc(object):
     def __init__(self, requested,
@@ -824,7 +994,7 @@ class GeometryInc(object):
                % (self.base_width, self.base_height,
                   self.inc_width, self.inc_height,
                   width, height, w, h, wvis, hvis))
-        return (0, 0, w, h, wvis, hvis)
+        return (w, h, wvis, hvis)
         
     def _fit1(self, base, inc, avail):
         if avail < base:

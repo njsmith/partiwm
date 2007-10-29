@@ -155,11 +155,11 @@ class WorldWindow(gtk.Window):
     def _give_focus_to_them_that_deserves_it(self):
         focus = self.get_focus()
         print focus
-        if isinstance(focus, parti.window.Window):
-            focus.give_client_focus()
+        if isinstance(focus, parti.window.WindowView):
+            focus.model.give_client_focus()
             trap.swallow(parti.prop.prop_set, gtk.gdk.get_default_root_window(),
                          "_NET_ACTIVE_WINDOW", "window",
-                         focus.get_property("client-window"))
+                         focus.model.get_property("client-window"))
         else:
             self._take_focus()
             parti.prop.prop_set(gtk.gdk.get_default_root_window(),

@@ -1,9 +1,12 @@
 #!/bin/sh
 
-RUNNER=
-#RUNNER="pydb --trace"
-#RUNNER="pydb --fntrace"
-#RUNNER="gdb --args python"
+USE_DISPLAY=:7
+WM_CMD="install/bin/parti --sync"
+
+RUN=$WM_CMD
+#RUN="pydb --trace $WM_CMD"
+#RUN="pydb --fntrace $WM_CMD"
+#RUN="xterm -display $DISPLAY -e 'gdb --args python $WM_CMD --display=$USE_DISPLAY'"
 
 set -e
 rm -rf build install
@@ -11,4 +14,4 @@ python make-constants-pxi.py parti/parti._lowlevel.const.txt parti/parti._lowlev
 CFLAGS=-O0 python setup.py install --home=install
 # NB Xephyr has a segfault bug in its reset logic -- shouldn't come up
 # when run via xinit like this, but use -noreset anyway.
-PYTHONPATH=install/lib/python:$PYTHONPATH PATH=install/bin:$PATH xinit /bin/sh -c "x-terminal-emulator || xterm & $RUNNER install/bin/parti --sync" -- /usr/bin/Xephyr :7 -ac -noreset
+PYTHONPATH=install/lib/python:$PYTHONPATH PATH=install/bin:$PATH xinit /bin/sh -c "x-terminal-emulator || xterm & $RUN" -- /usr/bin/Xephyr $USE_DISPLAY -ac -noreset
