@@ -916,7 +916,6 @@ class WindowView(gtk.Widget):
         self.set_flags(gtk.MAPPED)
         self.model._view_mapped(self)
         self.window.show_unraised()
-        self.window.queue_draw()
         print "Mapped"
 
     def do_unmap(self):
