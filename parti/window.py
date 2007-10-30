@@ -828,7 +828,7 @@ class WindowView(gtk.Widget):
         self.model._set_controlling_view(self)
 
     def do_expose_event(self, event):
-        # If we are unmapped, also no need to do anything
+        # If we are unmapped, we have no need to do anything.
         if not self.flags() & gtk.MAPPED:
             return
         # But if we are mapped, we have to blit the child window in as our
@@ -838,15 +838,17 @@ class WindowView(gtk.Widget):
         cr.rectangle(event.area)
         cr.clip()
         
-        # FIXME: it seems like this whole thing should just be:
-        #   cr.set_source_surface()
+        # FIXME: This whole thing should just be:
+        #   cr.set_source_surface(...)
         #   cr.set_operator(cairo.OPERATOR_SOURCE)
         #   cr.paint()
-        # But for some reason that just gives a black rectangle.  Also, if I
-        # do paint_with_alpha(1), that also gives a black rectangle.  But
-        # paint_with_alpha(0.99) is *almost* indistinguishable from a
-        # bit-for-bit copy... the colors are very slightly faded, but I can't
-        # see it with the naked eye, only by actually querying pixel values.
+        # However, if I do that, I get a black rectangle.  The problem seems
+        # to be Cairo bug #12996[1].  As a workaround, we clear to white and
+        # then overlay with an alpha level of 0.99, which seems to trigger a
+        # less-buggy slow-path.  The result is *almost* indistinguishable from
+        # a bit-for-bit copy; the colors are very slightly faded, but I can't
+        # see it with my naked eye, only by actually querying pixel values.
+        #   [1] https://bugs.freedesktop.org/show_bug.cgi?id=12996)
         
         cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.set_source_rgb(1, 1, 1)
@@ -857,10 +859,8 @@ class WindowView(gtk.Widget):
         # Hacky workaround:
         cr.set_source_surface(self.model.corral_window.cairo_create().get_target(),
                               0, 0)
-
         cr.set_operator(cairo.OPERATOR_OVER)
         cr.paint_with_alpha(0.99)
-        #cr.paint()
         
         return False
 
