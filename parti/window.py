@@ -159,7 +159,7 @@ class _ExposeListenerWidget(gtk.Widget):
         self.window.set_user_data(self)
 
     def do_expose_event(self, event):
-        print "expose event!"
+        print "synthetic damage-based expose event!"
         self.recipient._handle_damage(event)
 
     def do_destroy(self):
@@ -459,16 +459,16 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         if self.controlling_view is not None:
             (base_x, base_y, allocated_w, allocated_h) = self.controlling_view.allocation
             (w, h, wvis, hvis) = self.geometry_constraint.fit(allocated_w,
-                                                                    allocated_h)
+                                                              allocated_h)
             self._internal_set_property("actual-size", (w, h))
             self._internal_set_property("user-friendly-size", (wvis, hvis))
-            for view in self.views:
-                view._handle_new_size(w, h)
-            (x, y) = self.controlling_view._get_offset()
-            self.expose_window.move_resize(x, y, w, h)
             self.corral_window.resize(w, h)
             trap.swallow(parti.lowlevel.configureAndNotify,
                          self.client_window, 0, 0, w, h)
+            (x, y) = self.controlling_view._get_offset_for(w, h)
+            self.expose_window.move_resize(x, y, w, h)
+            for view in self.views:
+                view._invalidate_all()
 
     def _handle_configure_request(self, event):
         # Ignore the request, but as per ICCCM 4.1.5, send back a synthetic
@@ -809,11 +809,12 @@ class WindowView(gtk.Widget):
     def __init__(self, model):
         super(WindowView, self).__init__()
         
-        self._size = (1, 1)
-        self._offset = (0, 0)
         self._image_window = None
         self.model = model
 
+        # Standard GTK double-buffering is useless for us, because it's on our
+        # "official" window, and we don't draw to that.
+        self.set_double_buffered(False)
         # FIXME: make this dependent on whether the client accepts input focus
         self.set_property("can-focus", True)
 
@@ -827,32 +828,44 @@ class WindowView(gtk.Widget):
     def steal_control(self):
         self.model._set_controlling_view(self)
 
+    def _invalidate_all(self):
+        self._image_window.invalidate_rect(gtk.gdk.Rectangle(width=100000,
+                                                             height=10000),
+                                           False)
+
+    def _get_transform_matrix(self):
+        m = cairo.Matrix()
+        m.translate(*self._get_offset_for(*self.model.get_property("actual-size")))
+        return m
+
+    def _handle_damage(self, event):
+        m = self._get_transform_matrix()
+        area = event.area
+        (x, y) = m.transform_point(area.x, area.y)
+        (w, h) = m.transform_distance(area.width, area.height)
+        print ("damage (%s, %s, %s, %s) -> expose on (%s, %s, %s, %s)" %
+               (event.area.x, event.area.y, event.area.width, event.area.height,
+                x, y, w, h))
+        self._image_window.invalidate_rect(gtk.gdk.Rectangle(x, y, w, h),
+                                           False)
+        
     def do_expose_event(self, event):
         if not self.flags() & gtk.MAPPED:
             return
-        cr = self._image_window.cairo_create()
-        print event.area.x, event.area.y, event.area.width, event.area.height
-        cr.rectangle(event.area)
-        cr.clip()
-        self._redraw_with(cr)
 
-    def _handle_damage(self, event):
-        # This *should* just call gdk_window_invalidate_rect (or friends, see
-        # docs).  But will that end up getting clipped away by the image
-        # window?  Actually... the image window needs to becomes the same size
-        # and shape as the widget window anyway, and to receive real expose
-        # events.  So I guess we should just invalidate_rect on *it*.
         cr = self._image_window.cairo_create()
         print event.area.x, event.area.y, event.area.width, event.area.height
-        # FIXME: translate appropriately
         cr.rectangle(event.area)
         cr.clip()
-        self._redraw_with(cr)
-        
-    def _redraw_with(self, cr):
+
         # Blit the client window in as our image of ourself.
 
-        # FIXME: This whole thing should just be:
+        # Background:
+        cr.set_operator(cairo.OPERATOR_SOURCE)
+        cr.set_source_rgb(1, 1, 1)
+        cr.paint()
+        
+        # FIXME: This should just be:
         #   cr.set_source_surface(...)
         #   cr.set_operator(cairo.OPERATOR_SOURCE)
         #   cr.paint()
@@ -864,10 +877,8 @@ class WindowView(gtk.Widget):
         # see it with my naked eye, only by actually querying pixel values.
         #   [1] https://bugs.freedesktop.org/show_bug.cgi?id=12996)
         
-        cr.set_operator(cairo.OPERATOR_SOURCE)
-        cr.set_source_rgb(1, 1, 1)
-        cr.paint()
-        
+        cr.set_matrix(self._get_transform_matrix())
+
         # FIXME: This doesn't work, because of pygtk bug #491256:
         #cr.set_source_pixmap(self.model.client_window, 0, 0)
         # Hacky workaround:
@@ -888,7 +899,9 @@ class WindowView(gtk.Widget):
         print "New allocation = %r" % (tuple(self.allocation),)
         if self.flags() & gtk.REALIZED:
             self.window.move_resize(*allocation)
-            self._refresh_image_window()
+            self._image_window.resize(allocation.width, allocation.height)
+            self._image_window.input_shape_combine_region(gtk.gdk.Region(),
+                                                          0, 0)
         self.model._view_reallocated(self)
     
     def do_realize(self):
@@ -900,9 +913,7 @@ class WindowView(gtk.Widget):
                                      height=self.allocation.height,
                                      window_type=gtk.gdk.WINDOW_CHILD,
                                      wclass=gtk.gdk.INPUT_OUTPUT,
-                                     # FIXME: any reason not to just zero this
-                                     # out?
-                                     event_mask=self.get_events())
+                                     event_mask=0)
         self.window.set_user_data(self)
 
         # Give it a nice theme-defined background
@@ -911,11 +922,14 @@ class WindowView(gtk.Widget):
         self.window.move_resize(*self.allocation)
 
         self._image_window = gtk.gdk.Window(self.window,
-                                            width=100, height=100,
+                                            width=self.allocation.width,
+                                            height=self.allocation.height,
                                             window_type=gtk.gdk.WINDOW_CHILD,
                                             wclass=gtk.gdk.INPUT_OUTPUT,
-                                            event_mask=0)
-        self._refresh_image_window()
+                                            event_mask=gtk.gdk.EXPOSURE_MASK)
+        self._image_window.input_shape_combine_region(gtk.gdk.Region(),
+                                                      0, 0)
+        self._image_window.set_user_data(self)
         self._image_window.show()
 
         print "Realized"
@@ -953,26 +967,16 @@ class WindowView(gtk.Widget):
         self._image_window = None
         print "Unrealized"
 
-    def _refresh_image_window(self):
-        if self.flags() & gtk.REALIZED:
-            # These can come out negative; that's okay.
-            self._offset = ((self.allocation.width - self._size[0]) // 2,
-                            (self.allocation.height - self._size[1]) // 2)
-            self._image_window.move_resize(*(self._offset + self._size))
-            self._image_window.input_shape_combine_region(gtk.gdk.Region(),
-                                                          0, 0)
-            
-
-    def _handle_new_size(self, width, height):
-        self._size = (width, height)
-        self._refresh_image_window()
-
-    def _get_offset(self):
+    def _get_offset_for(self, w, h):
         assert self.flags() & gtk.REALIZED
-        return self._offset
-
+        # These can come out negative; that's okay.
+        return ((self.allocation.width - w) // 2,
+                (self.allocation.height - h) // 2)
+            
 gobject.type_register(WindowView)
 
+
+#### FIXME: look into gdk_window_constrain_size!
 
 class GeometryFree(object):
     def __init__(self, requested):
