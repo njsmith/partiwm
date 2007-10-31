@@ -79,11 +79,10 @@ from parti.prop import prop_get, prop_set
 #
 # Each box in this diagram represents one X/GDK window.  In the common case,
 # every window here takes up exactly the same space on the screen (!).  In
-# fact, the bottom 4 windows (everything except the one labeled 'widget')
-# *always* have exactly the same size, and the three on the right branch
-# ('expose catcher', 'corral', 'client') *always* have exactly the same
-# position as well.  However, each window in the diagram plays a subtly
-# different role.
+# fact, the three windows on the right *always* have exactly the same size and
+# location, and the window on the left and the top window also always have
+# exactly the same size and position.  However, each window in the diagram
+# plays a subtly different role.
 #
 # The client window is obvious -- this is the window owned by the client,
 # which they created and which we have various ICCCM/EWMH-mandated
@@ -126,17 +125,18 @@ from parti.prop import prop_get, prop_set
 #
 # Finally, there is the 'image' window.  This is a window that always remains
 # in the widget window, and is used to draw what the client currently looks
-# like.  It always changes in size to track the client window.  If the widget
-# is controlling the client, then the image window is directly on top of the
-# client window; otherwise, the client window is not there, but the image
-# window remains directly on top of where the client window *would* be if it
-# *were* there.  Why don't we just draw onto the widget window?  Two reasons.
-# # e main one is that there is no way to ask Cairo to use IncludeInferiors
-# # awing mode -- so if we were drawing onto the widget window, and the client
-# were present in the widget window, then the 'expose catcher' window would
-# obscure the image of the client.  That's the main reason -- the other reason
-# is that it makes various calculations easier that the client and image
-# windows have matching coordinate systems.
+# like.  It needs to receive endogenous expose events so it knows if it has
+# been literally exposed (not just when the window it is displaying has
+# changed), and the easiest way to arrange for this is to make it exactly the
+# same size as the parent 'widget' window.  Then the widget window never
+# receives expose events (because it is occluded), and we can arrange for the
+# image window's expose events to be delivered to the WindowView widget, and
+# they will be in the right coordinate space.  If the widget is controlling
+# the client, then the image window goes on top of the client window.  Why
+# don't we just draw onto the widget window?  Because there is no way to ask
+# Cairo to use IncludeInferiors drawing mode -- so if we were drawing onto the
+# widget window, and the client were present in the widget window, then the
+# blank black 'expose catcher' window would obscure the image of the client.
 #
 # All clear?
 
@@ -160,7 +160,7 @@ class _ExposeListenerWidget(gtk.Widget):
 
     def do_expose_event(self, event):
         print "expose event!"
-        self.recipient._handle_expose_event(event)
+        self.recipient._handle_damage(event)
 
     def do_destroy(self):
         self.window.set_user_data(None)
@@ -494,12 +494,12 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
 
         # FIXME: consider handling attempts to change stacking order here.
 
-    def _handle_expose_event(self, event):
+    def _handle_damage(self, event):
         print ("received composited expose event: (%s, %s, %s, %s)" %
                (event.area.x, event.area.y, event.area.width, event.area.height))
         for view in self.views:
             if view.flags() & gtk.MAPPED:
-                view.emit("expose-event", event)
+                view._handle_damage(event)
 
     ################################
     # Property reading
@@ -828,16 +828,30 @@ class WindowView(gtk.Widget):
         self.model._set_controlling_view(self)
 
     def do_expose_event(self, event):
-        # If we are unmapped, we have no need to do anything.
         if not self.flags() & gtk.MAPPED:
             return
-        # But if we are mapped, we have to blit the child window in as our
-        # image of ourself.
         cr = self._image_window.cairo_create()
         print event.area.x, event.area.y, event.area.width, event.area.height
         cr.rectangle(event.area)
         cr.clip()
+        self._redraw_with(cr)
+
+    def _handle_damage(self, event):
+        # This *should* just call gdk_window_invalidate_rect (or friends, see
+        # docs).  But will that end up getting clipped away by the image
+        # window?  Actually... the image window needs to becomes the same size
+        # and shape as the widget window anyway, and to receive real expose
+        # events.  So I guess we should just invalidate_rect on *it*.
+        cr = self._image_window.cairo_create()
+        print event.area.x, event.area.y, event.area.width, event.area.height
+        # FIXME: translate appropriately
+        cr.rectangle(event.area)
+        cr.clip()
+        self._redraw_with(cr)
         
+    def _redraw_with(self, cr):
+        # Blit the client window in as our image of ourself.
+
         # FIXME: This whole thing should just be:
         #   cr.set_source_surface(...)
         #   cr.set_operator(cairo.OPERATOR_SOURCE)
@@ -861,8 +875,6 @@ class WindowView(gtk.Widget):
                               0, 0)
         cr.set_operator(cairo.OPERATOR_OVER)
         cr.paint_with_alpha(0.99)
-        
-        return False
 
     def do_size_request(self, requisition):
         # FIXME if we ever need to do automatic layout of these sorts of
