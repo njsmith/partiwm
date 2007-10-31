@@ -860,22 +860,23 @@ class WindowView(gtk.Widget):
 
         # Blit the client window in as our image of ourself.
 
+        # We should optimize this so we only draw the background where the
+        # background grows, and then double-buffering will be unnecessary.
+        # Blitting in would then just be:
+        #   cr.set_source_surface(...)
+        #   cr.set_operator(cairo.OPERATOR_SOURCE)
+        #   cr.paint()
+        # However, if one does that directly, one gets a black rectangle.  The
+        # problem seems to be Cairo bug #12996:
+        #   https://bugs.freedesktop.org/show_bug.cgi?id=12996)
+
+        # Double-buffer:
+        cr.push_group()
+
         # Background:
         cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.set_source_rgb(1, 1, 1)
         cr.paint()
-        
-        # FIXME: This should just be:
-        #   cr.set_source_surface(...)
-        #   cr.set_operator(cairo.OPERATOR_SOURCE)
-        #   cr.paint()
-        # However, if I do that, I get a black rectangle.  The problem seems
-        # to be Cairo bug #12996[1].  As a workaround, we clear to white and
-        # then overlay with an alpha level of 0.99, which seems to trigger a
-        # less-buggy slow-path.  The result is *almost* indistinguishable from
-        # a bit-for-bit copy; the colors are very slightly faded, but I can't
-        # see it with my naked eye, only by actually querying pixel values.
-        #   [1] https://bugs.freedesktop.org/show_bug.cgi?id=12996)
         
         cr.set_matrix(self._get_transform_matrix())
 
@@ -884,8 +885,12 @@ class WindowView(gtk.Widget):
         # Hacky workaround:
         cr.set_source_surface(self.model.corral_window.cairo_create().get_target(),
                               0, 0)
-        cr.set_operator(cairo.OPERATOR_OVER)
-        cr.paint_with_alpha(0.99)
+        cr.set_operator(cairo.OPERATOR_SOURCE)
+        cr.paint()
+
+        cr.pop_group_to_source()
+        cr.set_operator(cairo.OPERATOR_SOURCE)
+        cr.paint()
 
     def do_size_request(self, requisition):
         # FIXME if we ever need to do automatic layout of these sorts of
