@@ -35,8 +35,7 @@ class WMSizeHints(object):
          win_gravity) = struct.unpack("@" + "i" * 18, data)
         #print repr(data)
         #print struct.unpack("@" + "i" * 18, data)
-        # Only extract the things we care about, i.e., max, min, base,
-        # increments.
+        # We only extract the pieces we care about:
         if flags & const["PMaxSize"]:
             self.max_size = (max_width, max_height)
         else:
@@ -53,6 +52,11 @@ class WMSizeHints(object):
             self.resize_inc = (width_inc, height_inc)
         else:
             self.resize_inc = None
+        if flags & const["PAspect"]:
+            self.min_aspect = min_aspect_num * 1.0 / min_aspect_den
+            self.max_aspect = max_aspect_num * 1.0 / max_aspect_den
+        else:
+            self.min_aspect, self.max_aspect = (None, None)
 
 class WMHints(object):
     def __init__(self, disp, data):
