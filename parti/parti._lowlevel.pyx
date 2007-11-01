@@ -434,6 +434,44 @@ def printFocus(display_source):
     cXGetInputFocus(get_xdisplay_for(display_source), &w, &revert_to)
     print "Current focus: %s, %s" % (hex(w), revert_to)
     
+# Geometry hints
+
+cdef extern from *:
+    ctypedef struct cGdkGeometry "GdkGeometry":
+        int min_width, min_height, max_width, max_height, 
+        int base_width, base_height, width_inc, height_inc
+        double min_aspect, max_aspect
+    void gdk_window_constrain_size(cGdkGeometry *geometry,
+                                   unsigned int flags, int width, int height,
+                                   int * new_width, int * new_height)
+
+def calc_constrained_size(width, height, hints):
+    cdef cGdkGeometry geom
+    cdef int new_width, new_height
+    flags = 0
+    
+    if hints.max_size is not None:
+        flags = flags | gtk.gdk.HINT_MAX_SIZE
+        geom.min_width, geom.max_height = hints.max_size
+    if hints.min_size is not None:
+        flags = flags | gtk.gdk.HINT_MIN_SIZE
+        geom.min_width, geom.min_height = hints.min_size
+    if hints.base_size is not None:
+        flags = flags | gtk.gdk.HINT_BASE_SIZE
+        geom.base_width, geom.base_height = hints.base_size
+    if hints.resize_inc is not None:
+        flags = flags | gtk.gdk.HINT_RESIZE_INC
+        geom.width_inc, geom.height_inc = hints.resize_inc
+    if hints.min_aspect is not None:
+        assert hints.max_aspect is not None
+        flags = flags | gtk.gdk.HINT_ASPECT
+        geom.min_aspect = hints.min_aspect
+        geom.max_aspect = hints.max_aspect
+    gdk_window_constrain_size(&geom, flags, width, height,
+                              &new_width, &new_height)
+    return (new_width, new_height)
+        
+
 ###################################
 # Smarter convenience wrappers
 ###################################
