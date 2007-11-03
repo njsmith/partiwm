@@ -467,7 +467,8 @@ class TestLowlevel(TestWithSession):
     # This doesn't actually need a session to play with...
     def test_calc_constrained_size(self):
         class Foo:
-            pass
+            def __repr__(self):
+                return repr(self.__dict__)
         def hints(**args):
             f = Foo()
             for k in ("max_size", "min_size", "base_size", "resize_inc",
@@ -478,8 +479,9 @@ class TestLowlevel(TestWithSession):
             return f
         def t(w, h, hints, exp_w, exp_h):
             got = l.calc_constrained_size(w, h, hints)
-            print hints.__dict__
+            print repr(hints)
             assert got == (exp_w, exp_h)
+        t(150, 100, None, 150, 100)
         t(150, 100, hints(), 150, 100)
         t(150, 100, hints(max_size=(90, 150)), 90, 100)
         t(150, 100, hints(max_size=(200, 90)), 150, 90)

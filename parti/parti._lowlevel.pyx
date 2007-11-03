@@ -446,6 +446,9 @@ cdef extern from *:
                                    int * new_width, int * new_height)
 
 def calc_constrained_size(width, height, hints):
+    if hints is None:
+        return (width, height)
+
     cdef cGdkGeometry geom
     cdef int new_width, new_height
     flags = 0
