@@ -447,7 +447,7 @@ cdef extern from *:
 
 def calc_constrained_size(width, height, hints):
     if hints is None:
-        return (width, height)
+        return (width, height, width, height)
 
     cdef cGdkGeometry geom
     cdef int new_width, new_height
@@ -472,7 +472,16 @@ def calc_constrained_size(width, height, hints):
         geom.max_aspect = hints.max_aspect
     gdk_window_constrain_size(&geom, flags, width, height,
                               &new_width, &new_height)
-    return (new_width, new_height)
+
+    vis_width, vis_height = (new_width, new_height)
+    if hints.resize_inc is not None:
+        if hints.base_size is not None:
+            vis_width = vis_width - hints.base_size[0]
+            vis_height = vis_height - hints.base_size[1]
+        vis_width = vis_width / hints.resize_inc[0]
+        vis_height = vis_height / hints.resize_inc[1]
+
+    return (new_width, new_height, vis_width, vis_height)
         
 
 ###################################

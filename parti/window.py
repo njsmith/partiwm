@@ -202,6 +202,12 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         "requested-position": (gobject.TYPE_PYOBJECT,
                                "Client-requested position on screen", "",
                                gobject.PARAM_READABLE),
+        "requested-size": (gobject.TYPE_PYOBJECT,
+                           "Client-requested size on screen", "",
+                           gobject.PARAM_READABLE),
+        "size-hints": (gobject.TYPE_PYOBJECT,
+                       "Client hints on constraining its size", "",
+                       gobject.PARAM_READABLE),
         "class": (gobject.TYPE_STRING,
                   "Classic X 'class'", "",
                   "",
@@ -289,8 +295,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         self.pending_unmaps = 0
 
         self.connect("notify::iconic", self._handle_iconic_update)
-
-        self.geometry_constraint = GeometryFree((100, 100))
 
         self.views = set()
         self.controlling_view = None
@@ -458,15 +462,18 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     def _update_client_geometry(self):
         if self.controlling_view is not None:
             (base_x, base_y, allocated_w, allocated_h) = self.controlling_view.allocation
-            (w, h, wvis, hvis) = self.geometry_constraint.fit(allocated_w,
-                                                              allocated_h)
-            self._internal_set_property("actual-size", (w, h))
-            self._internal_set_property("user-friendly-size", (wvis, hvis))
+            hints = self.get_property("size-hints")
+            size = parti.lowlevel.calc_constrained_size(allocated_w,
+                                                        allocated_h,
+                                                        hints)
+            (w, h, wvis, hvis) = size
             self.corral_window.resize(w, h)
             trap.swallow(parti.lowlevel.configureAndNotify,
                          self.client_window, 0, 0, w, h)
             (x, y) = self.controlling_view._get_offset_for(w, h)
             self.expose_window.move_resize(x, y, w, h)
+            self._internal_set_property("actual-size", (w, h))
+            self._internal_set_property("user-friendly-size", (wvis, hvis))
             for view in self.views:
                 view._invalidate_all()
 
@@ -484,12 +491,12 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             y = event.y
         self._internal_set_property("requested-position", (x, y))
 
-        (w, h) = self.geometry_constraint.requested
+        (w, h) = self.get_property("requested-size")
         if event.value_mask & parti.lowlevel.const["CWWidth"]:
             w = event.width
         if event.value_mask & parti.lowlevel.const["CWHeight"]:
             h = event.height
-        self.geometry_constraint.requested = (w, h)
+        self._internal_set_property("requested-size", (w, h))
         self._update_client_geometry()
 
         # FIXME: consider handling attempts to change stacking order here.
@@ -527,6 +534,14 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                 self.set_property("attention-requested", True)
 
     _property_handlers["WM_HINTS"] = _handle_wm_hints
+
+    def _handle_wm_normal_hints(self):
+        size_hints = prop_get(self.client_window,
+                              "WM_NORMAL_HINTS", "wm-size-hints")
+        self._internal_set_property("size-hints", size_hints)
+        self._update_client_geometry()
+
+    _property_handlers["WM_NORMAL_HINTS"] = _handle_wm_normal_hints
 
     def _handle_title_change(self):
         wm_name = prop_get(self.client_window, "WM_NAME", "latin1")
@@ -569,19 +584,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         # Things that don't change:
         geometry = self.client_window.get_geometry()
         self._internal_set_property("requested-position", (geometry[0], geometry[1]))
-        requested_size = (geometry[2], geometry[3])
-
-        size_hints = prop_get(self.client_window,
-                              "WM_NORMAL_HINTS", "wm-size-hints")
-        if not size_hints:
-            self.geometry_constraint = GeometryFree(requested_size)
-        elif (size_hints.max_size and size_hints.min_size
-              and size_hints.max_size == size_hints.min_size):
-            self.geometry_constraint = GeometryFixed(size_hints.max_size)
-        elif size_hints.base_size and size_hints.resize_inc:
-            self.geometry_constraint = GeometryInc(requested_size,
-                                                   *(size_hints.base_size
-                                                     + size_hints.resize_inc))
+        self._internal_set_property("requested-size", (geometry[2], geometry[3]))
 
         class_instance = prop_get(self.client_window,
                                   "WM_CLASS", "latin1")
@@ -654,7 +657,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         else:
             self._internal_set_property("state", sets.ImmutableSet())
 
-        for mutable in ["WM_HINTS",
+        for mutable in ["WM_HINTS", "WM_NORMAL_HINTS",
                         "WM_NAME", "_NET_WM_NAME",
                         "WM_ICON_NAME", "_NET_WM_ICON_NAME",
                         "_NET_WM_STRUT", "_NET_WM_STRUT_PARTIAL",
