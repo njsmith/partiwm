@@ -452,7 +452,7 @@ def calc_constrained_size(width, height, hints):
     
     if hints.max_size is not None:
         flags = flags | gtk.gdk.HINT_MAX_SIZE
-        geom.min_width, geom.max_height = hints.max_size
+        geom.max_width, geom.max_height = hints.max_size
     if hints.min_size is not None:
         flags = flags | gtk.gdk.HINT_MIN_SIZE
         geom.min_width, geom.min_height = hints.min_size

@@ -463,3 +463,61 @@ class TestLowlevel(TestWithSession):
         assert self.ev.value_mask == (l.const["CWWidth"]
                                       | l.const["CWBorderWidth"])
         
+
+    # This doesn't actually need a session to play with...
+    def test_calc_constrained_size(self):
+        class Foo:
+            pass
+        def hints(**args):
+            f = Foo()
+            for k in ("max_size", "min_size", "base_size", "resize_inc",
+                      "min_aspect", "max_aspect"):
+                setattr(f, k, None)
+            for k, v in args.iteritems():
+                setattr(f, k, v)
+            return f
+        def t(w, h, hints, exp_w, exp_h):
+            got = l.calc_constrained_size(w, h, hints)
+            print hints.__dict__
+            assert got == (exp_w, exp_h)
+        t(150, 100, hints(), 150, 100)
+        t(150, 100, hints(max_size=(90, 150)), 90, 100)
+        t(150, 100, hints(max_size=(200, 90)), 150, 90)
+        t(150, 100, hints(min_size=(90, 150)), 150, 150)
+        t(150, 100, hints(min_size=(200, 90)), 200, 100)
+        t(150, 100, hints(min_size=(182, 17), max_size=(182, 17)), 182, 17)
+
+        t(150, 100, hints(base_size=(3, 4), resize_inc=(10, 10)), 143, 94)
+        try:
+            t(150, 100, hints(base_size=(3, 4), resize_inc=(10, 10),
+                              max_size=(100, 150), min_size=(0, 140)),
+              93, 144)
+        except AssertionError:
+            print ("Assertion Failed!  But *cough* *cough* actually gdk "
+                   + "(and apparently every wm ever) has a bug here. "
+                   + "and it's trivial and I'm ignoring it for now. "
+                   + "(see http://bugzilla.gnome.org/show_bug.cgi?id=492961)")
+        else:
+            raise AssertionError, "Dude look at this, gtk+ fixed bug#492961"
+        # FIXME: this is wrong (see above), but it is what it actually
+        # returns, and is not so bad as all that:
+        t(150, 100, hints(base_size=(3, 4), resize_inc=(10, 10),
+                          max_size=(100, 150), min_size=(0, 140)),
+          93, 134)
+        
+        # Behavior in this case is basically undefined, so *shrug*:
+        t(150, 100, hints(base_size=(3, 4), resize_inc=(10, 10),
+                          max_size=(100, 100), min_size=(100, 100)),
+          93, 94)
+        
+        t(150, 100, hints(min_aspect=1, max_aspect=1), 100, 100)
+        t(100, 150, hints(min_aspect=1, max_aspect=1), 100, 100)
+
+        t(100, 150, hints(min_aspect=1, max_aspect=1,
+                          base_size=(3, 3), resize_inc=(10, 10)),
+          93, 93)
+
+        # Also undefined, but (93, 94) is good enough:
+        t(100, 150, hints(min_aspect=1, max_aspect=1,
+                          base_size=(3, 4), resize_inc=(10, 10)),
+          93, 94)
