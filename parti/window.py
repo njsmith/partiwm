@@ -8,6 +8,7 @@ import gobject
 import gtk
 import gtk.gdk
 import cairo
+import math
 import parti.lowlevel
 from parti.util import AutoPropGObjectMixin
 from parti.error import *
@@ -95,7 +96,11 @@ from parti.prop import prop_get, prop_set
 # think that one could just make the client composited, and indeed, this would
 # work fine in theory, but gtk bug #491309 means that compositing only works
 # properly on GDK windows of type GDK_WINDOW_CHILD, and the client window is a
-# GDK_WINDOW_FOREIGN.
+# GDK_WINDOW_FOREIGN.  (This also has the advantage that we can access the
+# composited contents of the client window without worrying about it
+# disappearing unexpectedly and causing an X error -- one could also use
+# the NameWindowPixmap operation in the Composite extension for the same
+# thing, but this lets us skip that.
 #
 # The way GDK's compositing API works, the parent window of a composited
 # window is the one that receives information about drawing into the
@@ -145,7 +150,7 @@ class Unmanageable(Exception):
 
 class _ExposeListenerWidget(gtk.Widget):
     # GTK wants to route events from GdkWindows to GtkWidgets.  We need to
-    # receive events (esp. synthetic GDK expose events) on the "frame" window
+    # receive events (esp. synthetic GDK expose events) on the "corral" window
     # that our client has been reparented into.  Therefore we need to attach a
     # widget to that window, even though that widget will not really go
     # anywhere in the widget hierarchy; it is just a placeholder to receive
@@ -438,6 +443,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             view.destroy()
         assert not self.views
         assert self.controlling_view is None
+        self.expose_listener.destroy()
 
     def _view_unmapped(self, view):
         assert view in self.views
@@ -838,28 +844,52 @@ class WindowView(gtk.Widget):
 
     def _get_transform_matrix(self):
         m = cairo.Matrix()
-        m.translate(*self._get_offset_for(*self.model.get_property("actual-size")))
+        size = self.model.get_property("actual-size")
+        if self.model.controlling_view is self:
+            m.translate(*self._get_offset_for(*size))
+        else:
+            scale_factor = min(self.allocation[2] * 1.0 / size[0],
+                               self.allocation[3] * 1.0 / size[1])
+            if 0.9 < scale_factor < 1.05:
+                scale_factor = 1
+            offset = self._get_offset_for(size[0] * scale_factor,
+                                          size[1] * scale_factor)
+            print "offset: (%s, %s)" % offset
+            m.translate(*offset)
+            m.scale(scale_factor, scale_factor)
         return m
 
     def _handle_damage(self, event):
         m = self._get_transform_matrix()
-        area = event.area
-        (x, y) = m.transform_point(area.x, area.y)
-        (w, h) = m.transform_distance(area.width, area.height)
+        # This is the right way to convert an integer-space bounding box into
+        # another integer-space bounding box:
+        (x1, y1) = m.transform_point(event.area.x, event.area.y)
+        (x2, y2) = m.transform_point(event.area.x + event.area.width,
+                                     event.area.y + event.area.height)
+        x1i = math.floor(x1)
+        y1i = math.floor(y1)
+        x2i = math.ceil(x2)
+        y2i = math.ceil(y2)
+        transformed = gtk.gdk.Rectangle(x1i, y1i, x2i - x1i, y2i - y1i)
         print ("damage (%s, %s, %s, %s) -> expose on (%s, %s, %s, %s)" %
                (event.area.x, event.area.y, event.area.width, event.area.height,
-                x, y, w, h))
-        self._image_window.invalidate_rect(gtk.gdk.Rectangle(x, y, w, h),
-                                           False)
+                transformed.x, transformed.y, transformed.width, transformed.height))
+        self._image_window.invalidate_rect(transformed, False)
         
     def do_expose_event(self, event):
         if not self.flags() & gtk.MAPPED:
             return
 
+        debug = True
+
         cr = self._image_window.cairo_create()
-        print event.area.x, event.area.y, event.area.width, event.area.height
-        cr.rectangle(event.area)
-        cr.clip()
+        cr.save()
+        print ("redrawing rectangle at (%s, %s, %s, %s)"
+               % (event.area.x, event.area.y,
+                  event.area.width, event.area.height))
+        if not debug:
+            cr.rectangle(event.area)
+            cr.clip()
 
         # Blit the client window in as our image of ourself.
 
@@ -874,26 +904,59 @@ class WindowView(gtk.Widget):
         #   https://bugs.freedesktop.org/show_bug.cgi?id=12996)
 
         # Double-buffer:
+        cr.save()
         cr.push_group()
 
         # Background:
+        cr.save()
         cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.set_source_rgb(1, 1, 1)
         cr.paint()
+        cr.restore()
         
-        cr.set_matrix(self._get_transform_matrix())
-
+        cr.save()
+        matrix = self._get_transform_matrix()
+        print "Old matrix: ", cr.get_matrix()
+        cr.set_matrix(matrix)
+        print matrix
         # FIXME: This doesn't work, because of pygtk bug #491256:
         #cr.set_source_pixmap(self.model.client_window, 0, 0)
         # Hacky workaround:
-        cr.set_source_surface(self.model.corral_window.cairo_create().get_target(),
-                              0, 0)
+        source = self.model.corral_window.cairo_create().get_target()
+        print source.get_device_offset()
+
+        cr.set_source_surface(source, 0, 0)
+        #tmpsrf = cairo.ImageSurface(cairo.FORMAT_ARGB32,
+        #                            source.get_width(), source.get_height())
+        #tmpcr = cairo.Context(tmpsrf)
+        #tmpcr.set_source_surface(source)
+        #tmpcr.set_operator(cairo.OPERATOR_SOURCE)
+        #tmpcr.paint()
+        #cr.set_source_surface(tmpsrf, 0, 0)
+                                    
         cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.paint()
+        
+        if debug:
+            cr.set_operator(cairo.OPERATOR_OVER)
+            cr.rectangle(0, 0, 10, 10)
+            cr.set_source_rgba(0, 0, 1, 0.2)
+            cr.fill()
+
+        cr.restore()
 
         cr.pop_group_to_source()
         cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.paint()
+        cr.restore()
+
+        cr.restore()
+        if debug:
+            cr.rectangle(event.area)
+            cr.clip()
+            cr.set_source_rgba(0, 1, 0, 0.2)
+            cr.set_operator(cairo.OPERATOR_OVER)
+            cr.paint()
 
     def do_size_request(self, requisition):
         # FIXME if we ever need to do automatic layout of these sorts of

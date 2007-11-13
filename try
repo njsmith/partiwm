@@ -7,6 +7,7 @@ RUN=$WM_CMD
 #RUN="pydb --trace $WM_CMD"
 #RUN="pydb --fntrace $WM_CMD"
 #RUN="xterm -display $DISPLAY -e 'gdb --args python $WM_CMD --display=$USE_DISPLAY'"
+#RUN="xtrace -n | tee xtrace.out & (sleep 1; python $WM_CMD --display=:9)"
 
 set -e
 rm -rf build install
