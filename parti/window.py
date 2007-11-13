@@ -897,37 +897,35 @@ class WindowView(gtk.Widget):
         if not self.flags() & gtk.MAPPED:
             return
 
-        debug = True
+        debug = False
 
-        cr = self._image_window.cairo_create()
-        cr.save()
         print ("redrawing rectangle at (%s, %s, %s, %s)"
                % (event.area.x, event.area.y,
                   event.area.width, event.area.height))
+
+        # Blit the client window in as our image of ourself.
+        cr = self._image_window.cairo_create()
+
+        # Create a temporary buffer and draw onto that.  It would be somewhat
+        # efficient (and less code) to just call begin_paint_rect and
+        # end_paint on our target window (because begin_paint_rect allocates
+        # just the right amount of offscreen space, and push_group allocates a
+        # full window-sized offscreen buffer), but this is also a workaround
+        # for Cairo bug #12996:
+        #   https://bugs.freedesktop.org/show_bug.cgi?id=12996
+        # and possibly other X server bugs, that for whatever reason don't get
+        # triggered when we use push_group and force a Render-based "slow"
+        # path.
+        cr.save()
+        cr.push_group()
         if not debug:
             cr.rectangle(event.area)
             cr.clip()
 
-        # Blit the client window in as our image of ourself.
-
-        # We should optimize this so we only draw the background where the
-        # background grows, and then double-buffering will be unnecessary.
-        # Blitting in would then just be:
-        #   cr.set_source_surface(...)
-        #   cr.set_operator(cairo.OPERATOR_SOURCE)
-        #   cr.paint()
-        # However, if one does that directly, one gets a black rectangle.  The
-        # problem seems to be Cairo bug #12996:
-        #   https://bugs.freedesktop.org/show_bug.cgi?id=12996)
-
-        # Double-buffer:
-        cr.save()
-        cr.push_group()
-
         # Background:
         cr.save()
         cr.set_operator(cairo.OPERATOR_SOURCE)
-        cr.set_source_rgb(1, 1, 1)
+        cr.set_source_rgb(0.5, 0.5, 0.5)
         cr.paint()
         cr.restore()
         
@@ -939,6 +937,8 @@ class WindowView(gtk.Widget):
         source = self.model.corral_window.cairo_create().get_target()
 
         cr.set_source_surface(source, 0, 0)
+        # Super slow (copies everything out of the server and then back
+        # again), but an option for working around Cairo/X bugs:
         #tmpsrf = cairo.ImageSurface(cairo.FORMAT_ARGB32,
         #                            source.get_width(), source.get_height())
         #tmpcr = cairo.Context(tmpsrf)
@@ -949,27 +949,31 @@ class WindowView(gtk.Widget):
                                     
         cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.paint()
-        
         if debug:
+            # Overlay a blue square to show where the origin of the
+            # transformed coordinates is
             cr.set_operator(cairo.OPERATOR_OVER)
             cr.rectangle(0, 0, 10, 10)
             cr.set_source_rgba(0, 0, 1, 0.2)
             cr.fill()
-
         cr.restore()
 
         cr.pop_group_to_source()
+        if not debug:
+            cr.rectangle(event.area)
+            cr.clip()
         cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.paint()
         cr.restore()
 
-        cr.restore()
         if debug:
+            # Overlay a green rectangle to show the damaged area
+            cr.save()
             cr.rectangle(event.area)
-            cr.clip()
             cr.set_source_rgba(0, 1, 0, 0.2)
-            cr.set_operator(cairo.OPERATOR_OVER)
-            cr.paint()
+            cr.fill()
+            cr.restore()
+
 
     def do_size_request(self, requisition):
         # FIXME if we ever need to do automatic layout of these sorts of
