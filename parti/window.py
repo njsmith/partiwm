@@ -850,12 +850,29 @@ class WindowView(gtk.Widget):
         else:
             scale_factor = min(self.allocation[2] * 1.0 / size[0],
                                self.allocation[3] * 1.0 / size[1])
-            if 0.9 < scale_factor < 1.05:
+            if 0.95 < scale_factor:
                 scale_factor = 1
-            offset = self._get_offset_for(size[0] * scale_factor,
-                                          size[1] * scale_factor)
-            print "offset: (%s, %s)" % offset
-            m.translate(*offset)
+            # FIXME: Disable translation for now, because at least the
+            # following X servers have (different) bugs handling scaling +
+            # translation for composited windows:
+            #   Xephyr with XAA
+            #   Xephyr with -fakexa
+            #   intel with XAA
+            # Intel with EXA is known to work.
+            #
+            # See, for instance:
+            #   https://bugs.freedesktop.org/show_bug.cgi?id=13115
+            #   https://bugs.freedesktop.org/show_bug.cgi?id=13116
+            #   https://bugs.freedesktop.org/show_bug.cgi?id=13117
+            # I bet everyone else has bugs in this too, though.
+            #
+            # Using NameWindowPixmap and then compositing the pixmap instead
+            # of the window directly might or might not be a workaround --
+            # have to try it to find out.
+            # 
+            #offset = self._get_offset_for(size[0] * scale_factor,
+            #                              size[1] * scale_factor)
+            #m.translate(*offset)
             m.scale(scale_factor, scale_factor)
         return m
 
@@ -915,15 +932,11 @@ class WindowView(gtk.Widget):
         cr.restore()
         
         cr.save()
-        matrix = self._get_transform_matrix()
-        print "Old matrix: ", cr.get_matrix()
-        cr.set_matrix(matrix)
-        print matrix
+        cr.set_matrix(self._get_transform_matrix())
         # FIXME: This doesn't work, because of pygtk bug #491256:
         #cr.set_source_pixmap(self.model.client_window, 0, 0)
         # Hacky workaround:
         source = self.model.corral_window.cairo_create().get_target()
-        print source.get_device_offset()
 
         cr.set_source_surface(source, 0, 0)
         #tmpsrf = cairo.ImageSurface(cairo.FORMAT_ARGB32,
