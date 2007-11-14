@@ -961,9 +961,6 @@ class WindowView(gtk.Widget):
         cr.restore()
 
         cr.pop_group_to_source()
-        if not debug:
-            cr.rectangle(event.area)
-            cr.clip()
         cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.paint()
         cr.restore()
