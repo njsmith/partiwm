@@ -830,7 +830,7 @@ gobject.type_register(WindowModel)
 
 class WindowView(gtk.Widget):
     def __init__(self, model):
-        base(WindowView).__init__()
+        base(self).__init__(self)
         
         self._image_window = None
         self.model = model

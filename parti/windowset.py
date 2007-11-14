@@ -11,7 +11,7 @@ class WindowSet(gobject.GObject):
         }
 
     def __init__(self):
-        base(self).__init__()
+        base(self).__init__(self)
         self.l = []
         self.d = {}
 
