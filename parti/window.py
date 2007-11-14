@@ -257,6 +257,9 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         "icon-title": (gobject.TYPE_PYOBJECT,
                        "Icon title (unicode or None)", "",
                        gobject.PARAM_READABLE),
+        "icon": (gobject.TYPE_PYOBJECT,
+                 "Icon (Cairo surface)", "",
+                 gobject.PARAM_READABLE),
         }
     __gsignals__ = {
         "client-unmap-event": (gobject.SIGNAL_RUN_LAST,
@@ -592,8 +595,8 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     _property_handlers["_NET_WM_STRUT_PARTIAL"] = _handle_wm_strut
 
     def _handle_net_wm_icon(self):
-        # FIXME
-        pass
+        self._internal_set_property(prop_get(self.client_window,
+                                             "_NET_WM_ICON", "icon"))
 
     _property_handlers["_NET_WM_ICON"] = _handle_net_wm_icon
 
