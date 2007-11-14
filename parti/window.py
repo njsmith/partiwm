@@ -951,8 +951,12 @@ class WindowView(gtk.Widget):
         cr.set_matrix(self._get_transform_matrix())
         # FIXME: This doesn't work, because of pygtk bug #491256:
         #cr.set_source_pixmap(self.model.client_window, 0, 0)
-        # Hacky workaround:
-        source = self.model.corral_window.cairo_create().get_target()
+        # Hacky workaround.  Note that we have to hold on to a handle to the
+        # cairo context we create, because once it is destructed the surface
+        # we got might stop working (I'm actually not sure whether it will or
+        # not).
+        source_cr = self.model.corral_window.cairo_create()
+        source = source_cr.get_target()
 
         cr.set_source_surface(source, 0, 0)
         # Super slow (copies everything out of the server and then back
