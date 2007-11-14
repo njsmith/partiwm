@@ -174,7 +174,7 @@ _prop_types = {
               unsupported, NetWMStrut, None),
     "strut-partial": (NetWMStrut, "_NET_WM_STRUT_PARTIAL", 32,
                       unsupported, NetWMStrut, None),
-    "icon": (cairo.Surface, "_NET_WM_ICON", 32
+    "icon": (cairo.Surface, "_NET_WM_ICON", 32,
              unsupported, NetWMIcons, None),
     }
 
