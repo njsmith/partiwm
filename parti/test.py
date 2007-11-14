@@ -60,7 +60,10 @@ class TestWithSession(object):
         self._x11 = subprocess.Popen(["Xvfb-for-parti", self.display_name,
                                       "-ac",
                                       "-audit", "10",
-                                      "+extension", "Composite"],
+                                      "+extension", "Composite",
+                                      # Need to set the depth like this to get
+                                      # non-paletted visuals:
+                                      "-screen", "0", "1024x768x24+32"],
                                      executable="Xvfb")
         # This is not a race condition, nor do we need to sleep here, because
         # gtk.gdk.Display.__init__ is smart enough to silently block until the
