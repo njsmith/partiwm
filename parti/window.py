@@ -595,7 +595,8 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     _property_handlers["_NET_WM_STRUT_PARTIAL"] = _handle_wm_strut
 
     def _handle_net_wm_icon(self):
-        self._internal_set_property(prop_get(self.client_window,
+        self._internal_set_property("icon",
+                                    prop_get(self.client_window,
                                              "_NET_WM_ICON", "icon"))
 
     _property_handlers["_NET_WM_ICON"] = _handle_net_wm_icon
