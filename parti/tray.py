@@ -1,13 +1,15 @@
 import gobject
 import gtk
 
+from parti.util import base
+
 # FIXME: The current design here is lame... these should probably be models of
 # some sort, or possibly hold many models, so that one can cycle through
 # multiple layout implementations losslessly.  But just making them widgets is
 # expedient for now.
 class Tray(gtk.Widget):
     def __init__(self, trayset, tag):
-        super(Tray, self).__init__()
+        base(Tray).__init__()
         self.trayset = trayset
         self.tag = tag
 
@@ -49,7 +51,7 @@ class TraySet(gobject.GObject):
         }
 
     def __init__(self):
-        super(TraySet, self).__init__()
+        base(TraySet).__init__()
         self.trays = []
 
     def tags(self):

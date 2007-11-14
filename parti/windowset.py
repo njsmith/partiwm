@@ -1,6 +1,7 @@
 import gtk
 import gobject
 
+from parti.util import base
 from parti.window import WindowModel, Unmanageable
 
 class WindowSet(gobject.GObject):
@@ -10,7 +11,7 @@ class WindowSet(gobject.GObject):
         }
 
     def __init__(self):
-        super(WindowSet, self).__init__()
+        base(self).__init__()
         self.l = []
         self.d = {}
 

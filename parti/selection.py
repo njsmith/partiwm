@@ -16,6 +16,7 @@ import gtk.gdk
 from struct import pack, unpack
 from warnings import warn
 
+from parti.util import base
 import parti.lowlevel
 
 class AlreadyOwned(Exception):
@@ -28,7 +29,7 @@ class ManagerSelection(gobject.GObject):
         }
 
     def __init__(self, display, selection):
-        gobject.GObject.__init__(self)
+        base(self).__init__(self)
         self.atom = selection
         self.clipboard = gtk.Clipboard(display, selection)
 
