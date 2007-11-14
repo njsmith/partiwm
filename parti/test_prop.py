@@ -89,8 +89,25 @@ class TestProp(TestWithSession):
         assert full.bottom_start_x == 0
         assert full.bottom_stop_x == 0
 
-        # FIXME: use ["utf8"] trick to round-trip this (or add a way to push
-        # CARDINAL bytes directly to the server for testing)
+        p.prop_set(self.win,
+                   "corrupted1", "debug-CARDINAL",
+                   "\xff\xff\xff\xff")
+        corrupted = p.prop_get(self.win,
+                               "corrupted1", "strut")
+        # If we just said 0xffffffff as a manifest constant here, then this
+        # test wouldn't work on 64-bit machines:
+        assert corrupted.left == struct.unpack("@i", "\xff\xff\xff\xff")[0]
+        assert corrupted.right == 0
+        assert corrupted.top == 0
+        assert corrupted.bottom == 0
+        assert corrupted.left_start_y == 0
+        assert corrupted.left_end_y == 0
+        assert corrupted.right_start_y == 0
+        assert corrupted.right_end_y == 0
+        assert corrupted.top_start_x == 0
+        assert corrupted.top_end_x == 0
+        assert corrupted.bottom_start_x == 0
+        assert corrupted.bottom_stop_x == 0
 
     def test_icon(self):
         import cairo
