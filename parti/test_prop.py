@@ -120,6 +120,13 @@ class TestProp(TestWithSession):
 
         assert pixmap.get_size() == (LARGE_W, LARGE_H)
 
-        # FIXME: finish this
+        round_tripped = cairo.ImageSurface(cairo.FORMAT_ARGB32,
+                                           *pixmap.get_size())
+        round_tripped_cr = gtk.gdk.CairoContext(cairo.Context(round_tripped))
+        round_tripped_cr.set_source_pixmap(pixmap, 0, 0)
+        round_tripped_cr.set_operator(cairo.OPERATOR_SOURCE)
+        round_tripped_cr.paint()
+
+        assert str(round_tripped.get_data()) == str(large.get_data())
 
     # FIXME: WMSizeHints and WMHints tests.  Stupid baroque formats...
