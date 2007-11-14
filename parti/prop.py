@@ -4,7 +4,10 @@ Everyone else should just use prop_set/prop_get with nice clean Python calling
 conventions, and if you need more (un)marshalling smarts, add them here."""
 
 import struct
+import array
+from cStringIO import StringIO
 import gtk.gdk
+import cairo
 from parti.lowlevel import \
      XGetWindowProperty, XChangeProperty, PropertyError, \
      get_xatom, get_pyatom, get_xwindow, get_pywindow, const
@@ -95,6 +98,44 @@ class NetWMStrut(object):
          self.bottom_start_x, self.bottom_stop_x,
          ) = struct.unpack("@" + "i" * 12, data)
 
+def _read_image(disp, width, height, stream):
+    header = stream.read(2 * 4)
+    if len(header) < 2 * 4:
+        return None
+    (width, height) = struct.unpack("@ii", header)
+    bytes = stream.read(width * height * 4)
+    if len(bytes) < width * height * 4:
+        print "Corrupt _NET_WM_ICON"
+        return None
+    bytes_as_array = array.array("c", bytes)
+    local_surf = cairo.ImageSurface.create_for_data(bytes_as_array,
+                                                    cairo.FORMAT_ARGB32,
+                                                    width, height, 0)
+    # FIXME: There is no Pixmap.new_for_display(), so this isn't actually
+    # display-clean.  Oh well.
+    pixmap = gtk.gdk.Pixmap(None, width, height, 32)
+    pixmap.set_colormap(disp.get_default_screen().get_rgba_colormap())
+    cr = pixmap.cairo_create()
+    cr.set_source_surface(local_surf)
+    cr.paint()
+    return cr.get_target()
+
+# This returns a (helpfully server-side) cairo surface which is the larget
+# icon defined in a _NET_WM_ICON property.
+def NetWMIcons(disp, data):
+    icons = []
+    stream = StringIO(data)
+    while True:
+        image = _read_image(disp, width, height, stream)
+        if image is None:
+            break
+        icons.append(image)
+    if not icons:
+        return None
+    icons.sort(lambda a, b: cmp(a.get_width() * a.get_height(),
+                                b.get_width() * b.get_height()))
+    return icons[-1]
+
 _prop_types = {
     # Python type, X type Atom, format, serializer, deserializer, list
     # terminator
@@ -133,6 +174,8 @@ _prop_types = {
               unsupported, NetWMStrut, None),
     "strut-partial": (NetWMStrut, "_NET_WM_STRUT_PARTIAL", 32,
                       unsupported, NetWMStrut, None),
+    "icon": (cairo.Surface, "_NET_WM_ICON", 32
+             unsupported, NetWMIcons, None),
     }
 
 def _prop_encode(disp, type, value):
@@ -169,7 +212,7 @@ def _prop_decode(disp, type, data):
 def _prop_decode_scalar(disp, type, data):
     (pytype, atom, format, serialize, deserialize, terminator) = _prop_types[type]
     value = deserialize(disp, data)
-    assert isinstance(value, pytype)
+    assert value is None or isinstance(value, pytype)
     return value
 
 def _prop_decode_list(disp, type, data):
@@ -181,7 +224,9 @@ def _prop_decode_list(disp, type, data):
         while data:
             datums.append(data[:(format // 8)])
             data = data[(format // 8):]
-    return [_prop_decode_scalar(disp, type, datum) for datum in datums]
+    props = [_prop_decode_scalar(disp, type, datum) for datum in datums]
+    assert None not in props
+    return props
 
 # May return None.
 def prop_get(target, key, type):
