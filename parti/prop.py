@@ -181,6 +181,12 @@ _prop_types = {
                       unsupported, NetWMStrut, None),
     "icon": (gtk.gdk.Drawable, "CARDINAL", 32,
              unsupported, NetWMIcons, None),
+    # For uploading ad-hoc instances of the above complex structures to the
+    # server, so we can test reading them out again:
+    "debug-CARDINAL": (str, "CARDINAL", 32,
+                       lambda disp, c: c,
+                       lambda disp, d: d,
+                       None),
     }
 
 def _prop_encode(disp, type, value):

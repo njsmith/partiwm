@@ -112,10 +112,8 @@ class TestProp(TestWithSession):
         large_dat = struct.pack("@ii", LARGE_W, LARGE_H) + str(large.get_data())
 
         icon_bytes = small_dat + large_dat + small_dat
-        icon_32 = struct.unpack("@" + "i" * (len(icon_bytes) // 4),
-                                icon_bytes)
 
-        p.prop_set(self.win, "_NET_WM_ICON", ["u32"], icon_32)
+        p.prop_set(self.win, "_NET_WM_ICON", "debug-CARDINAL", icon_bytes)
         pixmap = p.prop_get(self.win, "_NET_WM_ICON", "icon")
 
         assert pixmap.get_size() == (LARGE_W, LARGE_H)
