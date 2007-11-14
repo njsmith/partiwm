@@ -10,7 +10,7 @@ import gtk.gdk
 import cairo
 import math
 import parti.lowlevel
-from parti.util import AutoPropGObjectMixin
+from parti.util import AutoPropGObjectMixin, base
 from parti.error import *
 from parti.prop import prop_get, prop_set
 
@@ -157,7 +157,7 @@ class _ExposeListenerWidget(gtk.Widget):
     # events.
 
     def __init__(self, window, recipient):
-        super(_ExposeListenerWidget, self).__init__()
+        base(_ExposeListenerWidget).__init__()
         self.set_flags(gtk.REALIZED)
         self.recipient = recipient
         self.window = window
@@ -213,6 +213,9 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         "size-hints": (gobject.TYPE_PYOBJECT,
                        "Client hints on constraining its size", "",
                        gobject.PARAM_READABLE),
+        "strut": (gobject.TYPE_PYOBJECT,
+                  "Struts requested by window, or None", "",
+                  gobject.PARAM_READABLE),
         "class": (gobject.TYPE_STRING,
                   "Classic X 'class'", "",
                   "",
@@ -506,6 +509,8 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         self._update_client_geometry()
 
         # FIXME: consider handling attempts to change stacking order here.
+        # (In particular, I believe that a request to jump to the top is
+        # meaningful and should perhaps even be respected.)
 
     def _handle_damage(self, event):
         print ("received composited expose event: (%s, %s, %s, %s)" %
@@ -574,8 +579,14 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     _property_handlers["_NET_WM_ICON_NAME"] = _handle_icon_title_change
 
     def _handle_wm_strut(self):
-        # FIXME
-        pass
+        partial = prop_get(self.client_window,
+                           "_NET_WM_STRUT_PARTIAL", "strut-partial")
+        if partial is not None:
+            self._internal_set_property("strut", partial)
+            return
+        full = prop_get(self.client_window, "_NET_WM_STRUT", "strut")
+        # Might be None:
+        self._internal_set_property("strut", full)
 
     _property_handlers["_NET_WM_STRUT"] = _handle_wm_strut
     _property_handlers["_NET_WM_STRUT_PARTIAL"] = _handle_wm_strut
@@ -816,7 +827,7 @@ gobject.type_register(WindowModel)
 
 class WindowView(gtk.Widget):
     def __init__(self, model):
-        super(WindowView, self).__init__()
+        base(WindowView).__init__()
         
         self._image_window = None
         self.model = model

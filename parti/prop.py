@@ -80,6 +80,21 @@ class WMHints(object):
         else:
             self.input = None
 
+class NetWMStrut(object):
+    def __init__(self, disp, data):
+        # This eats both _NET_WM_STRUT and _NET_WM_STRUT_PARTIAL.  If we are
+        # given a _NET_WM_STRUT instead of a _NET_WM_STRUT_PARTIAL, then it
+        # will be only length 4 instead of 12, but _force_length will zero-pad
+        # and _NET_WM_STRUT is *defined* as a _NET_WM_STRUT_PARTIAL where the
+        # extra fields are zero... so it all works out.
+        data = _force_length(data, 4 * 12)
+        (self.left, self.right, self.top, self.bottom,
+         self.left_start_y, self.left_end_y,
+         self.right_start_y, self.right_end_y,
+         self.top_start_x, self.top_end_x,
+         self.bottom_start_x, self.bottom_stop_x,
+         ) = struct.unpack("@" + "i" * 12, data)
+
 _prop_types = {
     # Python type, X type Atom, format, serializer, deserializer, list
     # terminator
@@ -114,6 +129,10 @@ _prop_types = {
                  unsupported,
                  WMHints,
                  None),
+    "strut": (NetWMStrut, "_NET_WM_STRUT", 32,
+              unsupported, NetWMStrut, None),
+    "strut-partial": (NetWMStrut, "_NET_WM_STRUT_PARTIAL", 32,
+                      unsupported, NetWMStrut, None),
     }
 
 def _prop_encode(disp, type, value):
