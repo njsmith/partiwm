@@ -52,9 +52,12 @@ class TestProp(TestWithSession):
         p.prop_set(self.win, "ASDF", "utf8", u"")
         assert p.prop_get(self.win, "ASDF", "latin1") is None
 
-    def test_strut_decode(self):
-        partial = p.NetWMStrut(self.display,
-                               struct.pack("@" + "i" * 12, *range(12)))
+    def test_strut(self):
+        p.prop_set(self.win,
+                   "_NET_WM_STRUT_PARTIAL", "debug-CARDINAL",
+                   struct.pack("@" + "i" * 12, *range(12)))
+        partial = p.prop_get(self.win,
+                             "_NET_WM_STRUT_PARTIAL", "strut-partial")
         assert partial.left == 0
         assert partial.right == 1
         assert partial.top == 2
@@ -68,8 +71,11 @@ class TestProp(TestWithSession):
         assert partial.bottom_start_x == 10
         assert partial.bottom_stop_x == 11
 
-        full = p.NetWMStrut(self.display,
-                            struct.pack("@" + "i" * 4, *range(4)))
+        p.prop_set(self.win,
+                   "_NET_WM_STRUT", "debug-CARDINAL",
+                   struct.pack("@" + "i" * 4, *range(4)))
+        full = p.prop_get(self.win,
+                          "_NET_WM_STRUT", "strut")
         assert full.left == 0
         assert full.right == 1
         assert full.top == 2
