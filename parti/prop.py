@@ -36,7 +36,7 @@ class WMSizeHints(object):
          min_aspect_num, min_aspect_den,
          max_aspect_num, max_aspect_den,
          base_width, base_height,
-         win_gravity) = struct.unpack("@" + "i" * 18, data)
+         win_gravity) = struct.unpack("@" + "I" * 18, data)
         #print repr(data)
         #print struct.unpack("@" + "i" * 18, data)
         # We only extract the pieces we care about:
@@ -97,16 +97,18 @@ class NetWMStrut(object):
          self.right_start_y, self.right_end_y,
          self.top_start_x, self.top_end_x,
          self.bottom_start_x, self.bottom_stop_x,
-         ) = struct.unpack("@" + "i" * 12, data)
+         ) = struct.unpack("@" + "I" * 12, data)
 
 def _read_image(disp, stream):
-    header = stream.read(2 * 4)
-    if len(header) < 2 * 4:
-        return None
-    (width, height) = struct.unpack("@ii", header)
-    bytes = stream.read(width * height * 4)
-    if len(bytes) < width * height * 4:
-        print "Corrupt _NET_WM_ICON"
+    try:
+        header = stream.read(2 * 4)
+        (width, height) = struct.unpack("@II", header)
+        bytes = stream.read(width * height * 4)
+        if len(bytes) < width * height * 4:
+            print "Corrupt _NET_WM_ICON"
+            return None
+    except Exception, e:
+        print "Weird corruption in _NET_WM_ICON: %s" % (e,)
         return None
     bytes_as_array = array.array("c", bytes)
     local_surf = cairo.ImageSurface.create_for_data(bytes_as_array,
@@ -160,8 +162,8 @@ _prop_types = {
              lambda disp, d: str(get_pyatom(disp, struct.unpack("@i", d)[0])),
              ""),
     "u32": ((int, long), "CARDINAL", 32,
-            lambda disp, c: struct.pack("@i", c),
-            lambda disp, d: struct.unpack("@i", d)[0],
+            lambda disp, c: struct.pack("@I", c),
+            lambda disp, d: struct.unpack("@I", d)[0],
             ""),
     "window": (gtk.gdk.Window, "WINDOW", 32,
                lambda disp, c: struct.pack("@i", get_xwindow(c)),

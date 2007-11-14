@@ -1,6 +1,7 @@
 from parti.test import *
 import struct
 import gtk
+import cairo
 import parti.prop as p
 import parti.lowlevel
 import parti.error
@@ -33,6 +34,7 @@ class TestProp(TestWithSession):
         self.enc("atom", "PRIMARY", struct.pack("@i", 1))
         self.enc(["atom"], ["PRIMARY", "SECONDARY"], struct.pack("@ii", 1, 2))
         self.enc("u32", 1, struct.pack("@i", 1))
+        self.enc("u32", 0xffffffff, struct.pack("@i", 0xffffffff))
         self.enc(["u32"], [1, 2], struct.pack("@ii", 1, 2))
         self.enc("window", self.win,
                  struct.pack("@i", parti.lowlevel.get_xwindow(self.win)))
@@ -94,9 +96,7 @@ class TestProp(TestWithSession):
                    "\xff\xff\xff\xff")
         corrupted = p.prop_get(self.win,
                                "corrupted1", "strut")
-        # If we just said 0xffffffff as a manifest constant here, then this
-        # test wouldn't work on 64-bit machines:
-        assert corrupted.left == struct.unpack("@i", "\xff\xff\xff\xff")[0]
+        assert corrupted.left == 0xffffffff
         assert corrupted.right == 0
         assert corrupted.top == 0
         assert corrupted.bottom == 0
@@ -109,8 +109,19 @@ class TestProp(TestWithSession):
         assert corrupted.bottom_start_x == 0
         assert corrupted.bottom_stop_x == 0
 
+    def _assert_icon_matches(self, prop, expected):
+        pixmap = p.prop_get(self.win, prop, "icon")
+        assert pixmap.get_size() == (expected.get_width(),
+                                     expected.get_height())
+        round_tripped = cairo.ImageSurface(cairo.FORMAT_ARGB32,
+                                           *pixmap.get_size())
+        round_tripped_cr = gtk.gdk.CairoContext(cairo.Context(round_tripped))
+        round_tripped_cr.set_source_pixmap(pixmap, 0, 0)
+        round_tripped_cr.set_operator(cairo.OPERATOR_SOURCE)
+        round_tripped_cr.paint()
+        assert str(round_tripped.get_data()) == str(expected.get_data())
+
     def test_icon(self):
-        import cairo
         LARGE_W = 49
         LARGE_H = 47
         SMALL_W = 25
@@ -136,18 +147,37 @@ class TestProp(TestWithSession):
 
         icon_bytes = small_dat + large_dat + small_dat
 
-        p.prop_set(self.win, "_NET_WM_ICON", "debug-CARDINAL", icon_bytes)
-        pixmap = p.prop_get(self.win, "_NET_WM_ICON", "icon")
+        p.prop_set(self.win, "_NET_WM_ICON", "debug-CARDINAL",
+                   small_dat + large_dat + small_dat)
+        self._assert_icon_matches("_NET_WM_ICON", large)
 
-        assert pixmap.get_size() == (LARGE_W, LARGE_H)
+        # Corrupted icons:
+        
+        # Width, but not height:
+        p.prop_set(self.win,
+                   "corrupted1", "debug-CARDINAL",
+                   "\xff\xff\xff\xff")
+        corrupted1 = p.prop_get(self.win, "corrupted1", "icon")
+        assert corrupted1 is None
+        # Width and height, but not enough data for them:
+        p.prop_set(self.win,
+                   "corrupted2", "debug-CARDINAL",
+                   struct.pack("@" + "i" * 4, 10, 10, 0, 0))
+        corrupted2 = p.prop_get(self.win, "corrupted2", "icon")
+        assert corrupted2 is None
 
-        round_tripped = cairo.ImageSurface(cairo.FORMAT_ARGB32,
-                                           *pixmap.get_size())
-        round_tripped_cr = gtk.gdk.CairoContext(cairo.Context(round_tripped))
-        round_tripped_cr.set_source_pixmap(pixmap, 0, 0)
-        round_tripped_cr.set_operator(cairo.OPERATOR_SOURCE)
-        round_tripped_cr.paint()
+        # A small, then a large, then a small, then a corrupted, should
+        # successfully extract largest:
+        p.prop_set(self.win,
+                   "corrupted3", "debug-CARDINAL",
+                   small_dat + large_dat + small_dat
+                   # Width and height -- large enough to overflow to negative
+                   # if we treat sizes as signed
+                   + "\xff\xff\xff\xff" + "\xff\xff\xff\xff"
+                   # Inadequate body
+                   + "\xff\xff\xff\xff")
+        self._assert_icon_matches("corrupted3", large)
 
-        assert str(round_tripped.get_data()) == str(large.get_data())
+        
 
     # FIXME: WMSizeHints and WMHints tests.  Stupid baroque formats...
