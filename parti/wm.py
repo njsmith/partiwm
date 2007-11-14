@@ -230,7 +230,8 @@ class Wm(object):
         # anyway, no harm in letting them move existing ones around), and it
         # means that when the window actually gets mapped, we have more
         # accurate info on what the app is actually requesting.
-        assert event.window not in self._windows
+        if event.window in self._windows:
+            self._windows[event.window]._handle_configure_request(event)
 
         if event.window not in self._windows:
             print "Reconfigure on withdrawn window"

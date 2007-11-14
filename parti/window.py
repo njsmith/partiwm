@@ -490,6 +490,12 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                 view._invalidate_all()
 
     def _handle_configure_request(self, event):
+        # WARNING: currently the global _handle_root_configure_request method
+        # calls this method directly if it receives a configure request for a
+        # newly managed window (this can happen if a window maps and then
+        # immediately configures, before our reparent has a chance to take
+        # affect).
+
         # Ignore the request, but as per ICCCM 4.1.5, send back a synthetic
         # ConfigureNotify telling the client that nothing has happened.
         trap.swallow(parti.lowlevel.sendConfigureNotify,

@@ -52,7 +52,7 @@ class TestProp(TestWithSession):
         p.prop_set(self.win, "ASDF", "utf8", u"")
         assert p.prop_get(self.win, "ASDF", "latin1") is None
 
-    def test_prop_strut(self):
+    def test_strut_decode(self):
         partial = p.NetWMStrut(self.display,
                                struct.pack("@" + "i" * 12, *range(12)))
         assert partial.left == 0
@@ -82,5 +82,8 @@ class TestProp(TestWithSession):
         assert full.top_end_x == 0
         assert full.bottom_start_x == 0
         assert full.bottom_stop_x == 0
+
+    def test_icon_decode(self):
+        
 
     # FIXME: WMSizeHints and WMHints tests.  Stupid baroque formats...

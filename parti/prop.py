@@ -119,6 +119,10 @@ def _read_image(disp, stream):
     pixmap.set_colormap(rgba)
     cr = pixmap.cairo_create()
     cr.set_source_surface(local_surf)
+    # Important to use SOURCE, because a newly created Pixmap can have random
+    # trash as its contents, and otherwise that will show through any alpha in
+    # the icon:
+    cr.set_operator(cairo.OPERATOR_SOURCE)
     cr.paint()
     return (width * height, pixmap)
 
