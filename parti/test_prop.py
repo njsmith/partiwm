@@ -83,7 +83,43 @@ class TestProp(TestWithSession):
         assert full.bottom_start_x == 0
         assert full.bottom_stop_x == 0
 
-    def test_icon_decode(self):
-        
+        # FIXME: use ["utf8"] trick to round-trip this (or add a way to push
+        # CARDINAL bytes directly to the server for testing)
+
+    def test_icon(self):
+        import cairo
+        LARGE_W = 49
+        LARGE_H = 47
+        SMALL_W = 25
+        SMALL_H = 23
+
+        large = cairo.ImageSurface(cairo.FORMAT_ARGB32, LARGE_W, LARGE_H)
+        # Scribble something on our "icon"
+        large_cr = cairo.Context(large)
+        pat = cairo.LinearGradient(0, 0, LARGE_W, LARGE_H)
+        pat.add_color_stop_rgb(0, 1, 0, 0)
+        pat.add_color_stop_rgb(1, 0, 1, 0)
+        large_cr.set_source(pat)
+        large_cr.paint()
+
+        # Make a "small version"
+        small = cairo.ImageSurface(cairo.FORMAT_ARGB32, SMALL_W, SMALL_H)
+        small_cr = cairo.Context(small)
+        small_cr.set_source(pat)
+        small_cr.paint()
+
+        small_dat = struct.pack("@ii", SMALL_W, SMALL_H) + str(small.get_data())
+        large_dat = struct.pack("@ii", LARGE_W, LARGE_H) + str(large.get_data())
+
+        icon_bytes = small_dat + large_dat + small_dat
+        icon_32 = struct.unpack("@" + "i" * (len(icon_bytes) // 4),
+                                icon_bytes)
+
+        p.prop_set(self.win, "_NET_WM_ICON", ["u32"], icon_32)
+        pixmap = p.prop_get(self.win, "_NET_WM_ICON", "icon")
+
+        assert pixmap.get_size() == (LARGE_W, LARGE_H)
+
+        # FIXME: finish this
 
     # FIXME: WMSizeHints and WMHints tests.  Stupid baroque formats...

@@ -238,7 +238,7 @@ def get_pywindow(display_source, xwindow):
 def get_display_for(obj):
     if isinstance(obj, gtk.gdk.Display):
         return obj
-    elif isinstance(obj, (gtk.gdk.Window,
+    elif isinstance(obj, (gtk.gdk.Drawable,
                           gtk.Widget,
                           gtk.Clipboard)):
         return obj.get_display()

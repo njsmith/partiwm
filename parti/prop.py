@@ -114,9 +114,19 @@ def _read_image(disp, stream):
                                                     width, height, 0)
     # FIXME: There is no Pixmap.new_for_display(), so this isn't actually
     # display-clean.  Oh well.
-    pixmap = gtk.gdk.Pixmap(None, width, height, 32)
-    rgba = get_display_for(disp).get_default_screen().get_rgba_colormap()
-    pixmap.set_colormap(rgba)
+    screen = get_display_for(disp).get_default_screen()
+    rgba = screen.get_rgba_colormap()
+    if rgba is not None:
+        pixmap = gtk.gdk.Pixmap(None, width, height, 32)
+        pixmap.set_colormap(rgba)
+    else:
+        # This nonsense is mostly included for Xvfb.  (Apparently, not only
+        # does it not support ARGB, but our default colormap on Xvfb has depth
+        # *8*?)
+        fallback_cm = screen.get_default_colormap()
+        depth = fallback_cm.get_visual().depth
+        pixmap = gtk.gdk.Pixmap(None, width, height, depth)
+        pixmap.set_colormap(fallback_cm)
     cr = pixmap.cairo_create()
     cr.set_source_surface(local_surf)
     # Important to use SOURCE, because a newly created Pixmap can have random
@@ -253,6 +263,6 @@ def prop_get(target, key, type):
     except:
         print (("Error parsing property %s (type %s); this may be a\n"
                 + "  misbehaving application, or bug in Parti\n"
-                + "  Data: %r") % (key, type, data,))
+                + "  Data: %r[...?]") % (key, type, data[:100],))
         raise
         return None
