@@ -9,7 +9,7 @@ from parti.util import base
 # expedient for now.
 class Tray(gtk.Widget):
     def __init__(self, trayset, tag):
-        base(self).__init__(self)
+        super(Tray, self).__init__()
         self.trayset = trayset
         self.tag = tag
 
