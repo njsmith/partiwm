@@ -905,24 +905,27 @@ class WindowView(gtk.Widget):
 
         # Blit the client window in as our image of ourself.
         cr = self._image_window.cairo_create()
-
-        # Create a temporary buffer and draw onto that.  It would be somewhat
-        # efficient (and less code) to just call begin_paint_rect and
-        # end_paint on our target window (because begin_paint_rect allocates
-        # just the right amount of offscreen space, and push_group allocates a
-        # full window-sized offscreen buffer), but this is also a workaround
-        # for Cairo bug #12996:
-        #   https://bugs.freedesktop.org/show_bug.cgi?id=12996
-        # and possibly other X server bugs, that for whatever reason don't get
-        # triggered when we use push_group and force a Render-based "slow"
-        # path.
-        cr.save()
-        cr.push_group()
         if not debug:
             cr.rectangle(event.area)
             cr.clip()
 
-        # Background:
+        # Create a temporary buffer and draw onto that.  It might in some
+        # vague sense be cleaner (and perhaps slightly less code) to just call
+        # begin_paint_rect and end_paint on our target window, but this works
+        # well *and* for some reason gives us a workaround for:
+        #   https://bugs.freedesktop.org/show_bug.cgi?id=12996
+        # Apparently push_group forces a Render-based "slow" path.
+        #
+        # Note about push_group():
+        #   "<cworth> njs: It's [the temporary buffer push_group allocates] as
+        #             large as the current clip region.
+        #    <cworth> njs: And yes, you'll get a server-side Pixmap when
+        #             targeting an xlib surface."
+        # Both of which are exactly what we want for double-buffering.
+        cr.save()
+        cr.push_group()
+
+        # Random grey background:
         cr.save()
         cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.set_source_rgb(0.5, 0.5, 0.5)
@@ -946,8 +949,7 @@ class WindowView(gtk.Widget):
         #tmpcr.set_operator(cairo.OPERATOR_SOURCE)
         #tmpcr.paint()
         #cr.set_source_surface(tmpsrf, 0, 0)
-                                    
-        cr.set_operator(cairo.OPERATOR_SOURCE)
+        
         cr.paint()
         if debug:
             # Overlay a blue square to show where the origin of the
