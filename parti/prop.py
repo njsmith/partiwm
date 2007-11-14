@@ -10,7 +10,8 @@ import gtk.gdk
 import cairo
 from parti.lowlevel import \
      XGetWindowProperty, XChangeProperty, PropertyError, \
-     get_xatom, get_pyatom, get_xwindow, get_pywindow, const
+     get_xatom, get_pyatom, get_xwindow, get_pywindow, const, \
+     get_display_for
 from parti.error import trap, XError
 
 def unsupported(*args):
@@ -98,7 +99,7 @@ class NetWMStrut(object):
          self.bottom_start_x, self.bottom_stop_x,
          ) = struct.unpack("@" + "i" * 12, data)
 
-def _read_image(disp, width, height, stream):
+def _read_image(disp, stream):
     header = stream.read(2 * 4)
     if len(header) < 2 * 4:
         return None
@@ -114,27 +115,27 @@ def _read_image(disp, width, height, stream):
     # FIXME: There is no Pixmap.new_for_display(), so this isn't actually
     # display-clean.  Oh well.
     pixmap = gtk.gdk.Pixmap(None, width, height, 32)
-    pixmap.set_colormap(disp.get_default_screen().get_rgba_colormap())
+    rgba = get_display_for(disp).get_default_screen().get_rgba_colormap()
+    pixmap.set_colormap(rgba)
     cr = pixmap.cairo_create()
     cr.set_source_surface(local_surf)
     cr.paint()
-    return cr.get_target()
+    return (width * height, pixmap)
 
-# This returns a (helpfully server-side) cairo surface which is the larget
-# icon defined in a _NET_WM_ICON property.
+# This returns a Drawable which contains the largest icon defined in a
+# _NET_WM_ICON property.
 def NetWMIcons(disp, data):
     icons = []
     stream = StringIO(data)
     while True:
-        image = _read_image(disp, width, height, stream)
-        if image is None:
+        size_image = _read_image(disp, stream)
+        if size_image is None:
             break
-        icons.append(image)
+        icons.append(size_image)
     if not icons:
         return None
-    icons.sort(lambda a, b: cmp(a.get_width() * a.get_height(),
-                                b.get_width() * b.get_height()))
-    return icons[-1]
+    icons.sort()
+    return icons[-1][1]
 
 _prop_types = {
     # Python type, X type Atom, format, serializer, deserializer, list
@@ -174,7 +175,7 @@ _prop_types = {
               unsupported, NetWMStrut, None),
     "strut-partial": (NetWMStrut, "CARDINAL", 32,
                       unsupported, NetWMStrut, None),
-    "icon": (cairo.Surface, "CARDINAL", 32,
+    "icon": (gtk.gdk.Drawable, "CARDINAL", 32,
              unsupported, NetWMIcons, None),
     }
 
@@ -238,7 +239,7 @@ def prop_get(target, key, type):
     try:
         print atom
         data = trap.call_synced(XGetWindowProperty, target, key, atom)
-        print atom, repr(data)
+        print atom, repr(data[:100])
     except (XError, PropertyError):
         print ("Missing window or missing property or wrong property type %s (%s)"
                % (key, type))
@@ -246,7 +247,8 @@ def prop_get(target, key, type):
     try:
         return _prop_decode(target, type, data)
     except:
-        print ("Error parsing property %s (type %s); this may be a\n"
-               + "  misbehaving application, or bug in Parti\n"
-               + "  Data: %r" % (key, type, data,))
+        print (("Error parsing property %s (type %s); this may be a\n"
+                + "  misbehaving application, or bug in Parti\n"
+                + "  Data: %r") % (key, type, data,))
+        raise
         return None

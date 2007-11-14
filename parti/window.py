@@ -898,10 +898,10 @@ class WindowView(gtk.Widget):
         (x1, y1) = m.transform_point(event.area.x, event.area.y)
         (x2, y2) = m.transform_point(event.area.x + event.area.width,
                                      event.area.y + event.area.height)
-        x1i = math.floor(x1)
-        y1i = math.floor(y1)
-        x2i = math.ceil(x2)
-        y2i = math.ceil(y2)
+        x1i = int(math.floor(x1))
+        y1i = int(math.floor(y1))
+        x2i = int(math.ceil(x2))
+        y2i = int(math.ceil(y2))
         transformed = gtk.gdk.Rectangle(x1i, y1i, x2i - x1i, y2i - y1i)
         print ("damage (%s, %s, %s, %s) -> expose on (%s, %s, %s, %s)" %
                (event.area.x, event.area.y, event.area.width, event.area.height,
@@ -966,6 +966,12 @@ class WindowView(gtk.Widget):
         #cr.set_source_surface(tmpsrf, 0, 0)
         
         cr.paint()
+
+        icon = self.model.get_property("icon")
+        if icon is not None:
+            cr.set_source_surface(icon.cairo_create().get_target(), 0, 0)
+            cr.paint_with_alpha(0.3)
+
         if debug:
             # Overlay a blue square to show where the origin of the
             # transformed coordinates is
