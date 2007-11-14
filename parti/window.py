@@ -969,7 +969,7 @@ class WindowView(gtk.Widget):
 
         icon = self.model.get_property("icon")
         if icon is not None:
-            cr.set_source_surface(icon.cairo_create().get_target(), 0, 0)
+            cr.set_source_pixmap(icon, 0, 0)
             cr.paint_with_alpha(0.3)
 
         if debug:
