@@ -10,12 +10,15 @@ class TestUtil(object):
         assert_raises(AssertionError, parti.util.base, OldStyle())
         class NewStyleBase(object):
             pass
+        class NewStyle(NewStyleBase):
+            pass
         class NewStyleMixin(object):
             pass
-        class NewStyle(NewStyleBase, NewStyleMixin):
+        class NewStyleMixed(NewStyleBase, NewStyleMixin):
             pass
         assert_raises(AssertionError, parti.util.base, NewStyle)
         assert parti.util.base(NewStyle()) is NewStyleBase
+        assert_raises(AssertionError, parti.util.base, NewStyleMixed())
 
 class APTestClass(parti.util.AutoPropGObjectMixin, gobject.GObject):
     __gproperties__ = {

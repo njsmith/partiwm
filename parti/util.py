@@ -55,4 +55,8 @@ def base(obj):
     # New-style classes only
     assert not isinstance(obj, types.ClassType)
     assert not isinstance(obj.__class__, types.ClassType)
+    # base() has no magic to support multiple inheritance, so blow up instead
+    # of silently doing the wrong thing.  (Sorry, using MI means you have to
+    # think, not just use utilities.)
+    assert len(obj.__class__.__bases__) == 1
     return obj.__class__.__base__
