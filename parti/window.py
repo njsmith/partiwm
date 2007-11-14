@@ -157,7 +157,7 @@ class _ExposeListenerWidget(gtk.Widget):
     # events.
 
     def __init__(self, window, recipient):
-        base(_ExposeListenerWidget).__init__()
+        base(self).__init__(self)
         self.set_flags(gtk.REALIZED)
         self.recipient = recipient
         self.window = window
