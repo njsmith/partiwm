@@ -22,8 +22,6 @@ from parti.prop import prop_get, prop_set
 #   title (WM_NAME, _NET_WM_NAME, WM_ICON_NAME, _NET_WM_ICON_NAME)
 #   WM_NORMAL_HINTS: flags, max_width/height, width/height_inc, max_aspect,
 #     base_width/height, gravity
-#     the flags are not actually relevant to us -- except that they say which
-#     fields are included?  I can't tell from the specs.
 #   WM_HINTS: flags, input model, initial_state, icon_pixmap, icon_window,
 #       icon_x, icon_y, icon_mask
 #   WM_CLASS: can be ignored, except plugins or whatever might want to peek at
@@ -242,7 +240,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                            "Host where client process is running", "",
                            gobject.PARAM_READABLE),
         "group-leader": (gobject.TYPE_PYOBJECT,
-                         "Window group leader", "",
+                         "Window group leader (opaque identifier)", "",
                          gobject.PARAM_READABLE),
         "iconic": (gobject.TYPE_BOOLEAN,
                    "ICCCM 'iconic' state -- any sort of 'not on desktop'.", "",
@@ -833,7 +831,9 @@ gobject.type_register(WindowModel)
 #
 # FIXME: AS A HACK, instead for now I am just saying that there is an explicit
 # call for a widget to steal control, and when the widget that has control
-# disappears, it is given to some other random widget.
+# disappears, it is given to some other random widget.  We should actually
+# implement the above, or something like it.  Let's see what happens with tray
+# layout stuff first.
 
 class WindowView(gtk.Widget):
     def __init__(self, model):
