@@ -102,6 +102,8 @@ class NetWMStrut(object):
 def _read_image(disp, stream):
     try:
         header = stream.read(2 * 4)
+        if not header:
+            return None
         (width, height) = struct.unpack("@II", header)
         bytes = stream.read(width * height * 4)
         if len(bytes) < width * height * 4:
