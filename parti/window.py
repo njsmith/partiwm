@@ -162,7 +162,6 @@ class _ExposeListenerWidget(gtk.Widget):
         self.window.set_user_data(self)
 
     def do_expose_event(self, event):
-        print "synthetic damage-based expose event!"
         self.recipient._handle_damage(event)
 
     def do_destroy(self):
@@ -348,6 +347,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                 self.pending_unmaps += 1
             
             # Process properties
+            self.client_window.set_data("send-events-to", self)
             self._read_initial_properties()
             self._write_initial_properties_and_setup()
 
@@ -399,6 +399,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
 
     def unmanage_window(self):
         print "unmanaging window"
+        self.client_window.set_data("send-events-to", None)
         def unmanageit():
             self._scrub_withdrawn_window()
             self.client_window.reparent(gtk.gdk.get_default_root_window(),
@@ -520,8 +521,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         # meaningful and should perhaps even be respected.)
 
     def _handle_damage(self, event):
-        print ("received composited expose event: (%s, %s, %s, %s)" %
-               (event.area.x, event.area.y, event.area.width, event.area.height))
         for view in self.views:
             if view.flags() & gtk.MAPPED:
                 view._handle_damage(event)
@@ -537,6 +536,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
 
     def _handle_property_change(self, gdkatom):
         name = str(gdkatom)
+        print "Property changed on %s: %s" % (self.client_window.xid, name)
         if name in self._property_handlers:
             self._property_handlers[name](self)
 
@@ -599,10 +599,12 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     _property_handlers["_NET_WM_STRUT_PARTIAL"] = _handle_wm_strut
 
     def _handle_net_wm_icon(self):
+        print "_NET_WM_ICON changed on %s, re-reading" % (self.client_window.xid,)
         self._internal_set_property("icon",
                                     prop_get(self.client_window,
                                              "_NET_WM_ICON", "icon"))
 
+        print "icon is now %r" % (self.get_property("icon"),)
     _property_handlers["_NET_WM_ICON"] = _handle_net_wm_icon
 
     def _read_initial_properties(self):
@@ -909,9 +911,9 @@ class WindowView(gtk.Widget):
         x2i = int(math.ceil(x2))
         y2i = int(math.ceil(y2))
         transformed = gtk.gdk.Rectangle(x1i, y1i, x2i - x1i, y2i - y1i)
-        print ("damage (%s, %s, %s, %s) -> expose on (%s, %s, %s, %s)" %
-               (event.area.x, event.area.y, event.area.width, event.area.height,
-                transformed.x, transformed.y, transformed.width, transformed.height))
+#        print ("damage (%s, %s, %s, %s) -> expose on (%s, %s, %s, %s)" %
+#               (event.area.x, event.area.y, event.area.width, event.area.height,
+#                transformed.x, transformed.y, transformed.width, transformed.height))
         self._image_window.invalidate_rect(transformed, False)
         
     def do_expose_event(self, event):
@@ -920,9 +922,10 @@ class WindowView(gtk.Widget):
 
         debug = False
 
-        print ("redrawing rectangle at (%s, %s, %s, %s)"
-               % (event.area.x, event.area.y,
-                  event.area.width, event.area.height))
+        if debug:
+            print ("redrawing rectangle at (%s, %s, %s, %s)"
+                   % (event.area.x, event.area.y,
+                      event.area.width, event.area.height))
 
         # Blit the client window in as our image of ourself.
         cr = self._image_window.cairo_create()
@@ -1080,8 +1083,8 @@ class WindowView(gtk.Widget):
         assert self.model.controlling_view is not self
         self.unset_flags(gtk.REALIZED)
         # Break circular reference
-        self.window.set_user_data(None)
-        self.window = None
+        if self.window:
+            self.window.set_user_data(None)
         self._image_window = None
         print "Unrealized"
 

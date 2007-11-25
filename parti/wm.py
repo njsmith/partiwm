@@ -244,18 +244,20 @@ class Wm(object):
         # This function is called for every event GDK sees.  Most of them we
         # want to just pass on to GTK, but some we are especially interested
         # in...
-        handlers = {
+        signals = {
             # These other events are on client windows, mostly
-            gtk.gdk.PROPERTY_NOTIFY: self._dispatch_property_notify,
-            gtk.gdk.UNMAP: self._dispatch_unmap,
-            gtk.gdk.DESTROY: self._dispatch_destroy,
+            gtk.gdk.PROPERTY_NOTIFY: "client-property-notify-event",
+            gtk.gdk.UNMAP: "client-unmap-event",
+            gtk.gdk.DESTROY: "client-destroy-event",
             # I can get CONFIGURE and MAP for client windows too,
             # but actually I don't care ATM:
-            #gtk.gdk.GDK_MAP: self._dispatch_map,
-            #gtk.gdk.GDK_CONFIGURE: self._dispatch_configure
+            #gtk.gdk.GDK_MAP: "client-map-event",
+            #gtk.gdk.GDK_CONFIGURE: "client-configure-event",
             }
-        if event.type in handlers:
-            handlers[event.type](event)
+        if event.type in signals:
+            handler = event.window.get_data("send-events-to")
+            if handler is not None:
+                handler.emit(signals[event.type], event)
         #self._debug_dump_gdk_event(event)
         gtk.main_do_event(event)
 
@@ -264,20 +266,6 @@ class Wm(object):
         print event.window
         if event.type == gtk.gdk.FOCUS_CHANGE:
             print event.in_
-
-    def _dispatch_property_notify(self, event):
-        if event.window in self._windows:
-            self._windows[event.window].emit("client-property-notify-event", event)
-        else:
-            print "Property notify for who?"
-
-    def _dispatch_unmap(self, event):
-        if event.window in self._windows:
-            self._windows[event.window].emit("client-unmap-event", event)
-
-    def _dispatch_destroy(self, event):
-        if event.window in self._windows:
-            self._windows[event.window].emit("client-destroy-event", event)
 
     def _update_window_list(self, *args):
         prop_set(self._root, "_NET_CLIENT_LIST",
