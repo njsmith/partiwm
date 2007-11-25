@@ -331,7 +331,8 @@ class NoSuchProperty(PropertyError):
     pass
 def XGetWindowProperty(pywindow, property, req_type):
     # "64k is enough for anybody"
-    buffer_size = 64 * 1024
+    # (Except, I've found window icons that are strictly larger...)
+    buffer_size = 64 * 1024 * 5
     cdef Atom xactual_type
     cdef int actual_format
     cdef unsigned long nitems, bytes_after
