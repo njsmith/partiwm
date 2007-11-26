@@ -53,7 +53,6 @@ class Wm(gobject.GObject):
 
         # These aren't supported in any particularly meaningful way, but hey.
         "_NET_FRAME_EXTENTS",
-        "_NET_REQUEST_FRAME_EXTENTS",
 
         "_NET_WM_WINDOW_TYPE",
         "_NET_WM_WINDOW_TYPE_NORMAL",
@@ -88,6 +87,7 @@ class Wm(gobject.GObject):
         # _NET_WM_STATE_BELOW,
 
         # Not at all yet:
+        #"_NET_REQUEST_FRAME_EXTENTS",
         #"_NET_CLOSE_WINDOW",
         #"_NET_CURRENT_DESKTOP",
         #"_NET_RESTACK_WINDOW",

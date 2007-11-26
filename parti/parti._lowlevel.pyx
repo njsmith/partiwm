@@ -707,6 +707,9 @@ _x_event_signals = {
     ClientMessage: ("parti-client-message-event", None),
     }
 
+def _gw(display, xwin):
+    return trap.call_synced(get_pywindow, display, xwin)
+
 cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                                     GdkEvent * gdk_event,
                                     void * userdata):
@@ -716,19 +719,18 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
         if e.type in _x_event_signals:
             pyev = LameStruct()
             pyev.type = e.type
-            pyev.display = wrap(gdk_x11_lookup_xdisplay(e.xany.display))
-            def gw(win):
-                return trap.call_synced(get_pywindow, pyev.display, win)
+            pyev.display = wrap(<cGObject*>gdk_x11_lookup_xdisplay(e.xany.display))
+            d = pyev.display
             # Unmarshal:
             try:
                 if e.type == MapRequest:
                     print "MapRequest"
-                    pyev.parent = gw(e.xmaprequest.parent)
-                    pyev.window = gw(e.xmaprequest.window)
+                    pyev.parent = _gw(d, e.xmaprequest.parent)
+                    pyev.window = _gw(d, e.xmaprequest.window)
                 elif e.type == ConfigureRequest:
                     print "ConfigureRequest"
-                    pyev.parent = gw(e.xconfigurerequest.parent)
-                    pyev.window = gw(e.xconfigurerequest.window)
+                    pyev.parent = _gw(d, e.xconfigurerequest.parent)
+                    pyev.window = _gw(d, e.xconfigurerequest.window)
                     pyev.x = e.xconfigurerequest.x
                     pyev.y = e.xconfigurerequest.y
                     pyev.width = e.xconfigurerequest.width
@@ -741,19 +743,19 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                         # specified by the client, but it specified something
                         # weird).  I don't see any reason to handle these
                         # differently, though.
-                        pyev.above = gw(e.xconfigurerequest.above)
+                        pyev.above = _gw(d, e.xconfigurerequest.above)
                     except XError:
                         pyev.above = None
                     pyev.detail = e.xconfigurerequest.detail
                     pyev.value_mask = e.xconfigurerequest.value_mask
                 elif e.type in (FocusIn, FocusOut):
                     print "FocusIn/FocusOut"
-                    pyev.window = gw(e.xfocus.window)
+                    pyev.window = _gw(d, e.xfocus.window)
                     pyev.mode = e.xfocus.mode
                     pyev.detail = e.xfocus.detail
                 elif e.type == ClientMessage:
                     print "ClientMessage"
-                    pyev.window = gw(e.xany.window)
+                    pyev.window = _gw(d, e.xany.window)
                     if e.xclient.message_type > (2 ** 32):
                         print ("Xlib claims that this ClientEvent's 32-bit "
                                + "message_type is %s.  "
@@ -807,6 +809,6 @@ _global_event_filters_installed = False
 def install_global_event_filter():
     global _global_event_filters_installed
     if not _global_event_filters_installed:
-        gdk_window_add_filter(<cGdkWindow*>0, global_event_filter, <void*>0)
+        gdk_window_add_filter(<cGdkWindow*>0, x_event_filter, <void*>0)
         gtk.gdk.event_handler_set(_dispatch_gdk_event)
         _global_event_filters_installed = True
