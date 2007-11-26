@@ -62,7 +62,10 @@ from parti.error import trap
 #
 # Finally, we have to notice when the root window gets focused (as it can when
 # a client misbehaves, or perhaps exits in a weird way), and regain the
-# focus.
+# focus.  The Wm object is actually responsible for doing this (since it is
+# responsible for all root-window event handling); we just expose an API
+# ('reset_x_focus') that people should call whenever they think that focus may
+# have gone wonky.
 
 class WorldWindow(gtk.Window):
     def __init__(self):
@@ -152,10 +155,11 @@ class WorldWindow(gtk.Window):
         now = gtk.gdk.x11_get_server_time(self.window)
         parti.lowlevel.send_wm_take_focus(self.window, now)
 
-    def _give_focus_to_them_that_deserves_it(self):
+    def reset_x_focus(self):
         focus = self.get_focus()
         print focus
         if isinstance(focus, parti.window.WindowView):
+            # FIXME: ugly:
             focus.model.give_client_focus()
             trap.swallow(parti.prop.prop_set, gtk.gdk.get_default_root_window(),
                          "_NET_ACTIVE_WINDOW", "window",
@@ -170,23 +174,6 @@ class WorldWindow(gtk.Window):
         # GTK focus has changed.  See comment in __init__ for why this isn't a
         # default handler.
         if self.get_focus() is not None:
-            self._give_focus_to_them_that_deserves_it()
-
-    # Finally, the code to handle root focus:
-    def _handle_root_focus_in(self, event):
-        # The purpose of this function is to detect when the focus mode has
-        # gone to PointerRoot or None, so that it can be given back to
-        # something real.  This is easy to detect -- a FocusIn event with
-        # detail PointerRoot or None is generated on the root window.
-        print "FocusIn on root"
-        print event.__dict__
-        if event.detail in (parti.lowlevel.const["NotifyPointerRoot"],
-                            parti.lowlevel.const["NotifyDetailNone"]):
-            print "PointerRoot or None?  This won't do... giving someone focus"
-            self._give_focus_to_them_that_deserves_it()
-
-    def _handle_root_focus_out(self, event):
-        print "Focus left root, FYI"
-        parti.lowlevel.printFocus(self)
+            self.reset_x_focus()
 
 gobject.type_register(WorldWindow)

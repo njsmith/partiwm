@@ -6,7 +6,9 @@ import parti.lowlevel
 from parti.prop import prop_set
 from parti.util import AutoPropGObjectMixin, one_arg_signal
 
-class Wm(AutoPropGObjectMixin, gobject.GObject):
+from parti.window import WindowModel, Unmanageable
+
+class Wm(gobject.GObject):
     _NET_SUPPORTED = [
         "_NET_SUPPORTED", # a bit redundant, perhaps...
         "_NET_SUPPORTING_WM_CHECK",
@@ -94,13 +96,23 @@ class Wm(AutoPropGObjectMixin, gobject.GObject):
 
     __gproperties__ = {
         "windows": (gobject.TYPE_PYOBJECT,
-                    "Tuple of managed windows (as WindowModels)", "",
+                    "List of managed windows (as WindowModels)", "",
                     gobject.PARAM_READABLE),
         }
     __gsignals__ = {
-        "new-window": one_arg_signal,
         "child-map-request-event": one_arg_signal,
         "child-configure-request-event": one_arg_signal,
+        "parti-focus-in-event": one_arg_signal,
+        "parti-focus-out-event": one_arg_signal,
+        "parti-client-message-event": one_arg_signal,
+        # A new window has shown up:
+        "new-window": one_arg_signal,
+        # "FYI, no client has focus, like the client that had focus died or
+        # something":
+        "focus-got-dropped": (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
+        # You can emit this to cause the WM to quit, or the WM may
+        # spontaneously raise it if another WM takes over the display:
+        "quit": (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
         }
 
     def __init__(self, name, display=None):
@@ -112,6 +124,8 @@ class Wm(AutoPropGObjectMixin, gobject.GObject):
         self._root = self._display.get_default_screen().get_root_window()
         self._ewmh_window = None
         
+        self._windows = {}
+
         # Become the Official Window Manager of this year's display:
         self._wm_selection = parti.selection.ManagerSelection(self._display, "WM_S0")
         self._wm_selection.connect("selection-lost", self._lost_wm_selection)
@@ -143,52 +157,60 @@ class Wm(AutoPropGObjectMixin, gobject.GObject):
                 self._manage_client(w)
 
         # FIXME:
-
         # Need viewport abstraction for _NET_CURRENT_DESKTOP...
         # Tray's need to provide info for _NET_ACTIVE_WINDOW and _NET_WORKAREA
         # (and notifications for both)
 
+
+    def do_get_property(self, pspec):
+        assert pspec.name == "windows"
+        return self._windows.values()
+
+    # This is the key function, where we have detected a new client window,
+    # and start managing it.
+    def _manage_client(self, gdkwindow):
+        assert gdkwindow not in self._windows
+        try:
+            win = WindowModel(self._root, gdkwindow)
+        except Unmanageable:
+            print "Window disappeared on us, never mind"
+            return
+        self._windows[gdkwindow] = win
+        win.connect("unmanaged", self._handle_client_unmanaged)
+        self.notify("windows")
+        self.emit("new-window", win)
+
+    def _handle_client_unmanaged(self, window):
+        assert window.client_window in self._windows
+        del self._windows[window.client_window]
+        self.notify("windows")
+
+    def do_parti_client_message_event(self, event):
+        # FIXME
         # Need to listen for:
         #   _NET_CLOSE_WINDOW
         #   _NET_ACTIVE_WINDOW
         #   _NET_CURRENT_DESKTOP
         #   _NET_REQUEST_FRAME_EXTENTS
-        # Maybe:
+        # and maybe:
         #   _NET_RESTACK_WINDOW
         #   _NET_WM_DESKTOP
         #   _NET_WM_STATE
-
-    # This is the key function, where we have detected a new client window,
-    # and start managing it.
-    def _manage_client(self, gdkwindow):
-        if gdkwindow in self._windows:
-            # This can happen if a window sends two map requests in quick
-            # succession, so that the second MapRequest arrives before we have
-            # reparented the window.  FSF Emacs 22.1.50.1 does this, at least.
-            print "Cannot manage the same window twice, ignoring"
-            return
-        # FIXME: totally lame tray setting
-        self._windows.manage(gdkwindow, [self._trays.trays[0]])
-
-    def _handle_root_client_message(self, event):
-        # FIXME
         pass
 
     def _lost_wm_selection(self, selection):
         print "Lost WM selection, exiting"
-        self.quit()
+        self.emit("quit")
 
-    def quit(self):
-        gtk.main_quit()
+    def do_quit(self):
+        for win in self._windows.itervalues():
+            win.unmanage_window(True)
 
-    def mainloop(self):
-        gtk.main()
-
-    def _handle_root_map_request(self, event):
+    def do_map_request_event(self, event):
         print "Found a potential client"
         self._manage_client(event.window)
 
-    def _handle_root_configure_request(self, event):
+    def do_configure_request_event(self, event):
         # The point of this method is to handle configure requests on
         # withdrawn windows.  We simply allow them to move/resize any way they
         # want.  This is harmless because the window isn't visible anyway (and
@@ -196,15 +218,28 @@ class Wm(AutoPropGObjectMixin, gobject.GObject):
         # anyway, no harm in letting them move existing ones around), and it
         # means that when the window actually gets mapped, we have more
         # accurate info on what the app is actually requesting.
-        if event.window in self._windows:
-            self._windows[event.window]._handle_configure_request(event)
+        assert event.window not in self._windows
+        print "Reconfigure on withdrawn window"
+        parti.lowlevel.configureAndNotify(event.window,
+                                          event.x, event.y,
+                                          event.width, event.height,
+                                          event.value_mask)
 
-        if event.window not in self._windows:
-            print "Reconfigure on withdrawn window"
-            parti.lowlevel.configureAndNotify(event.window,
-                                              event.x, event.y,
-                                              event.width, event.height,
-                                              event.value_mask)
+    def do_parti_focus_in_event(self, event):
+        # The purpose of this function is to detect when the focus mode has
+        # gone to PointerRoot or None, so that it can be given back to
+        # something real.  This is easy to detect -- a FocusIn event with
+        # detail PointerRoot or None is generated on the root window.
+        print "FocusIn on root"
+        print event
+        if event.detail in (parti.lowlevel.const["NotifyPointerRoot"],
+                            parti.lowlevel.const["NotifyDetailNone"]):
+            print "PointerRoot or None?  This won't do... someone should get focus!"
+            self.emit("focus-got-dropped")
+
+    def do_parti_focus_out_event(self, event):
+        print "Focus left root, FYI"
+        parti.lowlevel.printFocus(self)
 
     def _update_window_list(self, *args):
         prop_set(self._root, "_NET_CLIENT_LIST",
@@ -249,11 +284,4 @@ class Wm(AutoPropGObjectMixin, gobject.GObject):
     def _make_window_pseudoclient(self, win):
         "Used by PseudoclientWindow, only."
         win.set_screen(self._alt_display.get_default_screen())
-
-    def spawn_repl_window(self):
-        spawn_repl_window(self,
-                          {"wm": self,
-                           "windows": self._windows,
-                           "trays": self._trays,
-                           "lowlevel": parti.lowlevel})
 

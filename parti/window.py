@@ -267,7 +267,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         "unmanaged": (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
         }
         
-    def __init__(self, parking_window, client_window, start_trays):
+    def __init__(self, parking_window, client_window):
         """Register a new client window with the WM.
 
         Raises an Unmanageable exception if this window should not be
@@ -355,10 +355,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         except XError, e:
             raise Unmanageable, e
 
-        assert start_trays
-        for tray in start_trays:
-            tray.add(self)
-
     def do_map_request_event(self, event):
         # If we get a MapRequest then it might mean that someone tried to map
         # this window multiple times in quick succession, before we actually
@@ -399,13 +395,15 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         # simple code:
         self.unmanage_window()
 
-    def unmanage_window(self):
+    def unmanage_window(self, exiting=False):
         print "unmanaging window"
         def unmanageit():
             self._scrub_withdrawn_window()
             self.client_window.reparent(gtk.gdk.get_default_root_window(),
                                         0, 0)
             parti.lowlevel.sendConfigureNotify(self.client_window)
+            if exiting:
+                self.client_window.show_unraised()
         trap.swallow(unmanageit)
         self.emit("unmanaged")
         print "destroying self"
@@ -695,7 +693,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     # flags.  Clients are allowed to set the initial value of this X property
     # to anything they like, when their window is first mapped; after that,
     # though, only the window manager is allowed to touch this property.  So
-    # we store its value (our at least, our idea as to its value, the X server
+    # we store its value (or at least, our idea as to its value, the X server
     # in principle could disagree) as the "state" property.  There are
     # basically two things we need to accomplish:
     #   1) Whenever our property is modified, we mirror that modification into
@@ -707,15 +705,30 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     #      directly by the "state" property, and reading/writing them in fact
     #      accesses the "state" set directly.  This is done by overriding
     #      do_set_property and do_get_property.
+    _state_properties = {
+        "attention-requested": "_NET_WM_STATE_DEMANDS_ATTENTION",
+        "fullscreen": "_NET_WM_STATE_FULLSCREEN",
+        }
+
+    _state_properties_reversed = {}
+    for k, v in _state_properties.iteritems():
+        _state_properties_reversed[v] = k
+
     def _state_add(self, state_name):
         curr = set(self.get_property("state"))
-        curr.add(state_name)
-        self._internal_set_property("state", sets.ImmutableSet(curr))
+        if state_name not in curr:
+            curr.add(state_name)
+            self._internal_set_property("state", sets.ImmutableSet(curr))
+            if state_name in self._state_properties_reversed:
+                self.notify(self._state_properties_reversed[state_name])
 
     def _state_remove(self, state_name):
         curr = set(self.get_property("state"))
-        curr.discard(state_name)
-        self._internal_set_property("state", sets.ImmutableSet(curr))
+        if state_name in curr:
+            curr.discard(state_name)
+            self._internal_set_property("state", sets.ImmutableSet(curr))
+            if state_name in self._state_properties_reversed:
+                self.notify(self._state_properties_reversed[state_name])
 
     def _state_isset(self, state_name):
         return state_name in self.get_property("state")
@@ -725,10 +738,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         prop_set(self.client_window, "_NET_WM_STATE",
                  ["atom"], self.get_property("state"))
 
-    _state_properties = {
-        "attention-requested": "_NET_WM_STATE_DEMANDS_ATTENTION",
-        "fullscreen": "_NET_WM_STATE_FULLSCREEN",
-        }
     def do_set_property(self, pspec, value):
         if pspec.name in self._state_properties:
             state = self._state_properties[pspec.name]
