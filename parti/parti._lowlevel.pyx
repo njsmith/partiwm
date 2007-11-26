@@ -674,7 +674,7 @@ def substructureRedirect(pywindow):
     no way to actually send it.)"""
     addXSelectInput(pywindow, SubstructureRedirectMask)
 
-def selectFocusChange(pywindow, in_callback, out_callback):
+def selectFocusChange(pywindow):
     addXSelectInput(pywindow, FocusChangeMask)
 
 # No need to select for ClientMessage; in fact, one cannot select for

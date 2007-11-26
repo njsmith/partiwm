@@ -85,11 +85,6 @@ class WorldWindow(gtk.Window):
         self.move(0, 0)
         self._resize()
         
-        # Watch for focus events on the root window
-        parti.lowlevel.selectFocusChange(gtk.gdk.get_default_root_window(),
-                                         self._handle_root_focus_in,
-                                         self._handle_root_focus_out)
-
     def _resize(self, *args):
         x = gtk.gdk.screen_width()
         y = gtk.gdk.screen_height()
@@ -122,7 +117,7 @@ class WorldWindow(gtk.Window):
         # We are being mapped, so we can focus ourselves.
         # Check for the property, just in case this is the second time we are
         # being mapped -- otherwise we might miss the special call to
-        # _give_focus_to_them_that_deserves_it in do_focus_in_event:
+        # reset_x_focus in do_focus_in_event:
         if not self.get_property("has-toplevel-focus"):
             # Take initial focus upon being mapped.  Technically it is illegal
             # (ICCCM violating) to use CurrentTime in a WM_TAKE_FOCUS message,
@@ -136,7 +131,7 @@ class WorldWindow(gtk.Window):
         if not self.get_property("has-toplevel-focus"):
             #super(WorldWindow, self).do_focus_in_event(*args)
             gtk.Window.do_focus_in_event(self, *args)
-            self._give_focus_to_them_that_deserves_it()
+            self.reset_x_focus()
 
     def do_focus_out_event(self, *args):
         # Do nothing -- harder:

@@ -1,6 +1,8 @@
 import gtk
 import gobject
 
+from sets import ImmutableSet
+
 import parti.selection
 import parti.lowlevel
 from parti.prop import prop_set
@@ -96,7 +98,7 @@ class Wm(gobject.GObject):
 
     __gproperties__ = {
         "windows": (gobject.TYPE_PYOBJECT,
-                    "List of managed windows (as WindowModels)", "",
+                    "Set of managed windows (as WindowModels)", "",
                     gobject.PARAM_READABLE),
         }
     __gsignals__ = {
@@ -166,6 +168,9 @@ class Wm(gobject.GObject):
                 and parti.lowlevel.is_mapped(w)):
                 self._manage_client(w)
 
+        # Also watch for focus change events on the root window
+        parti.lowlevel.selectFocusChange(self._root)
+
         # FIXME:
         # Need viewport abstraction for _NET_CURRENT_DESKTOP...
         # Tray's need to provide info for _NET_ACTIVE_WINDOW and _NET_WORKAREA
@@ -173,7 +178,7 @@ class Wm(gobject.GObject):
 
     def do_get_property(self, pspec):
         assert pspec.name == "windows"
-        return list(self._windows_in_order)
+        return ImmutableSet(self._windows.itervalues())
 
     # This is in some sense the key entry point to the entire WM program.  We
     # have detected a new client window, and start managing it:
@@ -186,7 +191,7 @@ class Wm(gobject.GObject):
             return
         win.connect("unmanaged", self._handle_client_unmanaged)
         self._windows[gdkwindow] = win
-        self._windows_in_order.append(win)
+        self._windows_in_order.append(gdkwindow)
         self.notify("windows")
         self._update_window_list()
         self.emit("new-window", win)
@@ -260,7 +265,7 @@ class Wm(gobject.GObject):
 
     def do_parti_focus_out_event(self, event):
         print "Focus left root, FYI"
-        parti.lowlevel.printFocus(self)
+        parti.lowlevel.printFocus(self._display)
 
     def do_desktop_list_changed(self, desktops):
         prop_set(self._root, "_NET_NUMBER_OF_DESKTOPS", "u32", len(desktops))

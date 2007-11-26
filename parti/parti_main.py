@@ -31,6 +31,7 @@ class Parti(object):
         self._world_window = WorldWindow()
         self._world_organizer = WorldOrganizer(self._trays)
         self._world_window.add(self._world_organizer)
+        self._world_window.show_all()
 
         # FIXME: be less stupid
         #self._trays.new(u"default", SimpleTabTray)
@@ -39,8 +40,6 @@ class Parti(object):
 
         for window in self._wm.get_property("windows"):
             self._add_new_window(window)
-
-        self._world_window.show_all()
 
         # Start providing D-Bus api
         self._dbus = PartiDBusService(self)
