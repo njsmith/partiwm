@@ -14,7 +14,7 @@ import gobject
 import gtk
 import gtk.gdk
 from struct import pack, unpack
-from warnings import warn
+import time
 
 from parti.util import base
 import parti.lowlevel
@@ -38,7 +38,8 @@ class ManagerSelection(gobject.GObject):
         return self.clipboard.wait_for_targets() is not None
 
     def acquire(self, force=False):
-        if not force and self.owned():
+        was_owned = self.owned()
+        if not force and was_owned:
             raise AlreadyOwned
         self.clipboard.set_with_data([("VERSION", 0, 0)],
                                      self._get,
@@ -76,6 +77,11 @@ class ManagerSelection(gobject.GObject):
                                          selection_xatom,
                                          owner_window,
                                          0, 0)
+
+        if was_owned:
+            # Give the previous wm a little time to clear out (really we
+            # should wait for their window to disappear, blah blah).
+            time.sleep(2)
 
     def _get(self, clipboard, outdata, which, userdata):
         # We are compliant with ICCCM version 2.0 (see section 4.3)

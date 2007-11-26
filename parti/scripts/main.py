@@ -6,6 +6,9 @@ import parti.parti
 
 def main(cmdline):
     parser = PartiOptionParser()
+    parser.add_option("--replace", action="store_true",
+                      dest="replace", default=False,
+                      help="Replace any running window manager with Parti")
     (options, args) = parser.parse_args(cmdline[1:])
 
     # This means, if an exception propagates to the gtk mainloop, then pass it
@@ -14,7 +17,7 @@ def main(cmdline):
     os.environ["PYGTK_FATAL_EXCEPTIONS"] = "1"
 
     try:
-        p = parti.parti.Parti()
+        p = parti.parti.Parti(options["replace"])
         p.main()
     except:
         if "_PARTI_PDB" in os.environ:

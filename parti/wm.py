@@ -120,7 +120,7 @@ class Wm(gobject.GObject):
         "parti-client-message-event": one_arg_signal,
         }
 
-    def __init__(self, name, display=None):
+    def __init__(self, name, replace_other_wm, display=None):
         self._name = name
         if display is None:
             display = gtk.gdk.display_manager_get().get_default_display()
@@ -138,7 +138,7 @@ class Wm(gobject.GObject):
         self._wm_selection = parti.selection.ManagerSelection(self._display, "WM_S0")
         self._wm_selection.connect("selection-lost", self._lost_wm_selection)
         # May throw AlreadyOwned:
-        self._wm_selection.acquire()
+        self._wm_selection.acquire(force=replace_other_wm)
         # (If we become a compositing manager, then we will want to do the
         # same thing with the _NET_WM_CM_S0 selection (says EWMH).  AFAICT
         # this basically will just be used by clients to know that they can
