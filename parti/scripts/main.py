@@ -2,7 +2,7 @@
 
 import os
 from parti.scripts import PartiOptionParser
-import parti.wm
+import parti.parti
 
 def main(cmdline):
     parser = PartiOptionParser()
@@ -14,8 +14,8 @@ def main(cmdline):
     os.environ["PYGTK_FATAL_EXCEPTIONS"] = "1"
 
     try:
-        wm = parti.wm.Wm()
-        wm.mainloop()
+        p = parti.parti.Parti()
+        p.main()
     except:
         if "_PARTI_PDB" in os.environ:
             import sys, pdb

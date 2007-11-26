@@ -9,8 +9,8 @@ import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
 
 class PartiDBusService(dbus.service.Object):
-    def __init__(self, wm):
-        self._wm = wm
+    def __init__(self, parti):
+        self._parti = parti
         self._bus = dbus.SessionBus(mainloop=DBusGMainLoop())
         self._bus_name = dbus.service.BusName(_NAME, bus=self._bus)
         dbus.service.Object.__init__(self, self._bus_name, _ROOT)
@@ -18,7 +18,7 @@ class PartiDBusService(dbus.service.Object):
     @dbus.service.method(_INTERFACE,
                          in_signature="", out_signature="")
     def SpawnReplWindow(self):
-        self._wm.spawn_repl_window()
+        self._parti.spawn_repl_window()
 
 def get_parti_proxy():
     bus = dbus.SessionBus(mainloop=DBusGMainLoop())
