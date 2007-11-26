@@ -1,5 +1,5 @@
 import gtk
-import gtk.gdk
+import gobject
 
 import parti.selection
 import parti.lowlevel

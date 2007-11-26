@@ -1,6 +1,7 @@
 import cgitb
 import sys
 import types
+import gobject
 
 class AutoPropGObjectMixin(object):
     """Mixin for automagic property support in GObjects.

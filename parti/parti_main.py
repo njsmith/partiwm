@@ -1,5 +1,7 @@
 import gtk
 
+import parti.lowlevel
+
 from parti.wm import Wm
 
 from parti.world_window import WorldWindow

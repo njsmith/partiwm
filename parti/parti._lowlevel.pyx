@@ -800,8 +800,8 @@ def _dispatch_gdk_event(event):
     # This function is called for every event GDK sees.  Most of them we
     # want to just pass on to GTK, but some we are especially interested
     # in...
-    if event.type in signals:
-        _route_event(event, signals[event.type], None)
+    if event.type in _gdk_event_signals:
+        _route_event(event, _gdk_event_signals[event.type], None)
     gtk.main_do_event(event)
 
 _global_event_filters_installed = False
