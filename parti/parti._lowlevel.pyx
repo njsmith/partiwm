@@ -804,11 +804,8 @@ def _dispatch_gdk_event(event):
         _route_event(event, _gdk_event_signals[event.type], None)
     gtk.main_do_event(event)
 
-_global_event_filters_installed = False
+def _install_global_event_filters():
+    gdk_window_add_filter(<cGdkWindow*>0, x_event_filter, <void*>0)
+    gtk.gdk.event_handler_set(_dispatch_gdk_event)
 
-def install_global_event_filter():
-    global _global_event_filters_installed
-    if not _global_event_filters_installed:
-        gdk_window_add_filter(<cGdkWindow*>0, x_event_filter, <void*>0)
-        gtk.gdk.event_handler_set(_dispatch_gdk_event)
-        _global_event_filters_installed = True
+_install_global_event_filters()

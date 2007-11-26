@@ -17,8 +17,6 @@ from parti.bus import PartiDBusService
 
 class Parti(object):
     def __init__(self, replace_other_wm):
-        parti.lowlevel.install_global_event_filter()
-
         self._wm = Wm("Parti", replace_other_wm)
         self._wm.connect("new-window", self._new_window_signaled)
         self._wm.connect("quit", self._wm_quit)
