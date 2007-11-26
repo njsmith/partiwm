@@ -70,5 +70,6 @@ class LameStruct(object):
                 % (type(self).__name__, self.__dict__))
 
 
+no_arg_signal = (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ())
 one_arg_signal = (gobject.SIGNAL_RUN_LAST,
                   gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))

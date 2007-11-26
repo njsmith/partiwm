@@ -4,7 +4,7 @@ import gtk.gdk
 import parti.selection
 import parti.lowlevel
 from parti.prop import prop_set
-from parti.util import AutoPropGObjectMixin, one_arg_signal
+from parti.util import AutoPropGObjectMixin, no_arg_signal, one_arg_signal
 
 from parti.window import WindowModel, Unmanageable
 
@@ -47,8 +47,12 @@ class Wm(gobject.GObject):
         "WM_HINTS",
         "WM_NORMAL_HINTS",
         "WM_TRANSIENT_FOR",
+        "_NET_WM_STRUT",
+        "_NET_WM_STRUT_PARTIAL"
+        "_NET_WM_ICON",
 
-        # This isn't supported in any particularly meaningful way, but hey.
+        # These aren't supported in any particularly meaningful way, but hey.
+        "_NET_FRAME_EXTENTS",
         "_NET_REQUEST_FRAME_EXTENTS",
 
         "_NET_WM_WINDOW_TYPE",
@@ -76,19 +80,15 @@ class Wm(gobject.GObject):
         # _NET_WM_STATE_MAXIMIZED_VERT,
         # _NET_WM_STATE_MAXIMIZED_HORZ,
         # _NET_WM_STATE_SHADED,
-        # _NET_WM_STATE_SKIP_TASKBAR,
-        # _NET_WM_STATE_SKIP_PAGER,
-        # _NET_WM_STATE_HIDDEN,
+        "_NET_WM_STATE_SKIP_TASKBAR",
+        "_NET_WM_STATE_SKIP_PAGER",
+        "_NET_WM_STATE_HIDDEN",
         "_NET_WM_STATE_FULLSCREEN",
         # _NET_WM_STATE_ABOVE,
         # _NET_WM_STATE_BELOW,
 
         # Not at all yet:
-        #"_NET_WM_STRUT", "_NET_WM_STRUT_PARTIAL"
-        #"_NET_WM_ICON",
-        #"_NET_FRAME_EXTENTS",
         #"_NET_CLOSE_WINDOW",
-        #"_NET_ACTIVE_WINDOW",
         #"_NET_CURRENT_DESKTOP",
         #"_NET_RESTACK_WINDOW",
         #"_NET_WM_DESKTOP",
@@ -100,19 +100,24 @@ class Wm(gobject.GObject):
                     gobject.PARAM_READABLE),
         }
     __gsignals__ = {
+        # Public use:
+        # A new window has shown up:
+        "new-window": one_arg_signal,
+        # "FYI, no client has focus, like the client that had focus died or
+        # something":
+        "focus-got-dropped": no_arg_signal,
+        # You can emit this to cause the WM to quit, or the WM may
+        # spontaneously raise it if another WM takes over the display:
+        "quit": no_arg_signal,
+        # Emit this when the list of desktop names has changed:
+        "desktop-list-changed": one_arg_signal,
+
+        # Mostly intended for internal use:
         "child-map-request-event": one_arg_signal,
         "child-configure-request-event": one_arg_signal,
         "parti-focus-in-event": one_arg_signal,
         "parti-focus-out-event": one_arg_signal,
         "parti-client-message-event": one_arg_signal,
-        # A new window has shown up:
-        "new-window": one_arg_signal,
-        # "FYI, no client has focus, like the client that had focus died or
-        # something":
-        "focus-got-dropped": (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
-        # You can emit this to cause the WM to quit, or the WM may
-        # spontaneously raise it if another WM takes over the display:
-        "quit": (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
         }
 
     def __init__(self, name, display=None):
@@ -125,6 +130,9 @@ class Wm(gobject.GObject):
         self._ewmh_window = None
         
         self._windows = {}
+        # EWMH says we have to know the order of our windows oldest to
+        # youngest...
+        self._windows_in_order = []
 
         # Become the Official Window Manager of this year's display:
         self._wm_selection = parti.selection.ManagerSelection(self._display, "WM_S0")
@@ -161,13 +169,12 @@ class Wm(gobject.GObject):
         # Tray's need to provide info for _NET_ACTIVE_WINDOW and _NET_WORKAREA
         # (and notifications for both)
 
-
     def do_get_property(self, pspec):
         assert pspec.name == "windows"
-        return self._windows.values()
+        return list(self._windows_in_order)
 
-    # This is the key function, where we have detected a new client window,
-    # and start managing it.
+    # This is in some sense the key entry point to the entire WM program.  We
+    # have detected a new client window, and start managing it:
     def _manage_client(self, gdkwindow):
         assert gdkwindow not in self._windows
         try:
@@ -175,15 +182,27 @@ class Wm(gobject.GObject):
         except Unmanageable:
             print "Window disappeared on us, never mind"
             return
-        self._windows[gdkwindow] = win
         win.connect("unmanaged", self._handle_client_unmanaged)
+        self._windows[gdkwindow] = win
+        self._windows_in_order.append(win)
         self.notify("windows")
+        self._update_window_list()
         self.emit("new-window", win)
 
     def _handle_client_unmanaged(self, window):
-        assert window.client_window in self._windows
-        del self._windows[window.client_window]
+        gdkwindow = window.get_property("client-window")
+        assert gdkwindow in self._windows
+        del self._windows[gdkwindow]
+        self._windows_in_order.remove(gdkwindow)
+        self._update_window_list()
         self.notify("windows")
+
+    def _update_window_list(self, *args):
+        prop_set(self._root, "_NET_CLIENT_LIST",
+                 ["window"], self._windows_in_order)
+        # This is a lie, but we don't maintain a stacking order, so...
+        prop_set(self._root, "_NET_CLIENT_LIST_STACKING",
+                 ["window"], self._windows_in_order)
 
     def do_parti_client_message_event(self, event):
         # FIXME
@@ -241,18 +260,9 @@ class Wm(gobject.GObject):
         print "Focus left root, FYI"
         parti.lowlevel.printFocus(self)
 
-    def _update_window_list(self, *args):
-        prop_set(self._root, "_NET_CLIENT_LIST",
-                 ["window"], self._windows.window_list())
-        # This is a lie, but we don't maintain a stacking order, so...
-        prop_set(self._root, "_NET_CLIENT_LIST_STACKING",
-                 ["window"], self._windows.window_list())
-
-    def _update_desktop_list(self, *args):
-        prop_set(self._root, "_NET_NUMBER_OF_DESKTOPS",
-                 "u32", len(self._trays))
-        prop_set(self._root, "_NET_DESKTOP_NAMES",
-                 ["utf8"], self._trays.tags())
+    def do_desktop_list_changed(self, desktops):
+        prop_set(self._root, "_NET_NUMBER_OF_DESKTOPS", "u32", len(desktops))
+        prop_set(self._root, "_NET_DESKTOP_NAMES", ["utf8"], desktops)
 
     def _setup_ewmh_window(self):
         # Set up a 1x1 invisible unmapped window, with which to participate in
@@ -285,3 +295,4 @@ class Wm(gobject.GObject):
         "Used by PseudoclientWindow, only."
         win.set_screen(self._alt_display.get_default_screen())
 
+gobject.type_register(Wm)
