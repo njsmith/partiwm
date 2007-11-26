@@ -4,7 +4,7 @@ import gobject
 import parti.selection
 import parti.lowlevel
 from parti.prop import prop_set
-from parti.util import AutoPropGObjectMixin, no_arg_signal, one_arg_signal
+from parti.util import base, no_arg_signal, one_arg_signal
 
 from parti.window import WindowModel, Unmanageable
 
@@ -121,6 +121,8 @@ class Wm(gobject.GObject):
         }
 
     def __init__(self, name, replace_other_wm, display=None):
+        base(self).__init__(self)
+
         self._name = name
         if display is None:
             display = gtk.gdk.display_manager_get().get_default_display()
