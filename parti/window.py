@@ -10,7 +10,7 @@ import gtk.gdk
 import cairo
 import math
 import parti.lowlevel
-from parti.util import AutoPropGObjectMixin, base
+from parti.util import AutoPropGObjectMixin, base, one_arg_signal
 from parti.error import *
 from parti.prop import prop_get, prop_set
 
@@ -259,19 +259,12 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                  gobject.PARAM_READABLE),
         }
     __gsignals__ = {
-        "client-unmap-event": (gobject.SIGNAL_RUN_LAST,
-                               # Actually gets a GdkEventMumble
-                               gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
-        "client-destroy-event": (gobject.SIGNAL_RUN_LAST,
-                                 # Actually gets a GdkEventOwnerChange
-                                 gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
-        "client-property-notify-event": (gobject.SIGNAL_RUN_LAST,
-                                         # Actually gets a GdkEventProperty
-                                         gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
-        "managed": (gobject.SIGNAL_RUN_LAST,
-                   gobject.TYPE_NONE, ()),
-        "unmanaged": (gobject.SIGNAL_RUN_LAST,
-                    gobject.TYPE_NONE, ()),
+        "map-request-event": one_arg_signal,
+        "configure-request-event": one_arg_signal,
+        "parti-property-notify-event": one_arg_signal,
+        "parti-unmap-event": one_arg_signal,
+        "parti-destroy-event": one_arg_signal,
+        "unmanaged": (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
         }
         
     def __init__(self, parking_window, client_window, start_trays):
@@ -287,6 +280,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         self.parking_window = parking_window
         self.client_window = client_window
         self._internal_set_property("client-window", client_window)
+        self.client_window.set_data("parti-route-events-to", self)
 
         # We count how many times we have asked that the child be unmapped, so
         # that when the server tells us that the child has been unmapped, we
@@ -325,10 +319,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                                             window_type=gtk.gdk.WINDOW_CHILD,
                                             wclass=gtk.gdk.INPUT_OUTPUT,
                                             event_mask=0)
-        parti.lowlevel.substructureRedirect(self.corral_window,
-                                            None, # FIXME: surely we need
-                                            #       MapRequest handling?
-                                            self._handle_configure_request)
+        parti.lowlevel.substructureRedirect(self.corral_window)
         self.corral_window.set_composited(True)
         self.corral_window.show_unraised()
 
@@ -347,7 +338,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                 self.pending_unmaps += 1
             
             # Process properties
-            self.client_window.set_data("send-events-to", self)
             self._read_initial_properties()
             self._write_initial_properties_and_setup()
 
@@ -369,7 +359,18 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         for tray in start_trays:
             tray.add(self)
 
-    def do_client_unmap_event(self, event):
+    def do_map_request_event(self, event):
+        # If we get a MapRequest then it might mean that someone tried to map
+        # this window multiple times in quick succession, before we actually
+        # mapped it (so that several MapRequests ended up queued up; FSF Emacs
+        # 22.1.50.1 does this, at least).  It alternatively might mean that
+        # the client is naughty and tried to map their window which is
+        # currently not displayed.  In either case, we should just ignore the
+        # request.
+        pass
+
+    def do_parti_unmap_event(self, event):
+        assert event.window is self.client_window
         # The client window got unmapped.  The question is, though, was that
         # because it was withdrawn/destroyed, or was it because we unmapped it
         # going into IconicState?
@@ -387,7 +388,8 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         else:
             self.pending_unmaps -= 1
 
-    def do_client_destroy_event(self, event):
+    def do_parti_destroy_event(self, event):
+        assert event.window is self.client_window
         # This is somewhat redundant with the unmap signal, because if you
         # destroy a mapped window, then a UnmapNotify is always generated.
         # However, this allows us to catch the destruction of unmapped
@@ -399,7 +401,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
 
     def unmanage_window(self):
         print "unmanaging window"
-        self.client_window.set_data("send-events-to", None)
         def unmanageit():
             self._scrub_withdrawn_window()
             self.client_window.reparent(gtk.gdk.get_default_root_window(),
@@ -444,6 +445,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         return WindowView(self)
 
     def destroy(self):
+        self.client_window.set_data("parti-route-events-to", None)
         for view in list(self.views):
             view.destroy()
         assert not self.views
@@ -488,13 +490,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             for view in self.views:
                 view._invalidate_all()
 
-    def _handle_configure_request(self, event):
-        # WARNING: currently the global _handle_root_configure_request method
-        # calls this method directly if it receives a configure request for a
-        # newly managed window (this can happen if a window maps and then
-        # immediately configures, before our reparent has a chance to take
-        # affect).
-
+    def do_configure_request_event(self, event):
         # Ignore the request, but as per ICCCM 4.1.5, send back a synthetic
         # ConfigureNotify telling the client that nothing has happened.
         trap.swallow(parti.lowlevel.sendConfigureNotify,
@@ -529,13 +525,13 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     # Property reading
     ################################
     
-    def do_client_property_notify_event(self, event):
-        self._handle_property_change(event.atom)
+    def do_parti_property_notify_event(self, event):
+        assert event.window is self.client_window
+        self._handle_property_change(str(event.atom))
 
     _property_handlers = {}
 
-    def _handle_property_change(self, gdkatom):
-        name = str(gdkatom)
+    def _handle_property_change(self, name):
         print "Property changed on %s: %s" % (self.client_window.xid, name)
         if name in self._property_handlers:
             self._property_handlers[name](self)
@@ -689,7 +685,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                         "WM_ICON_NAME", "_NET_WM_ICON_NAME",
                         "_NET_WM_STRUT", "_NET_WM_STRUT_PARTIAL",
                         "_NET_WM_ICON"]:
-            self._handle_property_change(gtk.gdk.atom_intern(mutable))
+            self._handle_property_change(mutable)
 
     ################################
     # Property setting

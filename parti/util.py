@@ -60,3 +60,15 @@ def base(obj):
     # think, not just use utilities.)
     assert len(obj.__class__.__bases__) == 1
     return obj.__class__.__base__
+
+
+# A simple little class whose instances we can stick random bags of attributes
+# on.
+class LameStruct(object):
+    def __repr__(self):
+        return ("<%s object, contents: %r>"
+                % (type(self).__name__, self.__dict__))
+
+
+one_arg_signal = (gobject.SIGNAL_RUN_LAST,
+                  gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))

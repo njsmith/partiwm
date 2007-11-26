@@ -1,28 +1,12 @@
-import sys
-
-import pygtk
-pygtk.require('2.0')
 import gtk
 import gtk.gdk
 
 import parti.selection
 import parti.lowlevel
 from parti.prop import prop_set
+from parti.util import AutoPropGObjectMixin, one_arg_signal
 
-from parti.world_window import WorldWindow
-from parti.world_organizer import WorldOrganizer
-
-from parti.windowset import WindowSet
-from parti.tray import TraySet
-from parti.trays.simpletab import SimpleTabTray
-
-from parti.addons.ipython_embed import spawn_repl_window
-
-from parti.bus import PartiDBusService
-
-class Wm(object):
-    NAME = "Parti"
-
+class Wm(AutoPropGObjectMixin, gobject.GObject):
     _NET_SUPPORTED = [
         "_NET_SUPPORTED", # a bit redundant, perhaps...
         "_NET_SUPPORTING_WM_CHECK",
@@ -108,24 +92,26 @@ class Wm(object):
         #"_NET_WM_DESKTOP",
         ]
 
-    def __init__(self, display=None):
-        self._windows = WindowSet()
-        self._windows.connect("window-list-changed", self._update_window_list)
+    __gproperties__ = {
+        "windows": (gobject.TYPE_PYOBJECT,
+                    "Tuple of managed windows (as WindowModels)", "",
+                    gobject.PARAM_READABLE),
+        }
+    __gsignals__ = {
+        "new-window": one_arg_signal,
+        "child-map-request-event": one_arg_signal,
+        "child-configure-request-event": one_arg_signal,
+        }
 
-        self._trays = TraySet()
-        self._trays.connect("changed", self._update_desktop_list)
-
+    def __init__(self, name, display=None):
+        self._name = name
         if display is None:
             display = gtk.gdk.display_manager_get().get_default_display()
         self._display = display
         self._alt_display = gtk.gdk.Display(self._display.get_name())
         self._root = self._display.get_default_screen().get_root_window()
         self._ewmh_window = None
-        self._world_window = None
         
-        # Start snooping on the raw GDK event stream
-        gtk.gdk.event_handler_set(self._dispatch_gdk_event)
-
         # Become the Official Window Manager of this year's display:
         self._wm_selection = parti.selection.ManagerSelection(self._display, "WM_S0")
         self._wm_selection.connect("selection-lost", self._lost_wm_selection)
@@ -142,25 +128,11 @@ class Wm(object):
                  ["atom"], self._NET_SUPPORTED)
         prop_set(self._root, "_NET_DESKTOP_VIEWPORT",
                  ["u32"], [0, 0])
-        self._update_window_list()
-
-        # Create our giant window
-        self._world_window = WorldWindow()
-        self._world_organizer = WorldOrganizer(self._trays)
-        self._world_window.add(self._world_organizer)
-
-        # FIXME: be less stupid
-        #self._trays.new(u"default", SimpleTabTray)
-        from parti.trays.compositetest import CompositeTest
-        self._trays.new(u"default", CompositeTest)
-
-        self._world_window.show_all()
 
         # Okay, ready to select for SubstructureRedirect and then load in all
         # the existing clients.
-        parti.lowlevel.substructureRedirect(self._root,
-                                            self._handle_root_map_request,
-                                            self._handle_root_configure_request)
+        self._root.set_data("parti-route-events-to", self)
+        parti.lowlevel.substructureRedirect(self._root)
 
         for w in parti.lowlevel.get_children(self._root):
             # Checking for FOREIGN here filters out anything that we've
@@ -169,12 +141,6 @@ class Wm(object):
             if (w.get_window_type() == gtk.gdk.WINDOW_FOREIGN
                 and parti.lowlevel.is_mapped(w)):
                 self._manage_client(w)
-
-        # Start listening for client requests
-        parti.lowlevel.selectClientMessage(self._root, self._handle_root_client_message)
-
-        # Start providing D-Bus api
-        self._dbus = PartiDBusService(self)
 
         # FIXME:
 
@@ -240,33 +206,6 @@ class Wm(object):
                                               event.width, event.height,
                                               event.value_mask)
 
-    def _dispatch_gdk_event(self, event):
-        # This function is called for every event GDK sees.  Most of them we
-        # want to just pass on to GTK, but some we are especially interested
-        # in...
-        signals = {
-            # These other events are on client windows, mostly
-            gtk.gdk.PROPERTY_NOTIFY: "client-property-notify-event",
-            gtk.gdk.UNMAP: "client-unmap-event",
-            gtk.gdk.DESTROY: "client-destroy-event",
-            # I can get CONFIGURE and MAP for client windows too,
-            # but actually I don't care ATM:
-            #gtk.gdk.GDK_MAP: "client-map-event",
-            #gtk.gdk.GDK_CONFIGURE: "client-configure-event",
-            }
-        if event.type in signals:
-            handler = event.window.get_data("send-events-to")
-            if handler is not None:
-                handler.emit(signals[event.type], event)
-        #self._debug_dump_gdk_event(event)
-        gtk.main_do_event(event)
-
-    def _debug_dump_gdk_event(self, event):
-        print "GdkEvent %s" % event.type
-        print event.window
-        if event.type == gtk.gdk.FOCUS_CHANGE:
-            print event.in_
-
     def _update_window_list(self, *args):
         prop_set(self._root, "_NET_CLIENT_LIST",
                  ["window"], self._windows.window_list())
@@ -299,7 +238,7 @@ class Wm(object):
                                            window_type=gtk.gdk.WINDOW_TOPLEVEL,
                                            event_mask=0, # event mask
                                            wclass=gtk.gdk.INPUT_ONLY,
-                                           title=self.NAME)
+                                           title=self._name)
         prop_set(self._ewmh_window, "_NET_SUPPORTING_WM_CHECK",
                  "window", self._ewmh_window)
         prop_set(self._root, "_NET_SUPPORTING_WM_CHECK",
