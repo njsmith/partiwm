@@ -11,4 +11,4 @@ CFLAGS=-O0 python setup.py install --home=install
 #RUNNER="gdb --args python"
 #RUNNER="pydb --trace"
 RUNNER=python
-$RUNNER ./yatest.py install/lib/python/parti "$@"
+$RUNNER "-Wignore:could not open display" ./yatest.py install/lib/python/parti "$@"
