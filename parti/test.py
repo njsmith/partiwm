@@ -3,6 +3,9 @@ import subprocess
 import sys
 import os
 import traceback
+import os
+import atexit
+import errno
 import gobject
 import gtk
 import gtk.gdk
@@ -53,23 +56,102 @@ def assert_emits(f, obj, signal, slot=None):
         raise exc[0], exc[1], exc[2]
 
 
+class Session(object):
+    def __init__(self, display_name):
+        self._my_process = os.getpid()
+        self.display_name = display_name
+        self._x11 = None
+        self._dbus = None
+        self._dbus_address = None
+        
+    def _alive(self, pid):
+        # Just in case it's a zombie, reap it; otherwise, do nothing.
+        try:
+            os.waitpid(pid, os.WNOHANG)
+        except OSError, e:
+            pass
+        # Then use the old SIG 0 trick.
+        try:
+            os.kill(pid, 0)
+        except OSError, e:
+            if e.errno == errno.ESRCH:
+                return False
+        return True
+
+    def _x_really_running(self):
+        try:
+            d = gtk.gdk.Display(self.display_name)
+            d.close()
+        except RuntimeError:
+            return False
+        return True
+
+    def validate(self):
+        assert os.getpid() == self._my_process
+        # FIXME: add some sort of check in here that X has actually reset
+        # since the last time -- e.g., set a prop on the root window and make
+        # sure it isn't here anymore.  This is to make sure that other
+        # connections got properly disconnected, etc.
+        if (self._x11 is None
+            or self._dbus is None
+            or not self._alive(self._x11.pid)
+            or not self._alive(self._dbus.pid)
+            or not self._x_really_running()):
+            self.destroy()
+            self._x11 = subprocess.Popen(["Xvfb-for-parti", self.display_name,
+                                          "-ac",
+                                          #"-audit", "10",
+                                          "+extension", "Composite",
+                                          # Need to set the depth like this to
+                                          # get non-paletted visuals:
+                                          "-screen", "0", "1024x768x24+32"],
+                                         executable="Xvfb",
+                                         stderr=open("/dev/null", "w"))
+            self._dbus = subprocess.Popen(["dbus-daemon-for-parti", "--session",
+                                           "--nofork", "--print-address"],
+                                          executable="dbus-daemon",
+                                          stdout=subprocess.PIPE)
+            self._dbus_address = self._dbus.stdout.readline().strip()
+
+    def destroy(self):
+        if os.getpid() != self._my_process:
+            return
+        if self._x11 is not None:
+            try:
+                os.kill(self._x11.pid, 15)
+                self._x11.wait()
+            except OSError:
+                pass
+            self._x11 = None
+        if self._dbus is not None:
+            try:
+                os.kill(self._dbus.pid, 15)
+                self._dbus.wait()
+            except OSError:
+                pass
+            self._dbus = None
+            self._dbus_address = None
+
+_the_session = None
+
 class TestWithSession(object):
     "A test that runs with its own isolated X11 and D-Bus session."
     display_name = ":13"
     display = None
 
+    @classmethod
+    def preForkClassSetUp(cls):
+        global _the_session
+        if _the_session is None:
+            _the_session = Session(cls.display_name)
+            atexit.register(_the_session.destroy)
+        _the_session.validate()
+
     def setUp(self):
-        self._x11 = subprocess.Popen(["Xvfb-for-parti", self.display_name,
-                                      "-ac",
-                                      "-audit", "10",
-                                      "+extension", "Composite",
-                                      # Need to set the depth like this to get
-                                      # non-paletted visuals:
-                                      "-screen", "0", "1024x768x24+32"],
-                                     executable="Xvfb")
         # This is not a race condition, nor do we need to sleep here, because
         # gtk.gdk.Display.__init__ is smart enough to silently block until the
-        # X server comes up.
+        # X server comes up.  By using 127.0.0.1 explicitly we can force it to
+        # use TCP over loopback and that means wireshark can work.
         self.display = gtk.gdk.Display("127.0.0.1" + self.display_name)
         default_display = gtk.gdk.display_manager_get().get_default_display()
         if default_display is not None:
@@ -85,23 +167,14 @@ class TestWithSession(object):
         gtk.gdk.display_manager_get().set_default_display(self.display)
         print "Opened new display %r" % (self.display,)
 
-        self._dbus = subprocess.Popen(["dbus-daemon-for-parti", "--session",
-                                       "--nofork", "--print-address"],
-                                      executable="dbus-daemon",
-                                      stdout=subprocess.PIPE)
-        self._dbus_address = self._dbus.stdout.readline().strip()
-        os.environ["DBUS_SESSION_BUS_ADDRESS"] = self._dbus_address
-        print "Started session D-Bus at %s" % self._dbus_address
+        os.environ["DBUS_SESSION_BUS_ADDRESS"] = _the_session._dbus_address
 
     def tearDown(self):
-        os.kill(self._x11.pid, 15)
-        os.kill(self._dbus.pid, 15)
-        self._x11.wait()
-        self._dbus.wait()
-        # Could do more cleanup here (close X11 connections, unset
+        # Could do cleanup here (close X11 connections, unset
         # os.environ["DBUS_SESSION_BUS_ADDRESS"], etc.), but our test runner
         # runs us in a forked off process that will exit immediately after
         # this, so who cares?
+        pass
 
     def clone_display(self):
         clone = gtk.gdk.Display(self.display.get_name())

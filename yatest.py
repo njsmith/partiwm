@@ -33,6 +33,8 @@
 #      when all their clients have been *killed off*, even if we do not trust
 #      anything less than that to clean things up fully).
 #   -- Parallelized testing?
+#   -- Check test item's __module__ attribute, so as to only run items where
+#      they are defined, not where they have been imported?
 
 import sys
 import os
@@ -166,6 +168,14 @@ class Runner(object):
                 self.run_test_method(class_name, cls, key)
 
     def run_test_method(self, class_name, cls, name):
+        if hasattr(cls, "preForkClassSetUp"):
+            try:
+                cls.preForkClassSetUp()
+            except Exception, e:
+                sys.stderr.write("Error in preForkClassSetUp: %s; skipping %s\n"
+                                 % (e, cls))
+                return
+
         (readable_fd, writeable_fd) = os.pipe()
         readable = os.fdopen(readable_fd, "rb")
         writeable = os.fdopen(writeable_fd, "wb")
