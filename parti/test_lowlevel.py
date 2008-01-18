@@ -320,6 +320,71 @@ class TestClientMessageAndXSelectInputStuff(TestLowlevel, MockEventReceiver):
 
 # myGetSelectionOwner gets tested in test_selection.py
 
+class TestSendConfigureNotify(TestLowlevel):
+    # This test stomps on Parti's global event handler, so make sure not to
+    # try receiving parti events in it.
+    def test_sendConfigureNotify(self):
+        # GDK discards ConfigureNotify's sent to child windows, so we can't
+        # use self.window():
+        w1 = gtk.gdk.Window(self.root(), width=10, height=10,
+                            window_type=gtk.gdk.WINDOW_TOPLEVEL,
+                            wclass=gtk.gdk.INPUT_OUTPUT,
+                            event_mask=gtk.gdk.ALL_EVENTS_MASK)
+        self.ev = None
+        def myfilter(ev, data=None):
+            print "ev %s" % (ev.type,)
+            if ev.type == gtk.gdk.CONFIGURE:
+                self.ev = ev
+                gtk.main_quit()
+            gtk.main_do_event(ev)
+        gtk.gdk.event_handler_set(myfilter)
+
+        w1.show()
+        gtk.gdk.flush()
+        l.sendConfigureNotify(w1)
+        gtk.main()
+        
+        assert self.ev is not None
+        assert self.ev.type == gtk.gdk.CONFIGURE
+        assert self.ev.window == w1
+        assert self.ev.send_event
+        assert self.ev.x == 0
+        assert self.ev.y == 0
+        assert self.ev.width == 10
+        assert self.ev.height == 10
+        
+        # We have to create w2 on a separate connection, because if we just
+        # did w1.reparent(w2, ...), then GDK would magically convert w1 from a
+        # TOPLEVEL window into a CHILD window.
+        # Have to hold onto a reference to d2, so it doesn't get garbage
+        # collected and kill the connection:
+        d2 = self.clone_display()
+        w2 = self.window(d2)
+        gtk.gdk.flush()
+        w2on1 = l.get_pywindow(w1, l.get_xwindow(w2))
+        # Doesn't generate an event, because event mask is zeroed out.
+        w2.move(11, 12)
+        # Reparenting doesn't trigger a ConfigureNotify.
+        w1.reparent(w2on1, 13, 14)
+        # To double-check that it's still a TOPLEVEL:
+        print w1.get_window_type()
+        w1.resize(15, 16)
+        gtk.main()
+
+        # w1 in root coordinates is now at (24, 26)
+        self.ev = None
+        l.sendConfigureNotify(w1)
+        gtk.main()
+
+        assert self.ev is not None
+        assert self.ev.type == gtk.gdk.CONFIGURE
+        assert self.ev.window == w1
+        assert self.ev.send_event
+        assert self.ev.x == 24
+        assert self.ev.y == 26
+        assert self.ev.width == 15
+        assert self.ev.height == 16
+
 class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
     def do_map_request_event(self, event):
         print "do_map_request_event"
@@ -337,6 +402,7 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
         print "do_child_configure_request_event"
         self.child_conf_ev = event
         gtk.main_quit()
+
     def test_substructure_redirect(self):
         self.map_ev = None
         self.child_map_ev = None
@@ -429,111 +495,47 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
         assert self.conf_ev.detail == l.const["Above"]
         assert self.conf_ev.value_mask == l.const["CWStackMode"]
         
-    def test_sendConfigureNotify(self):
-        # GDK discards ConfigureNotify's sent to child windows, so we can't
-        # use self.window():
-        w1 = gtk.gdk.Window(self.root(), width=10, height=10,
-                            window_type=gtk.gdk.WINDOW_TOPLEVEL,
-                            wclass=gtk.gdk.INPUT_OUTPUT,
-                            event_mask=gtk.gdk.ALL_EVENTS_MASK)
-        self.ev = None
-        def myfilter(ev, data=None):
-            print "ev %s" % (ev.type,)
-            if ev.type == gtk.gdk.CONFIGURE:
-                self.ev = ev
-                gtk.main_quit()
-            gtk.main_do_event(ev)
-        gtk.gdk.event_handler_set(myfilter)
-
-        w1.show()
-        gtk.gdk.flush()
-        l.sendConfigureNotify(w1)
-        gtk.main()
-        
-        assert self.ev is not None
-        assert self.ev.type == gtk.gdk.CONFIGURE
-        assert self.ev.window == w1
-        assert self.ev.send_event
-        assert self.ev.x == 0
-        assert self.ev.y == 0
-        assert self.ev.width == 10
-        assert self.ev.height == 10
-        
-        # We have to create w2 on a separate connection, because if we just
-        # did w1.reparent(w2, ...), then GDK would magically convert w1 from a
-        # TOPLEVEL window into a CHILD window.
-        # Have to hold onto a reference to d2, so it doesn't get garbage
-        # collected and kill the connection:
-        d2 = self.clone_display()
-        w2 = self.window(d2)
-        gtk.gdk.flush()
-        w2on1 = l.get_pywindow(w1, l.get_xwindow(w2))
-        # Doesn't generate an event, because event mask is zeroed out.
-        w2.move(11, 12)
-        # Reparenting doesn't trigger a ConfigureNotify.
-        w1.reparent(w2on1, 13, 14)
-        # To double-check that it's still a TOPLEVEL:
-        print w1.get_window_type()
-        w1.resize(15, 16)
-        gtk.main()
-
-        # w1 in root coordinates is now at (24, 26)
-        self.ev = None
-        l.sendConfigureNotify(w1)
-        gtk.main()
-
-        assert self.ev is not None
-        assert self.ev.type == gtk.gdk.CONFIGURE
-        assert self.ev.window == w1
-        assert self.ev.send_event
-        assert self.ev.x == 24
-        assert self.ev.y == 26
-        assert self.ev.width == 15
-        assert self.ev.height == 16
-
     def test_configureAndNotify(self):
-        self.ev = None
-        def cb(ev):
-            print "got ConfigureRequest"
-            self.ev = ev
-            gtk.main_quit()
-        l.substructureRedirect(self.root(), None, cb)
+        self.conf_ev = None
+        l.substructureRedirect(self.root())
         # Need to hold onto a handle to this, so connection doesn't get
         # dropped:
         client = self.clone_display()
         w1_client = self.window(client)
         gtk.gdk.flush()
         w1_wm = l.get_pywindow(self.display, l.get_xwindow(w1_client))
+        w1_wm.set_data("parti-route-events-to", self)
 
         l.configureAndNotify(w1_client, 11, 12, 13, 14)
         gtk.main()
 
-        assert self.ev is not None
-        assert self.ev.parent is self.root()
-        assert self.ev.window is w1_wm
-        assert self.ev.x == 11
-        assert self.ev.y == 12
-        assert self.ev.width == 13
-        assert self.ev.height == 14
-        assert self.ev.border_width == 0
-        assert self.ev.value_mask == (l.const["CWX"]
-                                      | l.const["CWY"]
-                                      | l.const["CWWidth"]
-                                      | l.const["CWHeight"]
-                                      | l.const["CWBorderWidth"])
+        assert self.conf_ev is not None
+        assert self.conf_ev.parent is self.root()
+        assert self.conf_ev.window is w1_wm
+        assert self.conf_ev.x == 11
+        assert self.conf_ev.y == 12
+        assert self.conf_ev.width == 13
+        assert self.conf_ev.height == 14
+        assert self.conf_ev.border_width == 0
+        assert self.conf_ev.value_mask == (l.const["CWX"]
+                                           | l.const["CWY"]
+                                           | l.const["CWWidth"]
+                                           | l.const["CWHeight"]
+                                           | l.const["CWBorderWidth"])
         
         partial_mask = l.const["CWWidth"] | l.const["CWStackMode"]
         l.configureAndNotify(w1_client, 11, 12, 13, 14, partial_mask)
         gtk.main()
         
-        assert self.ev is not None
-        assert self.ev.parent is self.root()
-        assert self.ev.window is w1_wm
-        assert self.ev.width == 13
-        assert self.ev.border_width == 0
-        assert self.ev.value_mask == (l.const["CWWidth"]
-                                      | l.const["CWBorderWidth"])
+        assert self.conf_ev is not None
+        assert self.conf_ev.parent is self.root()
+        assert self.conf_ev.window is w1_wm
+        assert self.conf_ev.width == 13
+        assert self.conf_ev.border_width == 0
+        assert self.conf_ev.value_mask == (l.const["CWWidth"]
+                                           | l.const["CWBorderWidth"])
         
+
 
 class TestGeometryConstraints(object):
     # This doesn't actually need a session to play with...
