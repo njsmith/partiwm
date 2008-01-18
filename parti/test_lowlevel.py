@@ -1,9 +1,7 @@
 from parti.test import *
 import parti.lowlevel as l
-import gobject
 import gtk
 from parti.error import *
-from parti.util import one_arg_signal
 
 class TestLowlevel(TestWithSession):
     def root(self, disp=None):
@@ -155,39 +153,6 @@ class TestLowlevelMisc(TestLowlevel):
         gtk.gdk.flush()
         assert l.is_mapped(win)
 
-
-class MockEventReceiver(gobject.GObject):
-    __gsignals__ = {
-        "map-request-event": one_arg_signal,
-        "child-map-request-event": one_arg_signal,
-        "configure-request-event": one_arg_signal,
-        "child-configure-request-event": one_arg_signal,
-        "parti-focus-in-event": one_arg_signal,
-        "parti-focus-out-event": one_arg_signal,
-        "parti-client-message-event": one_arg_signal,
-        }
-    def do_map_request_event(self, event):
-        print "do_map_request_event"
-        assert False
-    def do_child_map_request_event(self, event):
-        print "do_child_map_request_event"
-        assert False
-    def do_configure_request_event(self, event):
-        print "do_configure_request_event"
-        assert False
-    def do_child_configure_request_event(self, event):
-        print "do_child_configure_request_event"
-        assert False
-    def do_parti_focus_in_event(self, event):
-        print "do_parti_focus_in_event"
-        assert False
-    def do_parti_focus_out_event(self, event):
-        print "do_parti_focus_out_event"
-        assert False
-    def do_parti_client_message_event(self, event):
-        print "do_parti_client_message_event"
-        assert False
-gobject.type_register(MockEventReceiver)
 
 class TestFocusStuff(TestLowlevel, MockEventReceiver):
     def do_parti_focus_in_event(self, event):

@@ -3,8 +3,10 @@ import subprocess
 import sys
 import os
 import traceback
+import gobject
 import gtk
 import gtk.gdk
+from parti.util import one_arg_signal
 
 # Skip contents of this file when looking for tests
 __test__ = False
@@ -105,3 +107,38 @@ class TestWithSession(object):
         clone = gtk.gdk.Display(self.display.get_name())
         print "Cloned new display %r" % (clone,)
         return clone
+
+
+class MockEventReceiver(gobject.GObject):
+    __gsignals__ = {
+        "map-request-event": one_arg_signal,
+        "child-map-request-event": one_arg_signal,
+        "configure-request-event": one_arg_signal,
+        "child-configure-request-event": one_arg_signal,
+        "parti-focus-in-event": one_arg_signal,
+        "parti-focus-out-event": one_arg_signal,
+        "parti-client-message-event": one_arg_signal,
+        }
+    def do_map_request_event(self, event):
+        print "do_map_request_event"
+        assert False
+    def do_child_map_request_event(self, event):
+        print "do_child_map_request_event"
+        assert False
+    def do_configure_request_event(self, event):
+        print "do_configure_request_event"
+        assert False
+    def do_child_configure_request_event(self, event):
+        print "do_child_configure_request_event"
+        assert False
+    def do_parti_focus_in_event(self, event):
+        print "do_parti_focus_in_event"
+        assert False
+    def do_parti_focus_out_event(self, event):
+        print "do_parti_focus_out_event"
+        assert False
+    def do_parti_client_message_event(self, event):
+        print "do_parti_client_message_event"
+        assert False
+gobject.type_register(MockEventReceiver)
+

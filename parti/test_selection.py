@@ -4,7 +4,7 @@ import parti.lowlevel
 
 import struct
 
-class TestSelection(TestWithSession):
+class TestSelection(TestWithSession, MockEventReceiver):
     def test_acquisition_stealing(self):
         d1 = self.clone_display()
         d2 = self.clone_display()
@@ -32,16 +32,16 @@ class TestSelection(TestWithSession):
         assert selection_lost_fired[m1]
         assert not selection_lost_fired[m2]
 
+    def do_parti_client_message_event(self, event):
+        self.event = event
+        gtk.main_quit()
     def test_notification(self):
         m = ManagerSelection(self.display, "WM_S0")
         root1 = self.display.get_default_screen().get_root_window()
         d2 = self.clone_display()
         root2 = d2.get_default_screen().get_root_window()
         root2.set_events(gtk.gdk.STRUCTURE_MASK)
-        def callback(event):
-            self.event = event
-            gtk.main_quit()
-        parti.lowlevel.selectClientMessage(root2, callback)
+        root2.set_data("parti-route-events-to", self)
         d2.flush()
         self.event = None
 
