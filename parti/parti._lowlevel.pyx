@@ -628,7 +628,7 @@ def configureAndNotify(pywindow, x, y, width, height, fields=None):
 # event window directly.
 #
 # So basically, to use this code:
-#   -- Call install_global_event_filter to enable.
+#   -- Import this module to install the global event filters
 #   -- Call win.set_data("parti-route-events-to", obj) on random windows.
 #   -- Call addXSelectInput or its convenience wrappers, substructureRedirect
 #      and selectFocusChange.
@@ -724,11 +724,11 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
             # Unmarshal:
             try:
                 if e.type == MapRequest:
-                    print "MapRequest"
+                    print "MapRequest received"
                     pyev.parent = _gw(d, e.xmaprequest.parent)
                     pyev.window = _gw(d, e.xmaprequest.window)
                 elif e.type == ConfigureRequest:
-                    print "ConfigureRequest"
+                    print "ConfigureRequest received"
                     pyev.parent = _gw(d, e.xconfigurerequest.parent)
                     pyev.window = _gw(d, e.xconfigurerequest.window)
                     pyev.x = e.xconfigurerequest.x
@@ -749,12 +749,12 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     pyev.detail = e.xconfigurerequest.detail
                     pyev.value_mask = e.xconfigurerequest.value_mask
                 elif e.type in (FocusIn, FocusOut):
-                    print "FocusIn/FocusOut"
+                    print "FocusIn/FocusOut received"
                     pyev.window = _gw(d, e.xfocus.window)
                     pyev.mode = e.xfocus.mode
                     pyev.detail = e.xfocus.detail
                 elif e.type == ClientMessage:
-                    print "ClientMessage"
+                    print "ClientMessage received"
                     pyev.window = _gw(d, e.xany.window)
                     if e.xclient.message_type > (2 ** 32):
                         print ("Xlib claims that this ClientEvent's 32-bit "

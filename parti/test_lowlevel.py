@@ -1,7 +1,9 @@
 from parti.test import *
 import parti.lowlevel as l
+import gobject
 import gtk
 from parti.error import *
+from parti.util import one_arg_signal
 
 class TestLowlevel(TestWithSession):
     def root(self, disp=None):
@@ -22,6 +24,7 @@ class TestLowlevel(TestWithSession):
                              event_mask=0)
         return win
 
+class TestLowlevelMisc(TestLowlevel):
     def test_get_xwindow_pywindow(self):
         d2 = self.clone_display()
         r1 = self.root()
@@ -152,39 +155,76 @@ class TestLowlevel(TestWithSession):
         gtk.gdk.flush()
         assert l.is_mapped(win)
 
+
+class MockEventReceiver(gobject.GObject):
+    __gsignals__ = {
+        "map-request-event": one_arg_signal,
+        "child-map-request-event": one_arg_signal,
+        "configure-request-event": one_arg_signal,
+        "child-configure-request-event": one_arg_signal,
+        "parti-focus-in-event": one_arg_signal,
+        "parti-focus-out-event": one_arg_signal,
+        "parti-client-message-event": one_arg_signal,
+        }
+    def do_map_request_event(self, event):
+        print "do_map_request_event"
+        assert False
+    def do_child_map_request_event(self, event):
+        print "do_child_map_request_event"
+        assert False
+    def do_configure_request_event(self, event):
+        print "do_configure_request_event"
+        assert False
+    def do_child_configure_request_event(self, event):
+        print "do_child_configure_request_event"
+        assert False
+    def do_parti_focus_in_event(self, event):
+        print "do_parti_focus_in_event"
+        assert False
+    def do_parti_focus_out_event(self, event):
+        print "do_parti_focus_out_event"
+        assert False
+    def do_parti_client_message_event(self, event):
+        print "do_parti_client_message_event"
+        assert False
+gobject.type_register(MockEventReceiver)
+
+class TestFocusStuff(TestLowlevel, MockEventReceiver):
+    def do_parti_focus_in_event(self, event):
+        if event.window is self.w1:
+            assert self.w1_got is None
+            self.w1_got = event
+        else:
+            assert self.w2_got is None
+            self.w2_got = event
+        gtk.main_quit()
+    def do_parti_focus_out_event(self, event):
+        if event.window is self.w1:
+            assert self.w1_lost is None
+            self.w1_lost = event
+        else:
+            assert self.w2_lost is None
+            self.w2_lost = event
+        gtk.main_quit()
     def test_focus_stuff(self):
-        w1 = self.window()
-        w1.show()
-        w2 = self.window()
-        w2.show()
+        self.w1 = self.window()
+        self.w1.show()
+        self.w2 = self.window()
+        self.w2.show()
         gtk.gdk.flush()
         self.w1_got, self.w2_got = None, None
         self.w1_lost, self.w2_lost = None, None
-        def in_callback(ev):
-            if ev.window is w1:
-                assert self.w1_got is None
-                self.w1_got = ev
-            else:
-                assert self.w2_got is None
-                self.w2_got = ev
-            gtk.main_quit()
-        def out_callback(ev):
-            if ev.window is w1:
-                assert self.w1_lost is None
-                self.w1_lost = ev
-            else:
-                assert self.w2_lost is None
-                self.w2_lost = ev
-            gtk.main_quit()
-        l.selectFocusChange(w1, in_callback, out_callback)
-        l.selectFocusChange(w2, in_callback, out_callback)
+        l.selectFocusChange(self.w1)
+        l.selectFocusChange(self.w2)
+        self.w1.set_data("parti-route-events-to", self)
+        self.w2.set_data("parti-route-events-to", self)
 
         gtk.gdk.flush()
-        l.XSetInputFocus(w1)
+        l.XSetInputFocus(self.w1)
         gtk.gdk.flush()
         gtk.main()
         assert self.w1_got is not None
-        assert self.w1_got.window is w1
+        assert self.w1_got.window is self.w1
         assert self.w1_got.mode == l.const["NotifyNormal"]
         assert self.w1_got.detail == l.const["NotifyNonlinear"]
         self.w1_got = None
@@ -192,18 +232,18 @@ class TestLowlevel(TestWithSession):
         assert self.w1_lost is None
         assert self.w2_lost is None
 
-        l.XSetInputFocus(w2)
+        l.XSetInputFocus(self.w2)
         gtk.gdk.flush()
         gtk.main()
         gtk.main()
         assert self.w1_got is None
         assert self.w2_got is not None
-        assert self.w2_got.window is w2
+        assert self.w2_got.window is self.w2
         assert self.w2_got.mode == l.const["NotifyNormal"]
         assert self.w2_got.detail == l.const["NotifyNonlinear"]
         self.w2_got = None
         assert self.w1_lost is not None
-        assert self.w1_lost.window is w1
+        assert self.w1_lost.window is self.w1
         assert self.w1_lost.mode == l.const["NotifyNormal"]
         assert self.w1_lost.detail == l.const["NotifyNonlinear"]
         self.w1_lost = None
@@ -216,56 +256,52 @@ class TestLowlevel(TestWithSession):
         assert self.w2_got is None
         assert self.w1_lost is None
         assert self.w2_lost is not None
-        assert self.w2_lost.window is w2
+        assert self.w2_lost.window is self.w2
         assert self.w2_lost.mode == l.const["NotifyNormal"]
         assert self.w2_lost.detail == l.const["NotifyAncestor"]
         self.w2_lost = None
         
+class TestClientMessageAndXSelectInput(TestLowlevel, MockEventReceiver):
+    def do_parti_client_message_event(self, event):
+        print "got clientmessage"
+        self.evs.append(event)
+        gtk.main_quit()
+
     def test_select_clientmessage_and_xselectinput(self):
-        root = self.root()
-        win = self.window()
+        self.evs = []
+        self.w = self.window()
         gtk.gdk.flush()
-        self.root_evs = []
-        def root_callback(ev):
-            print "root!"
-            self.root_evs.append(ev)
-            gtk.main_quit()
-        self.win_evs = []
-        def win_callback(ev):
-            print "win!"
-            self.win_evs.append(ev)
-            gtk.main_quit()
-        l.selectClientMessage(root, root_callback)
-        l.selectClientMessage(win, win_callback)
-        gtk.gdk.flush()
+
+        self.w.set_data("parti-route-events-to", self)
+        self.root().set_data("parti-route-events-to", self)
 
         data = (0x01020304, 0x05060708, 0x090a0b0c, 0x0d0e0f10, 0x11121314)
-        l.sendClientMessage(root, False, 0, "NOMASK", *data)
-        l.sendClientMessage(win, False, 0, "NOMASK", *data)
+        l.sendClientMessage(self.root(), False, 0, "NOMASK", *data)
+        l.sendClientMessage(self.w, False, 0, "NOMASK", *data)
         gtk.main()
-        assert not self.root_evs
-        assert len(self.win_evs) == 1
-        win_ev = self.win_evs[0]
-        assert win_ev.window is win
-        assert win_ev.message_type == "NOMASK"
-        assert win_ev.format == 32
-        assert win_ev.data == data
+        # Should have gotten message to w, not to root
+        assert len(self.evs) == 1
+        ev = self.evs[0]
+        assert ev.window is self.w
+        assert ev.message_type == "NOMASK"
+        assert ev.format == 32
+        assert ev.data == data
 
-        self.win_evs = []
-        l.sendClientMessage(root, False, l.const["Button1MotionMask"],
+        self.evs = []
+        l.sendClientMessage(self.root(), False, l.const["Button1MotionMask"],
                             "BAD", *data)
-        l.addXSelectInput(root, l.const["Button1MotionMask"])
-        l.sendClientMessage(root, False, l.const["Button1MotionMask"],
+        l.addXSelectInput(self.root(), l.const["Button1MotionMask"])
+        l.sendClientMessage(self.root(), False, l.const["Button1MotionMask"],
                             "GOOD", *data)
         gtk.main()
-        assert len(self.root_evs) == 1
-        root_ev = self.root_evs[0]
-        assert root_ev.window is root
-        assert root_ev.message_type == "GOOD"
-        assert root_ev.format == 32
-        assert root_ev.data == data
-        assert not self.win_evs
+        assert len(self.evs) == 1
+        ev = self.evs[0]
+        assert ev.window is self.root()
+        assert ev.message_type == "GOOD"
+        assert ev.format == 32
+        assert ev.data == data
 
+class TestEventStuff(TestWithSession):
     def test_send_wm_take_focus(self):
         win = self.window()
         gtk.gdk.flush()
