@@ -261,7 +261,7 @@ class TestFocusStuff(TestLowlevel, MockEventReceiver):
         assert self.w2_lost.detail == l.const["NotifyAncestor"]
         self.w2_lost = None
         
-class TestClientMessageAndXSelectInput(TestLowlevel, MockEventReceiver):
+class TestClientMessageAndXSelectInputStuff(TestLowlevel, MockEventReceiver):
     def do_parti_client_message_event(self, event):
         print "got clientmessage"
         self.evs.append(event)
@@ -301,44 +301,55 @@ class TestClientMessageAndXSelectInput(TestLowlevel, MockEventReceiver):
         assert ev.format == 32
         assert ev.data == data
 
-class TestEventStuff(TestWithSession):
     def test_send_wm_take_focus(self):
+        self.evs = []
         win = self.window()
+        win.set_data("parti-route-events-to", self)
         gtk.gdk.flush()
-        self.event = None
-        def callback(event):
-            self.event = event
-            gtk.main_quit()
-        l.selectClientMessage(win, callback)
+
         l.send_wm_take_focus(win, 1234)
         gtk.main()
-        assert self.event is not None
-        assert self.event.window is win
-        assert self.event.message_type == "WM_PROTOCOLS"
-        assert self.event.format == 32
-        assert self.event.data == (l.get_xatom(win, "WM_TAKE_FOCUS"),
-                                   1234, 0, 0, 0)
+        assert len(self.evs) == 1
+        event = self.evs[0]
+        assert event is not None
+        assert event.window is win
+        assert event.message_type == "WM_PROTOCOLS"
+        assert event.format == 32
+        assert event.data == (l.get_xatom(win, "WM_TAKE_FOCUS"),
+                              1234, 0, 0, 0)
 
-    # myGetSelectionOwner gets tested in test_selection.py
+# myGetSelectionOwner gets tested in test_selection.py
 
+class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
+    def do_map_request_event(self, event):
+        print "do_map_request_event"
+        self.map_ev = event
+        gtk.main_quit()
+    def do_child_map_request_event(self, event):
+        print "do_child_map_request_event"
+        self.child_map_ev = event
+        gtk.main_quit()
+    def do_configure_request_event(self, event):
+        print "do_configure_request_event"
+        self.conf_ev = event
+        gtk.main_quit()
+    def do_child_configure_request_event(self, event):
+        print "do_child_configure_request_event"
+        self.child_conf_ev = event
+        gtk.main_quit()
     def test_substructure_redirect(self):
+        self.map_ev = None
+        self.child_map_ev = None
+        self.conf_ev = None
+        self.child_conf_ev = None
         root = self.root()
         d2 = self.clone_display()
         w2 = self.window(d2)
         gtk.gdk.flush()
         w1 = l.get_pywindow(self.display, l.get_xwindow(w2))
 
-        self.map_ev = None
-        def map_cb(ev):
-            print "got map"
-            self.map_ev = ev
-            gtk.main_quit()
-        self.conf_ev = None
-        def conf_cb(ev):
-            print "got conf"
-            self.conf_ev = ev
-            gtk.main_quit()
-        l.substructureRedirect(root, map_cb, conf_cb)
+        root.set_data("parti-route-events-to", self)
+        l.substructureRedirect(root)
         gtk.gdk.flush()
 
         # gdk_window_show does both a map and a configure (to raise the
@@ -347,8 +358,30 @@ class TestEventStuff(TestWithSession):
         w2.show()
         # Can't just call gtk.main() twice, the two events may be delivered
         # together and processed in a single mainloop iteration.
+        while None in (self.child_map_ev, self.child_conf_ev):
+            gtk.main()
+        assert self.map_ev is None
+        assert self.conf_ev is None
+
+        assert self.child_map_ev.parent is root
+        assert self.child_map_ev.window is w1
+
+        assert self.child_conf_ev.parent is root
+        assert self.child_conf_ev.window is w1
+        for field in ("x", "y", "width", "height",
+                      "border_width", "above", "detail", "value_mask"):
+            print field
+            assert hasattr(self.child_conf_ev, field)
+
+        # If we have a handler installed on the child, it takes precedence:
+        self.child_map_ev = None
+        self.child_conf_ev = None
+        w1.set_data("parti-route-events-to", self)
+        w2.show()
         while None in (self.map_ev, self.conf_ev):
             gtk.main()
+        assert self.child_map_ev is None
+        assert self.child_conf_ev is None
 
         assert self.map_ev.parent is root
         assert self.map_ev.window is w1
@@ -362,6 +395,8 @@ class TestEventStuff(TestWithSession):
 
         self.map_ev = None
         self.conf_ev = None
+
+        # Now we'll just use that child handler going forward (less typing):
         w2.move_resize(1, 2, 3, 4)
         gtk.main()
         assert self.map_ev is None
@@ -500,6 +535,7 @@ class TestEventStuff(TestWithSession):
                                       | l.const["CWBorderWidth"])
         
 
+class TestGeometryConstraints(object):
     # This doesn't actually need a session to play with...
     def test_calc_constrained_size(self):
         class Foo:
