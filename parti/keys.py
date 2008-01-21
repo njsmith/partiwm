@@ -38,41 +38,29 @@ class HotkeyManager(gobject.GObject):
         for i in range(256):
             if not(i & ~self.modifier_map["nuisance"]):
                 self.nuisances.add(i)
-        print "nuisances: %r" % self.nuisances
         trap.swallow(self._rebind)
 
     def _rebind(self, *args):
-        print "_rebinding!"
         try:
-            print "grab"
             gtk.gdk.x11_grab_server()
-            print "unbind"
             self._unbind_all()
-            print "bind"
             self._bind_all()
-            print "done"
         finally:
-            print "ungrab"
             gtk.gdk.x11_ungrab_server()
 
     def _unbind_all(self):
         ungrab_all_keys(self.window)
 
     def _bind_all(self):
-        print "bind_all"
         self.normalized_hotkeys = {}
         for hotkey, target in self.hotkeys.iteritems():
-            print "binding for", hotkey
             modifier_mask, keycodes = parse_key(hotkey, self.keymap,
                                                 self.modifier_map)
             for keycode in keycodes:
                 # Claim a passive grab on all the different forms of this key
                 for nuisance_mask in self.nuisances:
-                    print "nuisance mask %s" % hex(nuisance_mask)
                     grab_key(self.window, keycode,
                              modifier_mask | nuisance_mask)
-                    print "done"
-                print "normalizing"
                 # Save off the normalized form to make it easy to lookup later
                 # when we see the key appear
                 unparsed = unparse_key(modifier_mask, keycode,

@@ -1,3 +1,18 @@
+Parti 0.0.3 (2008-?????)
+========================
+
+refactoring
+hotkeys
+model/view separation for client windows
+window icon support
+better geometry constraint interpretation
+redo event plumbing to avoid cross-language reference loops (-> memory
+  leaks)
+support for STRUT hints (i.e. we can tell how panels work)
+added --replace switch
+use one X/D-Bus session for running multiple tests -- speeds up test
+suite by ~3x, though may be buggy and fragile
+
 Parti 0.0.2 (2007-10-26)
 ========================
 
