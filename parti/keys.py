@@ -1,7 +1,9 @@
 import gobject
 import gtk
 from parti.util import base, two_arg_signal
-from parti.lowlevel import get_display_for, get_modifier_map, ungrab_all_keys
+from parti.error import *
+from parti.lowlevel import (get_display_for,
+                            get_modifier_map, grab_key, ungrab_all_keys)
 
 class HotkeyWidget(gtk.Widget):
     __gsignals__ = {
@@ -37,6 +39,7 @@ class HotkeyWidget(gtk.Widget):
         assert self.flags() & gtk.REALIZED
         self._modifier_map = grok_modifier_map(self.window)
         self._nuisances = set()
+        self._nuisances.add(0)
         for i in range(256):
             if i & ~self._modifier_map["nuisance"]:
                 self._nuisances.add(i)
@@ -56,6 +59,7 @@ class HotkeyWidget(gtk.Widget):
         base(self).do_destroy(self)
 
     def _rebind(self, *args):
+        assert self.flags() & gtk.REALIZED
         try:
             gtk.gdk.x11_grab_server()
             self._unbind_all()
@@ -67,7 +71,35 @@ class HotkeyWidget(gtk.Widget):
         ungrab_all_keys(self.window)
 
     def _bind_all(self):
-        pass
+        assert self.flags() & gtk.REALIZED
+        self._normalized_hotkeys = {}
+        for hotkey, target in self.hotkeys.iteritems():
+            modifier_mask, keycodes = parse_key(hotkey, self._keymap,
+                                                self._modifier_map)
+            for keycode in keycodes:
+                # Claim a passive grab on all the different forms of this key
+                for nuisance_mask in self._nuisances:
+                    trap.swallow(grab_key,
+                                 self.window, keycode,
+                                 modifier_mask | nuisance_mask)
+                # Save off the normalized form to make it easy to lookup later
+                # when we see the key appear
+                unparsed = unparse_key(modifier_mask, keycode,
+                                       self._keymap, self._modifier_map)
+                self._normalized_hotkeys[unparsed] = target
+
+    def _key_press(self, event):
+        self._key_event(event, "key-press-event", "hotkey-press-event")
+
+    def _key_release(self, event):
+        self._key_event(event, "key-release-event", "hotkey-release-event")
+        
+    def _key_event(self, event, orig_event, forward_event):
+        unparsed = unparse_key(event.state, event.hardware_keycode,
+                               self._keymap, self._modifier_map)
+        if unparsed in self._normalized_hotkeys:
+            self.stop_emission(orig_event)
+            self.emit(forward_event, self._normalized_hotkeys[unparsed])
 
     def add_hotkeys(self, hotkeys):
         self.hotkeys.update(hotkeys)

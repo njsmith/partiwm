@@ -513,7 +513,6 @@ def get_modifier_map(display_source):
         return (xmodmap.max_keypermod, keycode_array)
     finally:
         XFreeModifiermap(xmodmap)
-                            
 
 def grab_key(pywindow, keycode, modifiers):
     XGrabKey(get_xdisplay_for(pywindow), keycode, modifiers,
@@ -525,7 +524,7 @@ def grab_key(pywindow, keycode, modifiers):
              # Don't stall the keyboard upon this key being pressed (need to
              # change this if we ever want to allow for multi-key bindings
              # a la emacs):
-             GrabModeSync)
+             GrabModeAsync)
     
 def ungrab_all_keys(pywindow):
     XUngrabKey(get_xdisplay_for(pywindow), AnyKey, AnyModifier,
