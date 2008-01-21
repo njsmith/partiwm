@@ -515,6 +515,7 @@ def get_modifier_map(display_source):
         XFreeModifiermap(xmodmap)
 
 def grab_key(pywindow, keycode, modifiers):
+    print "grabbing %s (%s) on %s" % (keycode, hex(modifiers), pywindow)
     XGrabKey(get_xdisplay_for(pywindow), keycode, modifiers,
              get_xwindow(pywindow),
              # Really, grab the key even if it's also in another window we own
@@ -525,6 +526,7 @@ def grab_key(pywindow, keycode, modifiers):
              # change this if we ever want to allow for multi-key bindings
              # a la emacs):
              GrabModeAsync)
+    print "XGrabKey finished"
     
 def ungrab_all_keys(pywindow):
     XUngrabKey(get_xdisplay_for(pywindow), AnyKey, AnyModifier,
@@ -856,6 +858,11 @@ def _dispatch_gdk_event(event):
     # in...
     if event.type in _gdk_event_signals:
         _route_event(event, _gdk_event_signals[event.type], None)
+    if (event.window is not None
+        and event.type in (gtk.gdk.KEY_PRESS, gtk.gdk.KEY_RELEASE)):
+        hotkey_manager = event.window.get_data("parti-hotkey-manager")
+        if hotkey_manager is not None:
+            hotkey_manager.emit("key-event", event)
     gtk.main_do_event(event)
 
 def _install_global_event_filters():

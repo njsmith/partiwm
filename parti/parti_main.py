@@ -15,26 +15,18 @@ from parti.addons.ipython_embed import spawn_repl_window
 
 from parti.bus import PartiDBusService
 
-from parti.keys import HotkeyWidget
+from parti.keys import HotkeyManager
 
 # FIXME: this is only here for testing, definitely not the right place for it!
-class RootKeybindings(HotkeyWidget):
+class RootKeybindings(HotkeyManager):
     def __init__(self, parti):
-        HotkeyWidget.__init__(self)
+        HotkeyManager.__init__(self, gtk.gdk.get_default_root_window())
         self.parti = parti
         self.add_hotkeys({"<shift><alt>r": "repl"})
-        self.realize()
 
-    def do_realize(self):
-        self.set_flags(gtk.REALIZED)
-        self.window = gtk.gdk.get_default_root_window()
-
-    def do_unrealize(self):
-        self.unset_flags(gtk.REALIZED)
-
-    def do_hotkey_release_event(self, target):
+    def do_hotkey_release_event(self, event, target):
         if target == "repl":
-            parti.spawn_repl_window()
+            self.parti.spawn_repl_window()
 import gobject
 gobject.type_register(RootKeybindings)
 
