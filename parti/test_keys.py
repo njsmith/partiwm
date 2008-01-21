@@ -39,7 +39,7 @@ class TestKeys(TestWithSession):
                       "mod1": 8, "mod2": 16, "mod3": 32, "mod4": 64,
                       "mod5": 128,
                       "scroll": 0, "num": 0, "meta": 0, "super": 0,
-                      "hyper": 0, "alt": 0}
+                      "hyper": 0, "alt": 0, "nuisance": 2}
         
         self.xmodmap("""add Mod1 = Num_Lock Hyper_L
                         add Mod2 = Hyper_R Meta_L Alt_L
@@ -56,3 +56,4 @@ class TestKeys(TestWithSession):
         assert mm["super"] == 32 | 64 | 128
         assert mm["hyper"] == 8 | 16
         assert mm["alt"] == 16 | 64
+        assert mm["nuisance"] == 2 | 8 | 128

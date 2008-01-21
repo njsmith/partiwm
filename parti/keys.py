@@ -34,7 +34,7 @@ class HotkeyWidget(gtk.Widget):
 
     def _keys_changed(self, *args):
         assert self.flags() & gtk.REALIZED
-        self._modifiers = get_modifiers(get_display_for(self.window))
+        self._modifiers = grok_modifier_map(self.window)
         self._rebind()
 
     def _unrealizing(self):
@@ -79,9 +79,6 @@ gobject.type_register(HotkeyWidget)
 def grok_modifier_map(display_source):
     """Return an dict mapping modifier names to corresponding X modifier
     bitmasks."""
-    disp = get_display_for(display_source)
-    (max_keypermod, keycodes) = get_modifier_map(disp)
-    assert len(keycodes) == 8 * max_keypermod
     modifiers = {
         "shift": 1 << 0,
         "lock": 1 << 1,
@@ -110,6 +107,10 @@ def grok_modifier_map(display_source):
         "Alt_L": "alt",
         "Alt_R": "alt",
         }
+
+    disp = get_display_for(display_source)
+    (max_keypermod, keycodes) = get_modifier_map(disp)
+    assert len(keycodes) == 8 * max_keypermod
     keymap = gtk.gdk.keymap_get_for_display(disp)
     for i in range(8):
         for j in range(max_keypermod):
@@ -120,5 +121,8 @@ def grok_modifier_map(display_source):
                     keyval_name = gtk.gdk.keyval_name(keyval)
                     if keyval_name in meanings:
                         modifiers[meanings[keyval_name]] |= (1 << i)
+    modifiers["nuisance"] = (modifiers["lock"]
+                             | modifiers["scroll"]
+                             | modifiers["num"])
     return modifiers
 
