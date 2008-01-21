@@ -859,10 +859,10 @@ def _dispatch_gdk_event(event):
     if event.type in _gdk_event_signals:
         _route_event(event, _gdk_event_signals[event.type], None)
     if (event.window is not None
-        and event.type in (gtk.gdk.KEY_PRESS, gtk.gdk.KEY_RELEASE)):
+        and event.type == gtk.gdk.KEY_RELEASE):
         hotkey_manager = event.window.get_data("parti-hotkey-manager")
         if hotkey_manager is not None:
-            hotkey_manager.emit("key-event", event)
+            hotkey_manager.emit("key-release-event", event)
     gtk.main_do_event(event)
 
 def _install_global_event_filters():

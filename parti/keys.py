@@ -1,15 +1,14 @@
 import gobject
 import gtk
-from parti.util import base, one_arg_signal, two_arg_signal
+from parti.util import base, one_arg_signal
 from parti.error import *
 from parti.lowlevel import (get_display_for,
                             get_modifier_map, grab_key, ungrab_all_keys)
 
 class HotkeyManager(gobject.GObject):
     __gsignals__ = {
-        "key-event": one_arg_signal,
-        "hotkey-press-event": two_arg_signal,
-        "hotkey-release-event": two_arg_signal,
+        "key-release-event": one_arg_signal,
+        "hotkey": one_arg_signal,
         }
 
     def __init__(self, window):
@@ -80,15 +79,11 @@ class HotkeyManager(gobject.GObject):
                                        self.keymap, self.modifier_map)
                 self.normalized_hotkeys[unparsed] = target
 
-    def do_key_event(self, event):
+    def do_key_release_event(self, event):
         unparsed = unparse_key(event.state, event.hardware_keycode,
                                self.keymap, self.modifier_map)
         if unparsed in self.normalized_hotkeys:
-            if event.type == gtk.gdk.KEY_PRESS:
-                signal = "hotkey-press-event"
-            else:
-                signal = "hotkey-release-event"
-            self.emit(signal, event, self.normalized_hotkeys[unparsed])
+            self.emit("hotkey", self.normalized_hotkeys[unparsed])
 
     def add_hotkeys(self, hotkeys):
         self.hotkeys.update(hotkeys)

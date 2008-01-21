@@ -24,7 +24,7 @@ class RootKeybindings(HotkeyManager):
         self.parti = parti
         self.add_hotkeys({"<shift><alt>r": "repl"})
 
-    def do_hotkey_release_event(self, event, target):
+    def do_hotkey(self, target):
         if target == "repl":
             self.parti.spawn_repl_window()
 import gobject
