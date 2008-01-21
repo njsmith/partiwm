@@ -9,8 +9,9 @@ class TestKeys(TestWithSession):
                                     "-"],
                                    stdin=subprocess.PIPE)
         xmodmap.communicate(code)
+        subprocess.call(["xmodmap", "-display", self.display_name, "-pm"])
 
-    def test_grok_modifier_map(self):
+    def clear_xmodmap(self):
         # No assigned modifiers, but all modifier keys *have* keycodes for
         # later.
         self.xmodmap("""clear Lock
@@ -32,7 +33,9 @@ class TestKeys(TestWithSession):
                         keycode any = Meta_L
                         keycode any = Meta_R
                         """)
-        subprocess.call(["xmodmap", "-display", self.display_name, "-pm"])
+
+    def test_grok_modifier_map(self):
+        self.clear_xmodmap()
         mm = parti.keys.grok_modifier_map(self.display)
         print mm
         assert mm == {"shift": 1, "lock": 2, "control": 4,
@@ -47,7 +50,6 @@ class TestKeys(TestWithSession):
                         add Mod4 = Alt_R Meta_R Super_L
                         add Mod5 = Scroll_Lock Super_R
                         """)
-        subprocess.call(["xmodmap", "-display", self.display_name, "-pm"])
         mm = parti.keys.grok_modifier_map(self.display)
         print mm
         assert mm["scroll"] == 128
@@ -57,3 +59,48 @@ class TestKeys(TestWithSession):
         assert mm["hyper"] == 8 | 16
         assert mm["alt"] == 16 | 64
         assert mm["nuisance"] == 2 | 8 | 128
+
+    def test_parse_unparse_keys(self):
+        self.clear_xmodmap()
+        self.xmodmap("""add Mod1 = Meta_L Meta_R Alt_L
+                        !add Mod2 = 
+                        add Mod3 = Super_L Super_R
+                        !add Mod4 = 
+                        add Mod5 = Scroll_Lock
+                        keycode 240 = p P
+                        """)
+        gtk.gdk.flush()
+        mm = parti.keys.grok_modifier_map(self.display)
+        keymap = gtk.gdk.keymap_get_for_display(self.display)
+
+        o_keyval = gtk.gdk.keyval_from_name("o")
+        o_keycode = keymap.get_entries_for_keyval(o_keyval)[0][0]
+
+        assert parti.keys.parse_key("o", keymap, mm) == (0, [o_keycode])
+        assert parti.keys.parse_key("O", keymap, mm) == (0, [o_keycode])
+        assert parti.keys.parse_key("<alt>O", keymap, mm) == (8, [o_keycode])
+        assert parti.keys.parse_key("<ALT>O", keymap, mm) == (8, [o_keycode])
+        assert parti.keys.parse_key("<meTa>O", keymap, mm) == (8, [o_keycode])
+        assert parti.keys.parse_key("<meTa><mod5>O", keymap, mm) == (8, [o_keycode])
+        assert parti.keys.parse_key("<mod2>O", keymap, mm) == (16, [o_keycode])
+        assert (parti.keys.parse_key("<mod4><mod3><MOD1><mod3>O", keymap, mm)
+                == (8 | 32 | 64, [o_keycode]))
+
+        p_keyval = gtk.gdk.keyval_from_name("p")
+        p_keycodes = [entry[0]
+                      for entry in keymap.get_entries_for_keyval(p_keyval)]
+        assert len(p_keycodes) > 1
+        assert parti.keys.parse_key("P", keymap, mm) == (0, p_keycodes)
+        assert parti.keys.parse_key("<alt>p", keymap, mm) == (8, p_keycodes)
+
+        assert parti.keys.unparse_key(0, o_keycode, keymap, mm) == "o"
+        assert parti.keys.unparse_key(8, o_keycode, keymap, mm) == "<alt>o"
+        assert parti.keys.unparse_key(16, o_keycode, keymap, mm) == "<mod2>o"
+        assert parti.keys.unparse_key(32, o_keycode, keymap, mm) == "<super>o"
+        assert (parti.keys.unparse_key(16 | 32, o_keycode, keymap, mm)
+                == "<mod2><super>o")
+        assert (parti.keys.unparse_key(8 | 32, o_keycode, keymap, mm)
+                == "<super><alt>o")
+        assert (parti.keys.unparse_key(1 | 2 | 4, o_keycode, keymap, mm)
+                == "<shift><control>o")
+        
