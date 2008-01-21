@@ -74,3 +74,6 @@ class LameStruct(object):
 no_arg_signal = (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ())
 one_arg_signal = (gobject.SIGNAL_RUN_LAST,
                   gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
+two_arg_signal = (gobject.SIGNAL_RUN_LAST,
+                  gobject.TYPE_NONE,
+                  (gobject.TYPE_PYOBJECT, gobject.TYPE_PYOBJECT))

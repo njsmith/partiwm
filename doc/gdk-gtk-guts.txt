@@ -202,3 +202,69 @@ Select for focus events on client toplevels, when one of them gets a
 focus-out, check to see if we think it should currently be focused,
 and if so, unconditionally send the focus back?  The question is, how
 race-y is this.
+
+
+-------
+Keybindings:
+
+This is another of those places where X is insane.
+
+So: we have *Keysyms* which represent what we usually think of as keys
+("space bar", "lowercase g", "num lock", etc.), and *Keycodes* which
+are just arbitrary integers in the [8, 255] range.  There are also
+what the user thinks of as modifiers -- shift, alt, super, numlock --
+let's call these *user modifiers* -- and there are *X modifiers*,
+which are a bit-mask whose bits are Shift, Lock, Control, Mod1, ...,
+Mod5.
+
+There is an arbitrary many-to-many mapping between Keysyms and
+Keycodes, and it can change at any time.  (Which causes a
+MappingNotify event to all clients.)  There is also a semi-arbitrary
+mapping between user modifiers and X modifiers (which can also change
+at any time, and causes a MappingNotify event).  Suppose, for
+instance, that we would like to grab the key combination "<meta>n".
+The proper way to do this is:
+  -- Look up the keycode corresponding to the keyval "n"
+  -- Look up the keycode corresponding to the keyvals "Meta_L" and
+     "Meta_R".
+  -- Look up the keycodes corresponding to all X modifiers.
+  -- Check to see which X modifiers are bound to keycodes that are
+     equivalent to Meta_L or Meta_R.
+  -- Now we know the X keycode and the X modifiers meant by
+     "<meta>n".
+  -- Also look up the keycodes corresponding to all nuisance modifiers
+     (like scroll lock and num lock).  Then compare them to the X
+     modifiers as well, to figure out what the X nuisance modifiers
+     are.
+  -- Now bind the X keycode and X modifiers meant by <meta>n, with and
+     without all combinations of nuisance modifiers.
+  -- Redo all of the above if the keymap changes.  (To ungrab in that
+     case, just use AnyKey/AnyModifier, to avoid the horror of trying
+     to figure out what we grabbed before in the previous universe.)
+
+Of course, life is not actually that simple -- there are also things
+like "<meta>plus", which on most keyboards is of course equivalent to
+"<meta><shift>equals".  GDK has a function that will take a keypress
+with X modifiers and tell you that it was really <meta>plus and not
+<meta><shift>equals, but it doesn't have any way in general to work
+out what keypresses will trigger such behavior and generally things
+are a mess.  For our purposes, let's assume:
+  -- WM hotkeys are used spatially, so they should not be affected by
+     caps lock or a language-switch key
+  -- People might want to use shift itself as a modifier, and it
+     probably makes more sense to treat it as a modifier than as a
+     thing-that-changes-what-other-keys-mean.
+So, let's say that when we get a key name mentioned, that just means
+"whichever key(s) have this keyval on them somewhere", i.e. it's a way
+of referring to a physical hardware object, and then people have to
+specify modifiers as well (and for those we do do the weird lookup
+stuff).
+
+Nuisance modifiers are:
+  -- lock (this means capslock or shiftlock)
+  -- whatever Mod<n> that scroll lock is attached to
+  -- whatever Mod<n> that num lock is attached to
+  -- shift, but only sort of -- we won't treat it as one, see above.
+
+The GdkKeymap::keys-changed signal is emitted for *all* MappingNotify
+events, whether they refer to keys or modifiers or mouse buttons.

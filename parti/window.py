@@ -860,7 +860,7 @@ class WindowView(gtk.Widget):
     def do_destroy(self):
         self.model._unregister_view(self)
         self.model = None
-        gtk.Widget.destroy(self)
+        base(self).do_destroy(self)
 
     def steal_control(self):
         self.model._set_controlling_view(self)

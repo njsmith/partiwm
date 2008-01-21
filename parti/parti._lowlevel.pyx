@@ -1,8 +1,7 @@
 # Monolithic file containing simple Pyrex wrappers for otherwise unexposed
 # GDK, GTK, and X11 primitives, plus utility functions for writing same.
-# (Those utility functions are why this is monolithic; there's no way to write
-# a cdef function in one pyrex file and then use it in another, except via
-# some complex thing involving an extension type.)
+# Really this should be split up, but I haven't figured out how Pyrex's
+# cimport stuff works yet.
 
 import struct
 
@@ -209,6 +208,19 @@ cdef extern from *:
     # Debugging:
     int cXGetInputFocus "XGetInputFocus" (Display * display, Window * focus,
                                           int * revert_to)
+
+    # Keyboard bindings
+    ctypedef unsigned char KeyCode
+    ctypedef struct XModifierKeymap:
+        int max_keypermod
+        KeyCode * modifiermap # an array with 8*max_keypermod elements
+    XModifierKeymap * XGetModifierMapping(Display * display)
+    int XFreeModifiermap(XModifierKeymap *)
+    int XGrabKey(Display * display, int keycode, unsigned int modifiers,
+                 Window grab_window, Bool owner_events,
+                 int pointer_mode, int keyboard_mode)
+    int XUngrabKey(Display * display, int keycode, unsigned int modifiers,
+                   Window grab_window)
 
 ######
 # GDK primitives, and wrappers for Xlib
@@ -486,6 +498,38 @@ def calc_constrained_size(width, height, hints):
 
     return (new_width, new_height, vis_width, vis_height)
         
+
+###################################
+# Keyboard binding
+###################################
+
+def get_modifier_map(display_source):
+    cdef XModifierKeymap * xmodmap
+    xmodmap = XGetModifierMapping(get_xdisplay_for(display_source))
+    try:
+        keycode_array = []
+        for i in range(8 * xmodmap.max_keypermod):
+            keycode_array.append(xmodmap.modifiermap[i])
+        return (xmodmap.max_keypermod, keycode_array)
+    finally:
+        XFreeModifiermap(xmodmap)
+                            
+
+def grab_key(pywindow, keycode, modifiers):
+    XGrabKey(get_xdisplay_for(pywindow), keycode, modifiers,
+             get_xwindow(pywindow),
+             # Really, grab the key even if it's also in another window we own
+             False,
+             # Don't stall the pointer upon this key being pressed:
+             GrabModeAsync,
+             # Don't stall the keyboard upon this key being pressed (need to
+             # change this if we ever want to allow for multi-key bindings
+             # a la emacs):
+             GrabModeSync)
+    
+def ungrab_all_keys(pywindow):
+    XUngrabKey(get_xdisplay_for(pywindow), AnyKey, AnyModifier,
+               get_xwindow(pywindow))
 
 ###################################
 # Smarter convenience wrappers

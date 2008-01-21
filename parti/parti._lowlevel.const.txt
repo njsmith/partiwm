@@ -178,3 +178,11 @@ NotifyNonlinearVirtual
 NotifyPointer
 NotifyPointerRoot
 NotifyDetailNone
+
+# Grab modes
+GrabModeSync
+GrabModeAsync
+
+# Special grab codes
+AnyKey
+AnyModifier
