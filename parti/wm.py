@@ -232,11 +232,11 @@ class Wm(gobject.GObject):
         for win in self._windows.itervalues():
             win.unmanage_window(True)
 
-    def do_map_request_event(self, event):
+    def do_child_map_request_event(self, event):
         print "Found a potential client"
         self._manage_client(event.window)
 
-    def do_configure_request_event(self, event):
+    def do_child_configure_request_event(self, event):
         # The point of this method is to handle configure requests on
         # withdrawn windows.  We simply allow them to move/resize any way they
         # want.  This is harmless because the window isn't visible anyway (and

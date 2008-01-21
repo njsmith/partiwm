@@ -733,12 +733,23 @@ def _maybe_send_event(handler, signal, event):
                % (handler, signal))
 
 def _route_event(event, signal, parent_signal):
+    # Sometimes we get GDK events with event.window == None, because they are
+    # for windows we have never created a GdkWindow object for, and GDK
+    # doesn't do so just for this event.  As far as I can tell this only
+    # matters for override redirect windows when they disappear, and we don't
+    # care about those anyway.
+    if event.window is None:
+        assert event.type in (gtk.gdk.UNMAP, gtk.gdk.DESTROY)
+        return
     handler = event.window.get_data("parti-route-events-to")
     if handler is not None:
+        print "  sending event to event.window's handler"
         _maybe_send_event(handler, signal, event)
     elif parent_signal is not None:
         handler = event.parent.get_data("parti-route-events-to")
         if handler is not None:
+            print "  sending event to event.parent's handler"
+            print handler, parent_signal, event
             _maybe_send_event(handler, parent_signal, event)
 
 _x_event_signals = {

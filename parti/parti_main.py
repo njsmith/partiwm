@@ -15,6 +15,29 @@ from parti.addons.ipython_embed import spawn_repl_window
 
 from parti.bus import PartiDBusService
 
+from parti.keys import HotkeyWidget
+
+# FIXME: this is only here for testing, definitely not the right place for it!
+class RootKeybindings(HotkeyWidget):
+    def __init__(self, parti):
+        HotkeyWidget.__init__(self)
+        self.parti = parti
+        self.add_hotkeys({"<shift><alt>r": "repl"})
+        self.realize()
+
+    def do_realize(self):
+        self.set_flags(gtk.REALIZED)
+        self.window = gtk.gdk.get_default_root_window()
+
+    def do_unrealize(self):
+        self.unset_flags(gtk.REALIZED)
+
+    def do_hotkey_release_event(self, target):
+        if target == "repl":
+            parti.spawn_repl_window()
+import gobject
+gobject.type_register(RootKeybindings)
+
 class Parti(object):
     def __init__(self, replace_other_wm):
         self._wm = Wm("Parti", replace_other_wm)
@@ -36,6 +59,8 @@ class Parti(object):
         from parti.trays.compositetest import CompositeTest
         self._trays.new(u"default", CompositeTest)
 
+        self._root_keybindings = RootKeybindings(self)
+
         for window in self._wm.get_property("windows"):
             self._add_new_window(window)
 
@@ -49,7 +74,7 @@ class Parti(object):
         gtk.main_quit()
 
     def _new_window_signaled(self, wm, window):
-        self._handle_new_window(self, window)
+        self._add_new_window(window)
 
     def _add_new_window(self, window):
         # FIXME: be less stupid

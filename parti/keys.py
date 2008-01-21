@@ -12,7 +12,7 @@ class HotkeyWidget(gtk.Widget):
         }
 
     def __init__(self):
-        base(self).__init__(self)
+        gtk.Widget.__init__(self)
         self._hotkeys = {}
         self._modifier_map = None
         self._nuisances = None
@@ -54,12 +54,13 @@ class HotkeyWidget(gtk.Widget):
         self._keymap_id = None
 
     def do_destroy(self):
-        if keymap is not None:
-            self.keymap.disconnect(self.keymap_id)
-        base(self).do_destroy(self)
+        if self._keymap is not None:
+            self._keymap.disconnect(self._keymap_id)
+        gtk.Widget.do_destroy(self)
 
     def _rebind(self, *args):
-        assert self.flags() & gtk.REALIZED
+        if not self.flags() & gtk.REALIZED:
+            return
         try:
             gtk.gdk.x11_grab_server()
             self._unbind_all()
@@ -73,7 +74,7 @@ class HotkeyWidget(gtk.Widget):
     def _bind_all(self):
         assert self.flags() & gtk.REALIZED
         self._normalized_hotkeys = {}
-        for hotkey, target in self.hotkeys.iteritems():
+        for hotkey, target in self._hotkeys.iteritems():
             modifier_mask, keycodes = parse_key(hotkey, self._keymap,
                                                 self._modifier_map)
             for keycode in keycodes:
@@ -102,13 +103,13 @@ class HotkeyWidget(gtk.Widget):
             self.emit(forward_event, self._normalized_hotkeys[unparsed])
 
     def add_hotkeys(self, hotkeys):
-        self.hotkeys.update(hotkeys)
+        self._hotkeys.update(hotkeys)
         self._rebind()
 
     def del_hotkeys(self, keys):
         for k in keys:
-            if k in self.hotkeys:
-                del self.hotkeys[k]
+            if k in self._hotkeys:
+                del self._hotkeys[k]
         self._rebind()
 
 gobject.type_register(HotkeyWidget)
