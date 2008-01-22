@@ -4,6 +4,7 @@ Parti 0.0.3 (2008-?????)
 refactoring
 hotkeys
 model/view separation for client windows
+  compositing
 window icon support
 better geometry constraint interpretation
 redo event plumbing to avoid cross-language reference loops (-> memory
