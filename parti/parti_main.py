@@ -51,7 +51,8 @@ class Parti(object):
         from parti.trays.compositetest import CompositeTest
         self._trays.new(u"default", CompositeTest)
 
-        self._root_keybindings = RootKeybindings(self)
+        self._root_hotkeys = HotkeyManager(gtk.gdk.get_default_root_window())
+        self._root_hotkeys.connect("hotkey", 
 
         for window in self._wm.get_property("windows"):
             self._add_new_window(window)

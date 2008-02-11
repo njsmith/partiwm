@@ -9,6 +9,8 @@ import gtk
 import gtk.gdk
 import cairo
 import math
+import os
+from socket import gethostname
 import parti.lowlevel
 from parti.util import AutoPropGObjectMixin, base, one_arg_signal
 from parti.error import *
@@ -17,8 +19,8 @@ from parti.prop import prop_get, prop_set
 # Todo:
 #   client focus hints
 #   _NET_WM_SYNC_REQUEST
-#   WM_DELETE_WINDOW
 #   root window requests (pagers, etc. requesting to change client states)
+#   _NET_WM_PING/detect window not responding (also a root window message)
 
 # Okay, we need a block comment to explain the window arrangement that this
 # file is working with.
@@ -53,7 +55,7 @@ from parti.prop import prop_get, prop_set
 # which they created and which we have various ICCCM/EWMH-mandated
 # responsibilities towards.
 #
-# The purpose of the 'corral' is to keep the client window maintained -- we
+# The purpose of the 'corral' is to keep the client window managed -- we
 # select for SubstructureRedirect on it, so that the client cannot resize
 # etc. without going through the WM.  The corral is also the window that is
 # composited (i.e., gdk_window_set_composited is called on it).  One might
@@ -62,9 +64,9 @@ from parti.prop import prop_get, prop_set
 # properly on GDK windows of type GDK_WINDOW_CHILD, and the client window is a
 # GDK_WINDOW_FOREIGN.  (This also has the advantage that we can access the
 # composited contents of the client window without worrying about it
-# disappearing unexpectedly and causing an X error -- one could also use
-# the NameWindowPixmap operation in the Composite extension for the same
-# thing, but this lets us skip that.
+# disappearing unexpectedly and causing an X error -- one could also use the
+# NameWindowPixmap operation in the Composite extension for the same thing,
+# but this lets us skip that.)
 #
 # The way GDK's compositing API works, the parent window of a composited
 # window is the one that receives information about drawing into the
@@ -482,8 +484,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
 
     def _handle_damage(self, event):
         for view in self.views:
-            if view.flags() & gtk.MAPPED:
-                view._handle_damage(event)
+            view._handle_damage(event)
 
     ################################
     # Property reading
@@ -782,6 +783,29 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             trap.swallow(parti.lowlevel.XSetInputFocus,
                          self.client_window, now)
 
+    ################################
+    # Killing clients:
+    ################################
+    
+    def request_quit(self):
+        if "WM_DELETE_WINDOW" in self.get_property("protocols"):
+            trap.swallow(parti.lowlevel.send_wm_delete_window,
+                         self.client_window)
+        else:
+            # You don't wanna play ball?  Then no more Mr. Nice Guy!
+            self.force_quit()
+
+    def force_quit(self):
+        pid = self.get_property("pid")
+        machine = self.get_property("client-machine")
+        localhost = gethostname()
+        if pid > 0 and machine is not None and machine == localhost:
+            try:
+                os.kill(pid, 9)
+            except OSError:
+                print "failed to kill() client with pid %s" % (pid,)
+        trap.swallow(parti.lowlevel.XKillClient, self.client_window)
+
 gobject.type_register(WindowModel)
 
 # There may be many views for the same window.  Only one can actually work
@@ -871,6 +895,8 @@ class WindowView(gtk.Widget):
         return m
 
     def _handle_damage(self, event):
+        if not self.flags() & gtk.MAPPED:
+            return
         m = self._get_transform_matrix()
         # This is the right way to convert an integer-space bounding box into
         # another integer-space bounding box:
