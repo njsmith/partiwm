@@ -20,7 +20,9 @@ have to read:
      programming manual at:
        http://www.sbin.org/doc/Xlib/
      This book does not seem to be available through O'Reilly Safari.
-     It has more detailed explanations of various concepts.
+     It has more detailed explanations of some concepts -- useful when
+     you are going "so I read the spec and I know what all the words
+     mean but still have no idea what they were trying to do".
 
      You should understand the basic ideas of events, requests,
      errors, windows, event masks, atoms, properties, and
@@ -28,7 +30,13 @@ have to read:
      concept of "window manager" revolves).
 
   There also exist MWM hints, de facto standard hints introduced by
-  Motif, but I don't know anything about them yet.
+  Motif.  These are poorly documented, but it looks like basically,
+  they let a window say whether or not certain operations should be
+  allowed on it -- similar to _NET_WM_ALLOWED_ACTIONS, except a
+  request from a client rather than information from the WM -- and
+  some hints about decoration -- should it have a border, what sort of
+  buttons should it have, etc.  AFAICT these are all totally
+  uninteresting to us.
 
   Then there's the oral tradition, including things like
   _NET_WM_WINDOW_OPACITY...
