@@ -2,6 +2,8 @@ from parti.test import *
 import subprocess
 import parti.keys
 
+# FIXME: test the actual keybinding stuff!  But this require XTest support.
+
 class TestKeys(TestWithSession):
     def xmodmap(self, code):
         xmodmap = subprocess.Popen(["xmodmap",

@@ -17,19 +17,6 @@ from parti.bus import PartiDBusService
 
 from parti.keys import HotkeyManager
 
-# FIXME: this is only here for testing, definitely not the right place for it!
-class RootKeybindings(HotkeyManager):
-    def __init__(self, parti):
-        HotkeyManager.__init__(self, gtk.gdk.get_default_root_window())
-        self.parti = parti
-        self.add_hotkeys({"<shift><alt>r": "repl"})
-
-    def do_hotkey(self, target):
-        if target == "repl":
-            self.parti.spawn_repl_window()
-import gobject
-gobject.type_register(RootKeybindings)
-
 class Parti(object):
     def __init__(self, replace_other_wm):
         self._wm = Wm("Parti", replace_other_wm)
@@ -52,7 +39,9 @@ class Parti(object):
         self._trays.new(u"default", CompositeTest)
 
         self._root_hotkeys = HotkeyManager(gtk.gdk.get_default_root_window())
-        self._root_hotkeys.connect("hotkey", 
+        self._root_hotkeys.add_hotkeys({"<shift><alt>r": "repl"})
+        self._root_hotkeys.connect("hotkey::repl",
+                                   lambda *args: self.spawn_repl_window())
 
         for window in self._wm.get_property("windows"):
             self._add_new_window(window)

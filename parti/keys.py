@@ -8,7 +8,8 @@ from parti.lowlevel import (get_display_for,
 class HotkeyManager(gobject.GObject):
     __gsignals__ = {
         "key-press-event": one_arg_signal,
-        "hotkey": one_arg_signal,
+        "hotkey": (gobject.SIGNAL_RUN_LAST | gobject.SIGNAL_DETAILED,
+                   gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
         }
 
     def __init__(self, window):
@@ -71,7 +72,8 @@ class HotkeyManager(gobject.GObject):
         unparsed = unparse_key(event.state, event.hardware_keycode,
                                self.keymap, self.modifier_map)
         if unparsed in self.normalized_hotkeys:
-            self.emit("hotkey", self.normalized_hotkeys[unparsed])
+            target = self.normalized_hotkeys[unparsed]
+            self.emit("hotkey::%s" % (target,), target)
 
     def add_hotkeys(self, hotkeys):
         self.hotkeys.update(hotkeys)
