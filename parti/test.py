@@ -55,6 +55,14 @@ def assert_emits(f, obj, signal, slot=None):
         exc = backchannel["slot_exc"]
         raise exc[0], exc[1], exc[2]
 
+def assert_mainloop_emits(obj, signal, slot=None):
+    """Runs the mainloop and asserts that 'signal' is emitted.  Optionally,
+    also passes signaled data to 'slot', which may make its own assertions."""
+    def real_slot(*args, **kwargs):
+        gtk.main_quit()
+        if slot is not None:
+            slot(*args, **kwargs)
+    assert_emits(lambda x: gtk.main(), obj, signal, real_slot)
 
 class Session(object):
     def __init__(self, display_name):

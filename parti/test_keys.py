@@ -1,6 +1,7 @@
 from parti.test import *
 import subprocess
 import parti.keys
+from parti.lowlevel import xtest_fake_key
 
 # FIXME: test the actual keybinding stuff!  But this require XTest support.
 
@@ -12,6 +13,7 @@ class TestKeys(TestWithSession):
                                    stdin=subprocess.PIPE)
         xmodmap.communicate(code)
         subprocess.call(["xmodmap", "-display", self.display_name, "-pm"])
+        self.display.flush()
 
     def clear_xmodmap(self):
         # No assigned modifiers, but all modifier keys *have* keycodes for
@@ -106,3 +108,74 @@ class TestKeys(TestWithSession):
         assert (parti.keys.unparse_key(1 | 2 | 4, o_keycode, keymap, mm)
                 == "<shift><control>o")
         
+    def test_HotkeyManager_end_to_end(self):
+        self.clear_xmodmap()
+        self.xmodmap("""add shift = Shift_L Shift_R
+                        add lock = Caps_Lock
+                        add control = Control_L Control_R
+                        add Mod1 = Alt_L
+                        add Mod2 = Num_Lock
+                        add Mod4 = Super_L
+                        """)
+        
+        root = self.display.get_default_screen().get_root_window()
+        keymap = gtk.gdk.keymap_get_for_display(self.display)
+        def keycode(name):
+            keyval = gtk.gdk.keyval_from_name(name)
+            return keymap.get_entries_for_keyval(keyval)[0][0]
+
+        m = parti.keys.HotkeyManager(root)
+        m.add_hotkeys({"<shift><alt>r": "shift-alt-r",
+                       "<mod4>r": "mod4-r"})
+
+        def press_unpress(keys):
+            for k in keys:
+                xtest_fake_key(self.display, keycode(k), True)
+            for k in reversed(keys):
+                xtest_fake_key(self.display, keycode(k), False)
+
+        press_unpress(["Shift_L", "Alt_L", "r"])
+        def shift_alt_r(obj, ev):
+            assert ev == "shift-alt-r"
+        assert_mainloop_emits(m, "hotkey::shift-alt-r", shift_alt_r)
+        press_unpress(["Alt_L", "Shift_L", "r"])
+        assert_mainloop_emits(m, "hotkey::shift-alt-r", shift_alt_r)
+
+        press_unpress(["Super_L", "r"])
+        def mod4_r(obj, ev):
+            assert ev == "mod4-r"
+        assert_mainloop_emits(m, "hotkey::mod4-r", mod4_r)
+        
+        # Now ones with nuisances in
+        press_unpress(["Shift_L", "Caps_Lock", "Alt_L", "r"])
+        assert_mainloop_emits(m, "hotkey::shift-alt-r", shift_alt_r)
+
+        press_unpress(["Super_L", "Num_Lock", "r"])
+        assert_mainloop_emits(m, "hotkey::mod4-r", mod4_r)
+        
+        # And make sure we handle changing modifier maps correctly
+        print "Redoing modmap"
+        self.clear_xmodmap()
+        # We assert the keymap change is noticed mostly because it delays
+        # further execution until the key change has a chance to propagate
+        # from xmodmap, through the server, and back to us.
+        assert_mainloop_emits(keymap, "keys-changed")
+        self.xmodmap("""add shift = Shift_L Shift_R
+                        add lock = Caps_Lock
+                        add control = Control_L Control_R
+                        add Mod1 = Super_L
+                        add Mod2 = Num_Lock
+                        add Mod4 = Alt_L
+                        """)
+        assert_mainloop_emits(keymap, "keys-changed")
+
+        # Alt_L is now mod4, but this should still work:
+        print "shift/alt/r?"
+        press_unpress(["Shift_L", "Alt_L", "r"])
+        assert_mainloop_emits(m, "hotkey::shift-alt-r", shift_alt_r)
+        # And it should trigger the explicit mod4-version too
+        print "mod4/r?"
+        press_unpress(["Alt_L", "r"])
+        assert_mainloop_emits(m, "hotkey::mod4-r", mod4_r)
+
+        # FIXME: test del_hotkeys

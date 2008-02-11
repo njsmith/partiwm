@@ -20,6 +20,8 @@ cdef extern from "X11/Xlib.h":
     pass
 cdef extern from "X11/Xutil.h":
     pass
+cdef extern from "X11/extensions/XTest.h":
+    pass
 
 cdef extern from "gdk/gdk.h":
     pass
@@ -224,6 +226,16 @@ cdef extern from *:
 
     # XKillClient
     int cXKillClient "XKillClient" (Display *, XID)
+
+    # XTest
+    Bool XTestQueryExtension(Display *, int *, int *,
+                             int * major, int * minor)
+    int XTestFakeKeyEvent(Display *, unsigned int keycode,
+                          Bool is_press, unsigned long delay)
+    int XTestFakeButtonEvent(Display *, unsigned int button,
+                             Bool is_press, unsigned long delay)
+    
+    
 
 ######
 # GDK primitives, and wrappers for Xlib
@@ -541,6 +553,29 @@ def ungrab_all_keys(pywindow):
 
 def XKillClient(pywindow):
     cXKillClient(get_xdisplay_for(pywindow), get_xwindow(pywindow))
+
+###################################
+# XTest
+###################################
+
+def _ensure_XTest_support(display_source):
+    display = get_display_for(display_source)
+    cdef int ignored
+    if display.get_data("XTest-support") is None:
+        display.set_data("XTest-support",
+                         XTestQueryExtension(get_xdisplay_for(display),
+                                             &ignored, &ignored,
+                                             &ignored, &ignored))
+    if not display.get_data("XTest-support"):
+        raise ValueError, "XTest not supported"
+
+def xtest_fake_key(display_source, keycode, is_press):
+    _ensure_XTest_support(display_source)
+    XTestFakeKeyEvent(get_xdisplay_for(display_source), keycode, is_press, 0)
+
+def xtest_fake_button(display_source, button, is_press):
+    _ensure_XTest_support(display_source)
+    XTestFakeButtonEvent(get_xdisplay_for(display_source), button, is_press, 0)
 
 ###################################
 # Smarter convenience wrappers

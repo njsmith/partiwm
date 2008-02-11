@@ -43,7 +43,8 @@ setup(
   ext_modules=[ 
     Extension("parti._lowlevel",
               ["parti/parti._lowlevel.pyx"],
-              **pkgconfig("pygobject-2.0", "gdk-x11-2.0", "gtk+-x11-2.0")
+              **pkgconfig("pygobject-2.0", "gdk-x11-2.0", "gtk+-x11-2.0",
+                          "xtst")
               ),
     ],
   # Turn on Pyrex-sensitivity:
