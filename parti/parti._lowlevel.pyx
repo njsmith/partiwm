@@ -222,6 +222,9 @@ cdef extern from *:
     int XUngrabKey(Display * display, int keycode, unsigned int modifiers,
                    Window grab_window)
 
+    # XKillClient
+    int cXKillClient "XKillClient" (Display *, XID)
+
 ######
 # GDK primitives, and wrappers for Xlib
 ######
@@ -531,6 +534,13 @@ def grab_key(pywindow, keycode, modifiers):
 def ungrab_all_keys(pywindow):
     XUngrabKey(get_xdisplay_for(pywindow), AnyKey, AnyModifier,
                get_xwindow(pywindow))
+
+###################################
+# XKillClient
+###################################
+
+def XKillClient(pywindow):
+    cXKillClient(get_xdisplay_for(pywindow), get_xwindow(pywindow))
 
 ###################################
 # Smarter convenience wrappers
