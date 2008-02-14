@@ -29,8 +29,6 @@ cdef extern from "gdk/gdkx.h":
     pass
 
 cdef extern from "Python.h":
-    void Py_INCREF(object o)
-    void Py_DECREF(object o)
     object PyString_FromStringAndSize(char * s, int len)
 
 # Serious black magic happens here (I owe these guys beers):
@@ -81,7 +79,7 @@ cdef object wrap(cGObject * contents):
 # Xlib primitives and constants
 ######
 
-include "parti._lowlevel.const.pxi"
+include "constants.pxi"
 
 cdef extern from *:
     ctypedef struct Display:

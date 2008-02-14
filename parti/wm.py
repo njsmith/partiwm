@@ -218,6 +218,7 @@ class Wm(gobject.GObject):
         #   _NET_ACTIVE_WINDOW
         #   _NET_CURRENT_DESKTOP
         #   _NET_REQUEST_FRAME_EXTENTS
+        #   _NET_WM_PING responses
         # and maybe:
         #   _NET_RESTACK_WINDOW
         #   _NET_WM_DESKTOP

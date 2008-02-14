@@ -41,8 +41,8 @@ setup(
   scripts=["scripts/parti", "scripts/parti-repl"],
   packages=["parti", "parti.trays", "parti.addons", "parti.scripts"],
   ext_modules=[ 
-    Extension("parti._lowlevel",
-              ["parti/parti._lowlevel.pyx"],
+    Extension("parti.lowlevel.bindings",
+              ["parti/lowlevel/parti.lowlevel.bindings.pyx"],
               **pkgconfig("pygobject-2.0", "gdk-x11-2.0", "gtk+-x11-2.0",
                           "xtst")
               ),

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+set -e
+rm -rf build install
+python make-constants-pxi.py parti/lowlevel/constants.txt parti/lowlevel/constants.pxi
+CFLAGS=-O0 python setup.py install --home=install
