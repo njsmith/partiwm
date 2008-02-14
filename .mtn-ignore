@@ -1,6 +1,6 @@
 ^build
 ^install
-^parti/parti._lowlevel.c$
-^parti/parti._lowlevel.const.pxi$
+^parti/lowlevel/parti.lowlevel.bindings.c$
+^parti/lowlevel/constants.pxi$
 ^MANIFEST$
 ^dist
