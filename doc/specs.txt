@@ -29,6 +29,17 @@ have to read:
      SubstructureRedirect (the one key piece of magic around which the
      concept of "window manager" revolves).
 
+  X extension specs:
+     Xdamage:
+       http://gitweb.freedesktop.org/?p=xorg/proto/damageproto.git;a=tree
+     Composite: 
+       http://gitweb.freedesktop.org/?p=xorg/proto/compositeproto.git;a=tree
+     XFixes:
+       http://gitweb.freedesktop.org/?p=xorg/proto/fixesproto.git;a=tree
+
+     These are only necessary if dealing with compositing code
+     directly, really.
+
   There also exist MWM hints, de facto standard hints introduced by
   Motif.  These are poorly documented, but it looks like basically,
   they let a window say whether or not certain operations should be
