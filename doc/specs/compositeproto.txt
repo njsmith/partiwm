@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-US" lang="en-US">
+<!-- git web interface v267, (C) 2005-2006, Kay Sievers <kay.sievers@vrfy.org>, Christian Gierke -->
+<!-- git core binaries version 1.5.3.6 -->
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+<meta name="robots" content="index, nofollow"/>
+<title>freedesktop.org git - xorg/proto/compositeproto</title>
+<link rel="stylesheet" type="text/css" href="gitweb.css"/>
+<link rel="shortcut icon" href="http://www.freedesktop.org/favicon.ico" type="image/vnd.microsoft.icon"/>
+<link rel="alternate" title="xorg/proto/compositeproto.git log" href="/?p=xorg/proto/compositeproto.git;a=rss" type="application/rss+xml"/>
+</head>
+<body>
+<div class="page_header">
+<a href="http://www.kernel.org/pub/software/scm/git/docs/" title="git documentation"><img src="/?a=git-logo.png" width="72" height="27" alt="git" style="float:right; border-width:0px;"/></a>
+<a href="/">projects</a> / <a href="/?p=xorg/proto/compositeproto.git;a=summary">xorg/proto/compositeproto</a>
+<form method="get" action="/" enctype="application/x-www-form-urlencoded">
+<div class="search">
+<input type="hidden" name="p" value="xorg/proto/compositeproto.git"  />
+<input type="hidden" name="a" value="search"  />
+<input type="hidden" name="h" value="HEAD"  />
+<input type="text" name="s"  />
+</div>
+</form>
+</div>
+<div class="page_nav">
+summary | <a href="/?p=xorg/proto/compositeproto.git;a=shortlog">shortlog</a> | <a href="/?p=xorg/proto/compositeproto.git;a=log">log</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commit;h=2ffb32d61cbed1452d67abb2028ac13910550392">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=2ffb32d61cbed1452d67abb2028ac13910550392">commitdiff</a> | <a href="/?p=xorg/proto/compositeproto.git;a=tree">tree</a><br/><br/>
+</div>
+<div class="title">&nbsp;</div>
+<table cellspacing="0">
+<tr><td>description</td><td>Composite extension protocol specification and header files</td></tr>
+<tr><td>owner</td><td>Keith Packard</td></tr>
+<tr><td>last change</td><td>Thu, 6 Dec 2007 21:38:57 +0000</td></tr>
+<tr><td>URL:</td><td>git://anongit.freedesktop.org/git/xorg/proto/compositeproto</td></tr><tr><td>URL:</td><td>ssh://git.freedesktop.org/git/xorg/proto/compositeproto</td></tr></table>
+<div>
+<a class="title" href="/?p=xorg/proto/compositeproto.git;a=shortlog">shortlog</a></div>
+<table cellspacing="0">
+<tr class="light">
+<td><i>2 months ago</i></td>
+<td><i>James Cloos</i></td>
+<td><a class="list" title="Replace static ChangeLog with dist-hook to generate from git log" href="/?p=xorg/proto/compositeproto.git;a=commit;h=2ffb32d61cbed1452d67abb2028ac13910550392"><b>Replace static ChangeLog with dist-hook to generate ... <span class="tag">master</span></b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=2ffb32d61cbed1452d67abb2028ac13910550392">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=2ffb32d61cbed1452d67abb2028ac13910550392">commitdiff</a></td>
+</tr><tr class="dark">
+<td><i>5 months ago</i></td>
+<td><i>Jeremy C. Reed</i></td>
+<td><a class="list" title="Temporarily define Pixmap (just like Window and Region). (From pkgsrc.)" href="/?p=xorg/proto/compositeproto.git;a=commit;h=5ac473a9375fa43896e379da96d1955653960350"><b>Temporarily define Pixmap (just like Window and Region) ...</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=5ac473a9375fa43896e379da96d1955653960350">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=5ac473a9375fa43896e379da96d1955653960350">commitdiff</a></td>
+</tr><tr class="light">
+<td><i>7 months ago</i></td>
+<td><i>Keith Packard</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=commit;h=25e8047e25652be388dc66d85c180dcc4ccea4f6"><b>Bump version in configure.ac to 0.4 <span class="tag">compositeproto-0.4</span></b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=25e8047e25652be388dc66d85c180dcc4ccea4f6">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=25e8047e25652be388dc66d85c180dcc4ccea4f6">commitdiff</a></td>
+</tr><tr class="dark">
+<td><i>7 months ago</i></td>
+<td><i>Keith Packard</i></td>
+<td><a class="list" title="Define new manual-redirect clipping semantics and bump version to 0.4." href="/?p=xorg/proto/compositeproto.git;a=commit;h=1838412121d0bac8ce443d362e75439d58a93a4d"><b>Define new manual-redirect clipping semantics and bump ...</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=1838412121d0bac8ce443d362e75439d58a93a4d">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=1838412121d0bac8ce443d362e75439d58a93a4d">commitdiff</a></td>
+</tr><tr class="light">
+<td><i>9 months ago</i></td>
+<td><i>Alan Coopersmith</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=commit;h=bca9592612d60142e3c624b90649475b561b8eda"><b>Add *~ to .gitignore to skip emacs/patch droppings</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=bca9592612d60142e3c624b90649475b561b8eda">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=bca9592612d60142e3c624b90649475b561b8eda">commitdiff</a></td>
+</tr><tr class="dark">
+<td><i>9 months ago</i></td>
+<td><i>Alan Coopersmith</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=commit;h=6acacb52efd6f0927c9b82fe864f17623e7dc8c2"><b>Protocol spec nit cleanups</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=6acacb52efd6f0927c9b82fe864f17623e7dc8c2">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=6acacb52efd6f0927c9b82fe864f17623e7dc8c2">commitdiff</a></td>
+</tr><tr class="light">
+<td><i>13 months ago</i></td>
+<td><i>Eric Anholt</i></td>
+<td><a class="list" title="Update protocol spec for 0.3 -&gt; 0.4 rename and new 0.3 request." href="/?p=xorg/proto/compositeproto.git;a=commit;h=dd2133540f8dd0f0f66ecf24e01113184045af83"><b>Update protocol spec for 0.3 -&gt; 0.4 rename and new ...</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=dd2133540f8dd0f0f66ecf24e01113184045af83">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=dd2133540f8dd0f0f66ecf24e01113184045af83">commitdiff</a></td>
+</tr><tr class="dark">
+<td><i>13 months ago</i></td>
+<td><i>Eric Anholt</i></td>
+<td><a class="list" title="Move composite protocol description to the new canonical location/name." href="/?p=xorg/proto/compositeproto.git;a=commit;h=ea2c1d120e58e3eb5f2d8eedb3c32b2cfa052366"><b>Move composite protocol description to the new canonica ...</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=ea2c1d120e58e3eb5f2d8eedb3c32b2cfa052366">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=ea2c1d120e58e3eb5f2d8eedb3c32b2cfa052366">commitdiff</a></td>
+</tr><tr class="light">
+<td><i>14 months ago</i></td>
+<td><i>Aaron Plattner</i></td>
+<td><a class="list" title="Have NameWindowPixmap return a Match error on unrealized windows." href="/?p=xorg/proto/compositeproto.git;a=commit;h=34251361a60c9e0c0f3c51416985e067c2aa255a"><b>Have NameWindowPixmap return a Match error on unrealize ...</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=34251361a60c9e0c0f3c51416985e067c2aa255a">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=34251361a60c9e0c0f3c51416985e067c2aa255a">commitdiff</a></td>
+</tr><tr class="dark">
+<td><i>17 months ago</i></td>
+<td><i>root</i></td>
+<td><a class="list" title="Correct the spelling of compositedocdir_DATA.  Otherwise automake complains." href="/?p=xorg/proto/compositeproto.git;a=commit;h=5ecbf06cb7786009e8e1547f4bc2b0640599f655"><b>Correct the spelling of compositedocdir_DATA.  Otherwis ...</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=5ecbf06cb7786009e8e1547f4bc2b0640599f655">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=5ecbf06cb7786009e8e1547f4bc2b0640599f655">commitdiff</a></td>
+</tr><tr class="light">
+<td><i>22 months ago</i></td>
+<td><i>Deron</i></td>
+<td><a class="list" title="Sync'd with modular proto/Composite (Version 0.3 definitions)." href="/?p=xorg/proto/compositeproto.git;a=commit;h=ba9ca99638fac157b126a2d9a3e57385bad32998"><b>Sync&#39;d with modular proto/Composite (Version 0.3 defini ...</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=ba9ca99638fac157b126a2d9a3e57385bad32998">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=ba9ca99638fac157b126a2d9a3e57385bad32998">commitdiff</a></td>
+</tr><tr class="dark">
+<td><i>23 months ago</i></td>
+<td><i>Keith Packard</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=commit;h=565c0bcc569f5ab9114314185316fe2129aa5a3e"><b>Add coordinate transform redirect protocol bits</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=565c0bcc569f5ab9114314185316fe2129aa5a3e">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=565c0bcc569f5ab9114314185316fe2129aa5a3e">commitdiff</a></td>
+</tr><tr class="light">
+<td><i>23 months ago</i></td>
+<td><i>Keith Packard</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=commit;h=8e0790045d33525ec182afd3997014b46ef77b66"><b>Clean up mistakes integrating xorg changes</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=8e0790045d33525ec182afd3997014b46ef77b66">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=8e0790045d33525ec182afd3997014b46ef77b66">commitdiff</a></td>
+</tr><tr class="dark">
+<td><i>23 months ago</i></td>
+<td><i>Keith Packard</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=commit;h=1d43eaf21b32fef4aba8a58dee323344b7f48d16"><b>Remove .cvsignore</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=1d43eaf21b32fef4aba8a58dee323344b7f48d16">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=1d43eaf21b32fef4aba8a58dee323344b7f48d16">commitdiff</a></td>
+</tr><tr class="light">
+<td><i>23 months ago</i></td>
+<td><i>Keith Packard</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=commit;h=694da3931be9bb03e23e4fbaf54d331c2202b2fc"><b>Add .gitignore</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=694da3931be9bb03e23e4fbaf54d331c2202b2fc">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=694da3931be9bb03e23e4fbaf54d331c2202b2fc">commitdiff</a></td>
+</tr><tr class="dark">
+<td><i>23 months ago</i></td>
+<td><i>Keith Packard</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=commit;h=369d28141b1b296abeb4365b5c57846d72faeb82"><b>Paste Xorg changes on top of historical xlibs repository</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=commit;h=369d28141b1b296abeb4365b5c57846d72faeb82">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commitdiff;h=369d28141b1b296abeb4365b5c57846d72faeb82">commitdiff</a></td>
+</tr><tr class="light">
+<td><a href="/?p=xorg/proto/compositeproto.git;a=shortlog">...</a></td>
+</tr></table
+><div>
+<a class="title" href="/?p=xorg/proto/compositeproto.git;a=tags">tags</a></div>
+<table cellspacing="0">
+<tr class="light">
+<td><i>7 months ago</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=commit;h=25e8047e25652be388dc66d85c180dcc4ccea4f6"><b>compositeproto-0.4</b></a></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=tag;h=cc49ec666e1ba8efc85f798b3390094502fcc58f">Composite proto version 0.4
+</a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=tag;h=cc49ec666e1ba8efc85f798b3390094502fcc58f">tag</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commit;h=25e8047e25652be388dc66d85c180dcc4ccea4f6">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=shortlog;h=compositeproto-0.4">shortlog</a> | <a href="/?p=xorg/proto/compositeproto.git;a=log;h=25e8047e25652be388dc66d85c180dcc4ccea4f6">log</a></td>
+</tr><tr class="dark">
+<td><i>4 years ago</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=commit;h=cad37f16480f8f3f51e5dd9d3b3314ec8f73cee9"><b>COMPOSITEEXT-2_0-RELEASE</b></a></td>
+<td></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=tag;h=587109bb838fbcef85cedb01b3c970c532b3e0ed">tag</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commit;h=cad37f16480f8f3f51e5dd9d3b3314ec8f73cee9">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=shortlog;h=COMPOSITEEXT-2_0-RELEASE">shortlog</a> | <a href="/?p=xorg/proto/compositeproto.git;a=log;h=cad37f16480f8f3f51e5dd9d3b3314ec8f73cee9">log</a></td>
+</tr><tr class="light">
+<td><i>4 years ago</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=commit;h=801cabb66a2ce5afee84a183151a394f5ae5d6b3"><b>initial_import</b></a></td>
+<td></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=tag;h=65cae46b428f3e1d85041f58f93739bc0b8ab3c8">tag</a> | <a href="/?p=xorg/proto/compositeproto.git;a=commit;h=801cabb66a2ce5afee84a183151a394f5ae5d6b3">commit</a> | <a href="/?p=xorg/proto/compositeproto.git;a=shortlog;h=initial_import">shortlog</a> | <a href="/?p=xorg/proto/compositeproto.git;a=log;h=801cabb66a2ce5afee84a183151a394f5ae5d6b3">log</a></td>
+</tr></table
+><div>
+<a class="title" href="/?p=xorg/proto/compositeproto.git;a=heads">heads</a></div>
+<table cellspacing="0">
+<tr class="light">
+<td><i>2 months ago</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=shortlog;h=master"><b>master</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=shortlog;h=master">shortlog</a> | <a href="/?p=xorg/proto/compositeproto.git;a=log;h=master">log</a></td>
+</tr><tr class="dark">
+<td><i>4 years ago</i></td>
+<td><a class="list" href="/?p=xorg/proto/compositeproto.git;a=shortlog;h=ApportionExt"><b>ApportionExt</b></a></td>
+<td class="link"><a href="/?p=xorg/proto/compositeproto.git;a=shortlog;h=ApportionExt">shortlog</a> | <a href="/?p=xorg/proto/compositeproto.git;a=log;h=ApportionExt">log</a></td>
+</tr></table
+><div class="page_footer">
+<div class="page_footer_text">Composite extension protocol specification and header files</div>
+<a class="rss_logo" href="/?p=xorg/proto/compositeproto.git;a=rss">RSS</a>
+</div>
+</body>
+</html>
