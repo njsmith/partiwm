@@ -14,7 +14,7 @@ from parti.error import trap
 # This requires a very long comment, because focus management is teh awesome.
 # The basic problems are:
 #    1) X focus management sucks
-#    2) GDK/GTK know this, and sensible avoid it
+#    2) GDK/GTK know this, and sensibly avoids it
 # (1) is a problem by itself, but (2) makes it worse, because we have to wedge
 # them together somehow anyway.
 #
