@@ -251,9 +251,9 @@ def prop_get(target, key, type):
         scalar_type = type
     (pytype, atom, format, serialize, deserialize, terminator) = _prop_types[scalar_type]
     try:
-        print atom
+        #print atom
         data = trap.call_synced(XGetWindowProperty, target, key, atom)
-        print atom, repr(data[:100])
+        #print atom, repr(data[:100])
     except (XError, PropertyError):
         print ("Missing window or missing property or wrong property type %s (%s)"
                % (key, type))

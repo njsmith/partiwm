@@ -603,10 +603,11 @@ def _ensure_XComposite_support(display_source):
             (major, minor) = required_version
             if XCompositeQueryVersion(get_xdisplay_for(display),
                                       &major, &minor):
-                if (major, minor) == required_version:
+                # See X.org bug #14511:
+                if (major, 0) <= required_version <= (major, minor):
                     display.set_data("XComposite-support", True)
     if not display.get_data("XComposite-support"):
-        raise ValueError, "Composite not supported, or insufficiently supported"
+        raise ValueError, "Composite v%s.%s not supported" % required_version
 
 def xcomposite_redirect_window(window):
     _ensure_XComposite_support(window)
@@ -638,13 +639,29 @@ class _PixmapCleanupHandler(object):
             XFreePixmap(get_xdisplay_for(self.pixmap), self.pixmap.xid)
             self.pixmap = None
 
+cdef extern from *:
+    cGObject * gdk_pixmap_foreign_new_for_display(cGdkDisplay *, Pixmap)
+    Status XGetGeometry(Display *, Drawable, Window * root,
+                        int * x, int * y, unsigned int * width,
+                        unsigned int * height,
+                        unsigned int * border, unsigned int * depth)
+
+def raw_xcnwp(window):
+    return 
+
 def xcomposite_name_window_pixmap(window):
     _ensure_XComposite_support(window)
     xpixmap = XCompositeNameWindowPixmap(get_xdisplay_for(window),
                                          get_xwindow(window))
     gpixmap = gtk.gdk.pixmap_foreign_new_for_display(get_display_for(window),
                                                      xpixmap)
-    return _PixmapCleanupHandler(gpixmap)
+    if gpixmap is None:
+        # Can't always actually get a pixmap, e.g. if window is not yet mapped
+        # or if it has disappeared.
+        return None
+    else:
+        gpixmap.set_colormap(window.get_colormap())
+        return _PixmapCleanupHandler(gpixmap)
 
 ###################################
 # Xdamage
@@ -691,10 +708,11 @@ def _ensure_XDamage_support(display_source):
             (major, minor) = required_version
             if XDamageQueryVersion(get_xdisplay_for(display),
                                    &major, &minor):
-                if (major, minor) == required_version:
+                # See X.org bug #14511:
+                if (major, 0) <= required_version <= (major, minor):
                     display.set_data("XDamage-support", True)
     if not display.get_data("XDamage-support"):
-        raise ValueError, "Xdamage not supported, or insufficiently supported"
+        raise ValueError, "Xdamage v%s.%s not supported" % required_version
 
 def xdamage_start(window):
     _ensure_XDamage_support(window)
@@ -1042,7 +1060,7 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                        + "handle the event; so I'm just ignoring it instead.")
 
             # Dispatch:
-            _route_event(pyev, *_x_event_signals[e.type])
+            _route_event(pyev, *my_events[e.type])
     except:
         print "Unhandled exception in pyrex callback:"
         dump_exc()

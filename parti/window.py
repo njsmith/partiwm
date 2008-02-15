@@ -119,7 +119,7 @@ from parti.composite import CompositeHelper
 # Obviously, only one view can be live at any given time, so we have to figure
 # out which one that is.  Supposing we have a WindowModel called "model" and
 # a view called "view", then the following pieces come into play:
-#   The "owner-election" signal on window:
+#   The "ownership-election" signal on window:
 #     If a view wants the chance to become live, it must connect to this
 #     signal.  When the signal is emitted, its handler should return a tuple
 #     of the form:
@@ -132,7 +132,7 @@ from parti.composite import CompositeHelper
 #     election.  All views MUST call this method whenever they decide their
 #     number of votes has changed.  All views MUST call this method when they
 #     are destructing themselves (ideally after disconnecting from the
-#     owner-election signal).
+#     ownership-election signal).
 #   The "owner" property on window:
 #     This records the view that currently owns the window (i.e., the winner
 #     of the last election), or None if no view is live.
@@ -365,10 +365,10 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     def _damage_forward(self, obj, event):
         self.emit("redraw-needed", event)
 
-    def do_get_property_client_contents(self):
+    def do_get_property_client_contents(self, name):
         return self.get_property("client-contents-handle").pixmap
 
-    def do_get_property_client_contents_handle(self):
+    def do_get_property_client_contents_handle(self, name):
         return self._composite.get_property("window-contents-handle")
 
     def do_map_request_event(self, event):
@@ -452,7 +452,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         trap.swallow(parti.lowlevel.sendConfigureNotify, self.client_window)
 
     def maybe_recalculate_geometry_for(self, maybe_owner):
-        if owner and self.get_property("owner") is owner:
+        if maybe_owner and self.get_property("owner") is maybe_owner:
             self._update_client_geometry()
 
     def _update_client_geometry(self):
@@ -825,10 +825,10 @@ class WindowView(gtk.Widget):
         gtk.Widget.__init__(self)
         
         self._image_window = None
-        self._model = model
-        self._redraw_handle = self._model.connect("redraw-needed",
+        self.model = model
+        self._redraw_handle = self.model.connect("redraw-needed",
                                                   self._redraw_needed)
-        self._election_handle = self._model.connect("owner-election",
+        self._election_handle = self.model.connect("ownership-election",
                                                     self._vote_for_pedro)
 
         # Standard GTK double-buffering is useless for us, because it's on our
@@ -839,9 +839,9 @@ class WindowView(gtk.Widget):
 
 
     def do_destroy(self):
-        self._model.disconnect(self._redraw_handle)
-        self._model.disconnect(self._election_handle)
-        self._model = None
+        self.model.disconnect(self._redraw_handle)
+        self.model.disconnect(self._election_handle)
+        self.model = None
         gtk.Widget.do_destroy(self)
 
     def _invalidate_all(self):
@@ -851,9 +851,9 @@ class WindowView(gtk.Widget):
 
     def _get_transform_matrix(self):
         m = cairo.Matrix()
-        size = self._model.get_property("actual-size")
-        if self._model.controlling_view is self:
-            m.translate(*self._get_offset_for(*size))
+        size = self.model.get_property("actual-size")
+        if self.model.get_property("owner") is self:
+            m.translate(*self.window_position(self.model, *size))
         else:
             scale_factor = min(self.allocation[2] * 1.0 / size[0],
                                self.allocation[3] * 1.0 / size[1])
@@ -883,13 +883,13 @@ class WindowView(gtk.Widget):
             m.scale(scale_factor, scale_factor)
         return m
 
-    def _vote_for_pedro(self):
+    def _vote_for_pedro(self, model):
         if self.flags() & gtk.MAPPED:
             return (1, self)
         else:
             return (-1, self)
 
-    def _redraw_needed(self, event):
+    def _redraw_needed(self, model, event):
         if not self.flags() & gtk.MAPPED:
             return
         m = self._get_transform_matrix()
@@ -951,7 +951,7 @@ class WindowView(gtk.Widget):
         cr.save()
         cr.set_matrix(self._get_transform_matrix())
 
-        cr.set_source_pixmap(self._model.get_property("client-contents"),
+        cr.set_source_pixmap(self.model.get_property("client-contents"),
                              0, 0)
         # Super slow (copies everything out of the server and then back
         # again), but an option for working around Cairo/X bugs:
@@ -965,7 +965,7 @@ class WindowView(gtk.Widget):
         
         cr.paint()
 
-        icon = self._model.get_property("icon")
+        icon = self.model.get_property("icon")
         if icon is not None:
             cr.set_source_pixmap(icon, 0, 0)
             cr.paint_with_alpha(0.3)
@@ -1013,7 +1013,7 @@ class WindowView(gtk.Widget):
             self._image_window.resize(allocation.width, allocation.height)
             self._image_window.input_shape_combine_region(gtk.gdk.Region(),
                                                           0, 0)
-        self._model.maybe_recalculate_geometry_for(self)
+        self.model.maybe_recalculate_geometry_for(self)
     
     def window_size(self, model):
         assert self.flags() & gtk.REALIZED
@@ -1060,7 +1060,7 @@ class WindowView(gtk.Widget):
             return
         print "Mapping"
         self.set_flags(gtk.MAPPED)
-        self._model.ownership_election()
+        self.model.ownership_election()
         self.window.show_unraised()
         print "Mapped"
 
@@ -1070,7 +1070,7 @@ class WindowView(gtk.Widget):
         print "Unmapping"
         self.unset_flags(gtk.MAPPED)
         self.window.hide()
-        self._model.ownership_election()
+        self.model.ownership_election()
         print "Unmapped"
             
     def do_unrealize(self):
@@ -1079,7 +1079,6 @@ class WindowView(gtk.Widget):
         # do_unmap, etc.
         self.unmap()
         
-        assert self._model.controlling_view is not self
         self.unset_flags(gtk.REALIZED)
         # Break circular reference
         if self.window:

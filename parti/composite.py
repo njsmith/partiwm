@@ -39,13 +39,15 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
         self._window.set_data("parti-route-damage-to", None)
 
     def refresh_pixmap(self):
-        handle = trap.swallow(xcomposite_name_window_pixmap, self._window)
-        self._internal_set_property("window-contents-handle", handle)
+        def set_pixmap():
+            handle = xcomposite_name_window_pixmap(self._window)
+            self._internal_set_property("window-contents-handle", handle)
+        trap.swallow(set_pixmap)
 
-    def do_parti_map_event(self):
+    def do_parti_map_event(self, *args):
         self.refresh_pixmap()
 
-    def do_parti_configure_event(self):
+    def do_parti_configure_event(self, *args):
         self.refresh_pixmap()
 
     def do_parti_damage_event(self, event):

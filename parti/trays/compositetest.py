@@ -1,5 +1,6 @@
 import gtk
 import parti.tray
+from parti.window import WindowView
 
 class CompositeTest(parti.tray.Tray, gtk.HPaned):
     def __init__(self, trayset, tag):
@@ -21,18 +22,17 @@ class CompositeTest(parti.tray.Tray, gtk.HPaned):
 
     def add(self, window):
         self.windows.append(window)
-        real_view = window.new_view()
+        real_view = WindowView(window)
         self.client_notebook.append_page(real_view)
         real_view.show()
 
-        ro_view = window.new_view()
+        ro_view = WindowView(window)
         self.image_notebook.append_page(ro_view)
         ro_view.show()
 
         window.connect("notify::title", self._handle_title_change)
         self._handle_title_change(window)
 
-        real_view.steal_control()
         real_view.grab_focus()
 
     def _handle_title_change(self, window, *args):

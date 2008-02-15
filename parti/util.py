@@ -1,4 +1,4 @@
-import cgitb
+import traceback
 import sys
 import types
 import gobject
@@ -38,7 +38,7 @@ class AutoPropGObjectMixin(object):
 
 def dump_exc():
     """Call this from a except: clause to print a nice traceback."""
-    print cgitb.text(sys.exc_info())
+    print "".join(traceback.format_exception(*sys.exc_info()))
 
 
 # A little utility to make it slightly terser to call base class methods
