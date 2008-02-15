@@ -518,7 +518,6 @@ def get_modifier_map(display_source):
         XFreeModifiermap(xmodmap)
 
 def grab_key(pywindow, keycode, modifiers):
-    print "grabbing %s (%s) on %s" % (keycode, hex(modifiers), pywindow)
     XGrabKey(get_xdisplay_for(pywindow), keycode, modifiers,
              get_xwindow(pywindow),
              # Really, grab the key even if it's also in another window we own
@@ -529,7 +528,6 @@ def grab_key(pywindow, keycode, modifiers):
              # change this if we ever want to allow for multi-key bindings
              # a la emacs):
              GrabModeAsync)
-    print "XGrabKey finished"
     
 def ungrab_all_keys(pywindow):
     XUngrabKey(get_xdisplay_for(pywindow), AnyKey, AnyModifier,
