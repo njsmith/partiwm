@@ -25,7 +25,15 @@ so anyway, for each window, we:
 Questions for Keith:
   -- do DAMAGE objects get automatically cleaned up when a window is
      destroyed, or do we have to do that ourselves?
+     -- yes, they get cleaned up
+  -- can I unredirect a single child window while subwindow
+     redirection is in effect?
+     -- yes
+  -- ...exact rules for NameWindowPixmap?
+     -- see #xorg-devel log
   -- does reparenting affect composite status?
+     -- unmapping does not.  reparenting, keith isn't sure what
+        happens.
   -- what's up with the coordinate transformation stuff?  (which is
      currently still all over the protocol spec?)
 
