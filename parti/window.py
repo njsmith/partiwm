@@ -15,6 +15,7 @@ import parti.lowlevel
 from parti.util import AutoPropGObjectMixin, base, one_arg_signal
 from parti.error import *
 from parti.prop import prop_get, prop_set
+from parti.composite import CompositeHelper
 
 # Todo:
 #   client focus hints
@@ -31,55 +32,37 @@ from parti.prop import prop_get, prop_set
 #                  /    \
 #  <- top         /     -\-        bottom ->
 #                /        \
-#          +-------+   +---------+
-#          | image |   | expose  |
-#          +-------+   | catcher |
-#                      +---------+
-#                           |
-#                      +---------+
-#                      | corral  |
-#                      +---------+
-#                           |
-#                      +---------+
-#                      | client  |
-#                      +---------+
+#          +-------+       |     
+#          | image |  +---------+
+#          +-------+  | corral  |
+#                     +---------+
+#                          |     
+#                     +---------+
+#                     | client  |
+#                     +---------+
 #
 # Each box in this diagram represents one X/GDK window.  In the common case,
 # every window here takes up exactly the same space on the screen (!).  In
-# fact, the three windows on the right *always* have exactly the same size and
+# fact, the two windows on the right *always* have exactly the same size and
 # location, and the window on the left and the top window also always have
 # exactly the same size and position.  However, each window in the diagram
 # plays a subtly different role.
 #
 # The client window is obvious -- this is the window owned by the client,
 # which they created and which we have various ICCCM/EWMH-mandated
-# responsibilities towards.
+# responsibilities towards.  It is also composited.
 #
 # The purpose of the 'corral' is to keep the client window managed -- we
 # select for SubstructureRedirect on it, so that the client cannot resize
-# etc. without going through the WM.  The corral is also the window that is
-# composited (i.e., gdk_window_set_composited is called on it).  One might
-# think that one could just make the client composited, and indeed, this would
-# work fine in theory, but gtk bug #491309 means that compositing only works
-# properly on GDK windows of type GDK_WINDOW_CHILD, and the client window is a
-# GDK_WINDOW_FOREIGN.  (This also has the advantage that we can access the
-# composited contents of the client window without worrying about it
-# disappearing unexpectedly and causing an X error -- one could also use the
-# NameWindowPixmap operation in the Composite extension for the same thing,
-# but this lets us skip that.)
+# etc. without going through the WM.
 #
-# The way GDK's compositing API works, the parent window of a composited
-# window is the one that receives information about drawing into the
-# composited window.  Since the corral is composited, it needs a parent to
-# recieve these events; this is the purpose of the 'expose catcher'.
-#
-# These first three windows are always managed together, as a unit; an
-# invariant of the code is that they always take up exactly the same space on
-# the screen.  They get reparented back and forth between widgets, and when
-# there are no widgets, they get reparented to a "parking area".  For now,
-# we're just using the root window as a parking area, so we also map/unmap the
-# expose window depending on whether we are parked or not; the corral and
-# client windows are left mapped at all times.
+# These two windows are always managed together, as a unit; an invariant of
+# the code is that they always take up exactly the same space on the screen.
+# They get reparented back and forth between widgets, and when there are no
+# widgets, they get reparented to a "parking area".  For now, we're just using
+# the root window as a parking area, so we also map/unmap the expose window
+# depending on whether we are parked or not; the corral and client windows are
+# left mapped at all times.
 #
 # When a particular WindowView controls the underlying client window, then two
 # things happen:
@@ -87,12 +70,12 @@ from parti.prop import prop_get, prop_set
 #      the same size -- but this is not always the case, because the client
 #      may have specified sizing constraints, in which case the client window
 #      is the "best fit" to the controlling widget window.
-#   -- The stack of client windows is reparented under the widget window, as
-#      in the diagram above.  This is necessary to allow mouse events to work
-#      -- a WindowView widget can always *look* like the client window is
-#      there, through the magic of Composite, but in order for it to *act*
-#      like the client window is there in terms of receiving mouse events, it
-#      has to actually be there.
+#   -- The client window and its corral are reparented under the widget
+#      window, as in the diagram above.  This is necessary to allow mouse
+#      events to work -- a WindowView widget can always *look* like the client
+#      window is there, through the magic of Composite, but in order for it to
+#      *act* like the client window is there in terms of receiving mouse
+#      events, it has to actually be there.
 #
 # Finally, there is the 'image' window.  This is a window that always remains
 # in the widget window, and is used to draw what the client currently looks
@@ -113,32 +96,6 @@ from parti.prop import prop_get, prop_set
 
 class Unmanageable(Exception):
     pass
-
-class _ExposeListenerWidget(gtk.Widget):
-    # GTK wants to route events from GdkWindows to GtkWidgets.  We need to
-    # receive events (esp. synthetic GDK expose events) on the "corral" window
-    # that our client has been reparented into.  Therefore we need to attach a
-    # widget to that window, even though that widget will not really go
-    # anywhere in the widget hierarchy; it is just a placeholder to receive
-    # events.
-
-    def __init__(self, window, recipient):
-        base(self).__init__(self)
-        self.set_flags(gtk.REALIZED)
-        self.recipient = recipient
-        self.window = window
-        self.window.set_user_data(self)
-
-    def do_expose_event(self, event):
-        self.recipient._handle_damage(event)
-
-    def do_destroy(self):
-        self.window.set_user_data(None)
-        self.window = None
-        self.recipient = None
-        gtk.Widget.do_destroy(self)
-
-gobject.type_register(_ExposeListenerWidget)
 
 class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     """This represents a managed client window.  It allows one to produce
@@ -227,12 +184,14 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                  gobject.PARAM_READABLE),
         }
     __gsignals__ = {
+        "redraw-needed": one_arg_signal,
+        "unmanaged": (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
+
         "map-request-event": one_arg_signal,
         "configure-request-event": one_arg_signal,
         "parti-property-notify-event": one_arg_signal,
         "parti-unmap-event": one_arg_signal,
         "parti-destroy-event": one_arg_signal,
-        "unmanaged": (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
         }
         
     def __init__(self, parking_window, client_window):
@@ -271,25 +230,13 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
 
         # We enable PROPERTY_CHANGE_MASK so that we can call
         # x11_get_server_time on this window.
-        self.expose_window = gtk.gdk.Window(self.parking_window,
-                                            width=100,
-                                            height=100,
-                                            window_type=gtk.gdk.WINDOW_CHILD,
-                                            wclass=gtk.gdk.INPUT_OUTPUT,
-                                            event_mask=gtk.gdk.PROPERTY_CHANGE_MASK
-                                                     | gtk.gdk.EXPOSURE_MASK)
-        self.expose_listener = _ExposeListenerWidget(self.expose_window,
-                                                     self)
-
         self.corral_window = gtk.gdk.Window(self.expose_window,
                                             width=100,
                                             height=100,
                                             window_type=gtk.gdk.WINDOW_CHILD,
                                             wclass=gtk.gdk.INPUT_OUTPUT,
-                                            event_mask=0)
+                                            event_mask=gtk.gdk.PROPERTY_CHANGE_MASK
         parti.lowlevel.substructureRedirect(self.corral_window)
-        self.corral_window.set_composited(True)
-        self.corral_window.show_unraised()
 
         def setup_client():
             # Start listening for important events
@@ -316,12 +263,21 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             self.client_window.reparent(self.corral_window, 0, 0)
             client_size = self.client_window.get_geometry()[2:4]
             self.corral_window.resize(*client_size)
-            self.expose_window.resize(*client_size)
             self.client_window.show_unraised()
+
+            # Keith Packard says that composite state is undefined following a
+            # reparent, so let's be cautious and wait to turn on compositing
+            # until here:
+            self._composite = CompositeHelper(self.client_window, False)
+            h = self._composite.connect("redraw-needed", self._damage_forward)
+            self._damage_forward_handle = h
         try:
             trap.call(setup_client)
         except XError, e:
             raise Unmanageable, e
+
+    def _damage_forward(self, obj, event):
+        self.emit("redraw-needed", event)
 
     def do_map_request_event(self, event):
         # If we get a MapRequest then it might mean that someone tried to map
@@ -375,25 +331,31 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         trap.swallow(unmanageit)
         self.emit("unmanaged")
         print "destroying self"
-        self.destroy()
+        self.client_window.set_data("parti-route-events-to", None)
+        self._composite.disconnect(self._damage_forward_handle)
+        self._composite.destroy()
+        for view in list(self.views):
+            view.destroy()
+        assert not self.views
+        assert self.controlling_view is None
 
     def _set_controlling_view(self, view):
         assert view is None or view in self.views
         if self.controlling_view is view:
             return
         if self.controlling_view is not None:
-            self.expose_window.hide()
-            self.expose_window.reparent(self.parking_window, 0, 0)
+            self.corral_window.hide()
+            self.corral_window.reparent(self.parking_window, 0, 0)
         self.controlling_view = view
         if self.controlling_view is not None:
             assert self.controlling_view.flags() & gtk.REALIZED
             # We can reparent to (0, 0), even though that's probably not the
             # right place, because _update_client_geometry will move us to the
             # proper location.
-            self.expose_window.reparent(self.controlling_view.window, 0, 0)
+            self.corral_window.reparent(self.controlling_view.window, 0, 0)
             self._update_client_geometry()
-            self.expose_window.lower()
-            self.expose_window.show_unraised()
+            self.corral_window.lower()
+            self.corral_window.show_unraised()
         trap.swallow(parti.lowlevel.sendConfigureNotify, self.client_window)
 
     def _unregister_view(self, view):
@@ -409,14 +371,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
 
     def new_view(self):
         return WindowView(self)
-
-    def destroy(self):
-        self.client_window.set_data("parti-route-events-to", None)
-        for view in list(self.views):
-            view.destroy()
-        assert not self.views
-        assert self.controlling_view is None
-        self.expose_listener.destroy()
 
     def _view_unmapped(self, view):
         assert view in self.views
@@ -446,11 +400,10 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                                                         allocated_h,
                                                         hints)
             (w, h, wvis, hvis) = size
-            self.corral_window.resize(w, h)
+            (x, y) = self.controlling_view._get_offset_for(w, h)
+            self.corral_window.move_resize(x, y, w, h)
             trap.swallow(parti.lowlevel.configureAndNotify,
                          self.client_window, 0, 0, w, h)
-            (x, y) = self.controlling_view._get_offset_for(w, h)
-            self.expose_window.move_resize(x, y, w, h)
             self._internal_set_property("actual-size", (w, h))
             self._internal_set_property("user-friendly-size", (wvis, hvis))
             for view in self.views:
@@ -773,7 +726,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         # genuine race conditions here (e.g. suppose the client does not
         # actually get around to requesting the focus until after we have
         # already changed our mind and decided to give it to someone else).
-        now = gtk.gdk.x11_get_server_time(self.expose_window)
+        now = gtk.gdk.x11_get_server_time(self.corral_window)
         if "WM_TAKE_FOCUS" in self.get_property("protocols"):
             print "... using WM_TAKE_FOCUS"
             trap.swallow(parti.lowlevel.send_wm_take_focus,
