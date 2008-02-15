@@ -877,15 +877,16 @@ class WindowView(gtk.Widget):
             # of the window directly might or might not be a workaround --
             # have to try it to find out.
             # 
-            #offset = self._get_offset_for(size[0] * scale_factor,
-            #                              size[1] * scale_factor)
-            #m.translate(*offset)
+            offset = self.window_position(self.model,
+                                          size[0] * scale_factor,
+                                          size[1] * scale_factor)
+            m.translate(*offset)
             m.scale(scale_factor, scale_factor)
         return m
 
     def _vote_for_pedro(self, model):
         if self.flags() & gtk.MAPPED:
-            return (1, self)
+            return (self.allocation.width * self.allocation.height, self)
         else:
             return (-1, self)
 
@@ -1013,6 +1014,7 @@ class WindowView(gtk.Widget):
             self._image_window.resize(allocation.width, allocation.height)
             self._image_window.input_shape_combine_region(gtk.gdk.Region(),
                                                           0, 0)
+        self.model.ownership_election()
         self.model.maybe_recalculate_geometry_for(self)
     
     def window_size(self, model):
