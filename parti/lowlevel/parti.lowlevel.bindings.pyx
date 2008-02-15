@@ -20,8 +20,6 @@ cdef extern from "X11/Xlib.h":
     pass
 cdef extern from "X11/Xutil.h":
     pass
-cdef extern from "X11/extensions/XTest.h":
-    pass
 
 cdef extern from "gdk/gdk.h":
     pass
@@ -94,7 +92,9 @@ cdef extern from *:
     ctypedef int Bool
     ctypedef int Status
     ctypedef CARD32 Atom
+    ctypedef XID Drawable
     ctypedef XID Window
+    ctypedef XID Pixmap
     ctypedef CARD32 Time
 
     int XFree(void * data)
@@ -224,17 +224,7 @@ cdef extern from *:
 
     # XKillClient
     int cXKillClient "XKillClient" (Display *, XID)
-
-    # XTest
-    Bool XTestQueryExtension(Display *, int *, int *,
-                             int * major, int * minor)
-    int XTestFakeKeyEvent(Display *, unsigned int keycode,
-                          Bool is_press, unsigned long delay)
-    int XTestFakeButtonEvent(Display *, unsigned int button,
-                             Bool is_press, unsigned long delay)
     
-    
-
 ######
 # GDK primitives, and wrappers for Xlib
 ######
@@ -556,6 +546,14 @@ def XKillClient(pywindow):
 # XTest
 ###################################
 
+cdef extern from "X11/extensions/XTest.h":
+    Bool XTestQueryExtension(Display *, int *, int *,
+                             int * major, int * minor)
+    int XTestFakeKeyEvent(Display *, unsigned int keycode,
+                          Bool is_press, unsigned long delay)
+    int XTestFakeButtonEvent(Display *, unsigned int button,
+                             Bool is_press, unsigned long delay)
+
 def _ensure_XTest_support(display_source):
     display = get_display_for(display_source)
     cdef int ignored
@@ -574,6 +572,154 @@ def xtest_fake_key(display_source, keycode, is_press):
 def xtest_fake_button(display_source, button, is_press):
     _ensure_XTest_support(display_source)
     XTestFakeButtonEvent(get_xdisplay_for(display_source), button, is_press, 0)
+
+###################################
+# Composite
+###################################
+
+cdef extern from "X11/extensions/Xcomposite.h":
+    Bool XCompositeQueryExtension(Display *, int *, int *)
+    Status XCompositeQueryVersion(Display *, int * major, int * minor)
+    unsigned int CompositeRedirectManual
+    unsigned int CompositeRedirectAutomatic
+    void XCompositeRedirectWindow(Display *, Window, int mode)
+    void XCompositeRedirectSubwindows(Display *, Window, int mode)
+    void XCompositeUnredirectWindow(Display *, Window, int mode)
+    void XCompositeUnredirectSubwindows(Display *, Window, int mode)
+    Pixmap XCompositeNameWindowPixmap(Display *, Window)
+
+    int XFreePixmap(Display *, Pixmap)
+
+def _ensure_XComposite_support(display_source):
+    cdef int ignored
+    cdef int major
+    cdef int minor
+    display = get_display_for(display_source)
+    if display.get("XComposite-support") is None:
+        display.set_data("XComposite-support", False)
+        if XCompositeQueryExtension(get_xdisplay_for(display),
+                                    &ignored, &ignored):
+            required_version = (0, 4)
+            (major, minor) = required_version
+            if XCompositeQueryVersion(get_xdisplay_for(display),
+                                      &major, &minor):
+                if (major, minor) == required_version:
+                    display.set_data("XComposite-support", True)
+    if not display.get_data("XComposite-support"):
+        raise ValueError, "Composite not supported, or insufficiently supported"
+
+def _manual_mode(manual_redraw):
+    if manual_redraw:
+        return CompositeRedirectManual
+    else:
+        return CompositeRedirectAutomatic
+
+def xcomposite_redirect_window(window, manual_redraw):
+    _ensure_XComposite_support(window)
+    XCompositeRedirectWindow(get_xdisplay_for(window), get_xwindow(window),
+                             _manual_mode(mode))
+
+def xcomposite_redirect_subwindows(window, manual_redraw):
+    _ensure_XComposite_support(window)
+    XCompositeRedirectSubwindows(get_xdisplay_for(window), get_xwindow(window),
+                                 _manual_mode(mode))
+
+def xcomposite_unredirect_window(window, manual_redraw):
+    _ensure_XComposite_support(window)
+    XCompositeUnredirectWindow(get_xdisplay_for(window), get_xwindow(window),
+                               _manual_mode(mode))
+
+def xcomposite_unredirect_subwindows(window, manual_redraw):
+    _ensure_XComposite_support(window)
+    XCompositeUnredirectSubwindows(get_xdisplay_for(window), get_xwindow(window),
+                                   _manual_mode(mode))
+
+class _PixmapCleanupHandler(object):
+    def __init__(self, pixmap):
+        self.pixmap = pixmap
+
+    def cleanup(self):
+        if self.pixmap is not None:
+            XFreePixmap(get_xdisplay_for(self.pixmap), self.pixmap.xid)
+            self.pixmap = None
+
+    def __del__(self):
+        self.cleanup()
+
+def xcomposite_name_window_pixmap(window):
+    _ensure_XComposite_support(window)
+    xpixmap = XCompositeNameWindowPixmap(get_xdisplay_for(window),
+                                         get_xwindow(window))
+    gpixmap = gtk.gdk.pixmap_foreign_new_for_display(get_display_for(window),
+                                                     xpixmap)
+    return _PixmapCleanupHandler(gpixmap)
+
+###################################
+# Xdamage
+###################################
+
+cdef extern from "X11/extensions/Xfixes.h":
+    ctypedef XID XserverRegion
+    XserverRegion XFixesCreateRegion(Display *, XRectangle *, int nrectangles)
+    void XFixesDestroyRegion(Display *, XserverRegion)
+
+cdef extern from "X11/extensions/Xdamage.h":
+    ctypedef XID Damage
+    unsigned int XDamageReportDeltaRectangles
+    unsigned int XDamageNotify
+    ctypedef struct XRectangle:
+        short x, y
+        unsigned short width, height
+    ctypedef struct XDamageNotifyEvent:
+        Damage damage
+        int level
+        Bool more
+        XRectangle area
+    Bool XDamageQueryExtension(Display *, int * event_base, int *)
+    Status XDamageQueryVersion(Display *, int * major, int * minor)
+    Damage XDamageCreate(Display *, Drawable, int level)
+    void XDamageDestroy(Display *, Damage)
+    void XDamageSubtract(Display *, Damage,
+                         XserverRegion repair, XserverRegion parts)
+
+def _ensure_XDamage_support(display_source):
+    cdef int event_base
+    cdef int ignored
+    cdef int major
+    cdef int minor
+    display = get_display_for(display_source)
+    if display.get("XDamage-support") is None:
+        display.set_data("XDamage-support", False)
+        if XDamageQueryExtension(get_xdisplay_for(display),
+                                 &event_base, &ignored):
+            display.set_data("XDamage-event-base", event_base)
+            required_version = (1, 0)
+            (major, minor) = required_version
+            if XDamageQueryVersion(get_xdisplay_for(display),
+                                   &major, &minor):
+                if (major, minor) == required_version:
+                    display.set_data("XDamage-support", True)
+    if not display.get_data("XDamage-support"):
+        raise ValueError, "Xdamage not supported, or insufficiently supported"
+
+def xdamage_start(window):
+    _ensure_XDamage_support(window)
+    return XDamageCreate(get_xdisplay_for(window), get_xwindow(window),
+                         XDamageReportDeltaRectangles)
+
+def xdamage_stop(display_source, handle):
+    _ensure_XDamage_support(display_source)
+    XDamageDestroy(get_xdisplay_for(display_source), handle)
+
+def xdamage_acknowledge(display_source, handle, x, y, width, height):
+    cdef XRectangle rect
+    rect.x = x
+    rect.y = y
+    rect.width = width
+    rect.height = height
+    repair = XFixesCreateRegion(get_xdisplay_for(display_source), &rect, 1)
+    XDamageSubtract(get_xdisplay_for(display_source), handle, repair, XNone)
+    XFixesDestroyRegion(get_xdisplay_for(display_source), repair)
 
 ###################################
 # Smarter convenience wrappers
@@ -804,6 +950,7 @@ _x_event_signals = {
     FocusIn: ("parti-focus-in-event", None),
     FocusOut: ("parti-focus-out-event", None),
     ClientMessage: ("parti-client-message-event", None),
+    "XDamageNotify": ("parti-damage-event", None),
     }
 
 def _gw(display, xwin):
@@ -815,11 +962,17 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
     cdef XEvent * e
     e = <XEvent*>e_gdk
     try:
-        if e.type in _x_event_signals:
+        d = wrap(<cGObject*>gdk_x11_lookup_xdisplay(e.xany.display))
+        my_events = dict(_x_event_signals)
+        if d.get_data("XDamage-event-base") is not None:
+            damage_type = d.get_data("XDamage-event-base") + XDamageNotify
+            my_events[damage_type] = my_events["XDamageNotify"]
+        else:
+            damage_type = -1
+        if e.type in my_events:
             pyev = LameStruct()
             pyev.type = e.type
-            pyev.display = wrap(<cGObject*>gdk_x11_lookup_xdisplay(e.xany.display))
-            d = pyev.display
+            pyev.display = d
             # Unmarshal:
             try:
                 if e.type == MapRequest:
@@ -873,6 +1026,15 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     for i in xrange(5):
                         pieces.append(int(e.xclient.data.l[i]))
                     pyev.data = tuple(pieces)
+                elif e.type == damage_type:
+                    print "DamageNotify received"
+                    cdef XDamageNotifyEvent* damage_e
+                    damage_e = <XDamageNotifyEvent*>e
+                    pyev.window = _gw(d, e.xany.window)
+                    pyev.x = damage_e.area.x
+                    pyev.y = damage_e.area.y
+                    pyev.width = damage_e.area.width
+                    pyev.height = damage_e.area.height
             except XError, e:
                 print ("Some window in our event disappeared before we could "
                        + "handle the event; so I'm just ignoring it instead.")
