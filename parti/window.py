@@ -12,7 +12,8 @@ import math
 import os
 from socket import gethostname
 import parti.lowlevel
-from parti.util import AutoPropGObjectMixin, base, one_arg_signal
+from parti.util import (AutoPropGObjectMixin,
+                        one_arg_signal, n_arg_signal, list_accumulator)
 from parti.error import *
 from parti.prop import prop_get, prop_set
 from parti.composite import CompositeHelper
@@ -94,6 +95,81 @@ from parti.composite import CompositeHelper
 #
 # All clear?
 
+# We should also have a block comment describing how to create a
+# view/"controller" for a WindowModel.
+#
+# Viewing a WindowModel is easy.  Connect to the redraw-needed signal.  Every
+# time the window contents is updated, you'll get a message.  This message is
+# passed a single object e, which has useful members:
+#   e.x, e.y, e.width, e.height:
+#      The part of the client window that was modified, and needs to be
+#      redrawn.
+#   e.pixmap_handle:
+#      A "handle" for the window contents.  So long as you hold a reference to
+#      this object, the window contents will be available in...
+#   e.pixmap_handle.pixmap:
+#      ...this gtk.gdk.Pixmap object.  This object will be destroyed as soon
+#      as pixmap_handle passes out of scope, so if you want do anything fancy,
+#      hold onto pixmap_handle, not just the pixmap itself.
+#
+# But what if you'd like to do more than just look at your pretty composited
+# windows?  Maybe you'd like to, say, *interact* with them?  Then life is a
+# little more complicated.  To make a view "live", we have to move the actual
+# client window to be a child of your view window and position it correctly.
+# Obviously, only one view can be live at any given time, so we have to figure
+# out which one that is.  Supposing we have a WindowModel called "model" and
+# a view called "view", then the following pieces come into play:
+#   The "owner-election" signal on window:
+#     If a view wants the chance to become live, it must connect to this
+#     signal.  When the signal is emitted, its handler should return a tuple
+#     of the form:
+#       (votes, my_view)
+#     Just like a real election, everyone votes for themselves.  The view that
+#     gives the highest value to 'votes' becomes the new owner.  However, a
+#     view with a negative (< 0) votes value will never become the owner.
+#   model.ownership_election():
+#     This method (distinct from the ownership-election signal!) triggers an
+#     election.  All views MUST call this method whenever they decide their
+#     number of votes has changed.  All views MUST call this method when they
+#     are destructing themselves (ideally after disconnecting from the
+#     owner-election signal).
+#   The "owner" property on window:
+#     This records the view that currently owns the window (i.e., the winner
+#     of the last election), or None if no view is live.
+#   view.take_window(model, window):
+#     This method is called on 'view' when it becomes owner of 'model'.  It
+#     should reparent 'window' into the appropriate place, and put it at the
+#     appropriate place in its window stack.  (The x,y position, however, does
+#     not matter.)
+#   view.window_size(model):
+#     This method is called when the model needs to know how much space it is
+#     allocated.  It should return the maximum (width, height) allowed.
+#     (However, the model may choose to use less than this.)
+#   view.window_position(mode, width, height):
+#     This method is called when the model needs to know where it should be
+#     located (relative to the parent window the view placed it in).  'width'
+#     and 'height' are the size the model window will actually be.  It should
+#     return the (x, y) position desired.
+#   model.maybe_recalculate_geometry_for(view):
+#     This method (potentially) triggers a resize/move of the client window
+#     within the view.  If 'view' is not the current owner, is a no-op, which
+#     means that views can call it without worrying about whether they are in
+#     fact the current owner.
+#
+# The actual method for choosing 'votes' is not really determined yet.
+# Probably it should take into account at least the following factors:
+#   -- has focus (or has mouse-over?)
+#   -- is visible in a tray/other window, and the tray/other window is visible
+#      -- and is focusable
+#      -- and is not focusable
+#   -- is visible in a tray, and the tray/other window is not visible
+#      -- and is focusable
+#      -- and is not focusable
+#      (NB: Widget.get_ancestor(my.Tray) will give us the nearest ancestor
+#      that isinstance(my.Tray), if any.)
+#   -- is not visible
+#   -- the size of the widget (as a final tie-breaker)
+
 class Unmanageable(Exception):
     pass
 
@@ -118,8 +194,15 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                        gobject.PARAM_READWRITE),
 
         "client-window": (gobject.TYPE_PYOBJECT,
-                          "GdkWindow representing the client toplevel", "",
+                          "gtk.gdk.Window representing the client toplevel", "",
                           gobject.PARAM_READABLE),
+        # NB notify never fires for the client-contents properties:
+        "client-contents": (gobject.TYPE_PYOBJECT,
+                            "gtk.gdk.Pixmap containing the window contents", "",
+                            gobject.PARAM_READABLE),
+        "client-contents-handle": (gobject.TYPE_PYOBJECT,
+                                   "", "",
+                                   gobject.PARAM_READABLE),
         "actual-size": (gobject.TYPE_PYOBJECT,
                         "Size of client window (actual (width,height))", "",
                         gobject.PARAM_READABLE),
@@ -182,10 +265,16 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         "icon": (gobject.TYPE_PYOBJECT,
                  "Icon (Cairo surface)", "",
                  gobject.PARAM_READABLE),
+
+        "owner": (gobject.TYPE_PYOBJECT,
+                  "Owner", "",
+                  gobject.PARAM_READABLE),
         }
     __gsignals__ = {
         "redraw-needed": one_arg_signal,
-        "unmanaged": (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
+        "ownership-election": (gobject.SIGNAL_RUN_LAST,
+                               gobject.TYPE_PYOBJECT, (), list_accumulator),
+        "unmanaged": one_arg_signal,
 
         "map-request-event": one_arg_signal,
         "configure-request-event": one_arg_signal,
@@ -224,9 +313,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         self.pending_unmaps = 0
 
         self.connect("notify::iconic", self._handle_iconic_update)
-
-        self.views = set()
-        self.controlling_view = None
 
         # We enable PROPERTY_CHANGE_MASK so that we can call
         # x11_get_server_time on this window.
@@ -279,6 +365,12 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     def _damage_forward(self, obj, event):
         self.emit("redraw-needed", event)
 
+    def do_get_property_client_contents(self):
+        return self.get_property("client-contents-handle").pixmap
+
+    def do_get_property_client_contents_handle(self):
+        return self._composite.get_property("window-contents-handle")
+
     def do_map_request_event(self, event):
         # If we get a MapRequest then it might mean that someone tried to map
         # this window multiple times in quick succession, before we actually
@@ -319,8 +411,12 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         # simple code:
         self.unmanage_window()
 
-    def unmanage_window(self, exiting=False):
+    def unmanage(self, exiting=False):
+        self.emit("unmanaged", exiting)
+
+    def do_unmanaged(self, exiting):
         print "unmanaging window"
+        self._internal_set_property("owner", None)
         def unmanageit():
             self._scrub_withdrawn_window()
             self.client_window.reparent(gtk.gdk.get_default_root_window(),
@@ -329,85 +425,51 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             if exiting:
                 self.client_window.show_unraised()
         trap.swallow(unmanageit)
-        self.emit("unmanaged")
         print "destroying self"
         self.client_window.set_data("parti-route-events-to", None)
         self._composite.disconnect(self._damage_forward_handle)
         self._composite.destroy()
-        for view in list(self.views):
-            view.destroy()
-        assert not self.views
-        assert self.controlling_view is None
 
-    def _set_controlling_view(self, view):
-        assert view is None or view in self.views
-        if self.controlling_view is view:
+    def ownership_election(self):
+        candidates = self.emit("ownership-election")
+        if candidates:
+            rating, winner = sorted(candidates)[-1]
+            if rating < 0:
+                winner = None
+        else:
+            winner = None
+        old_owner = self.get_property("owner")
+        if old_owner is winner:
             return
-        if self.controlling_view is not None:
+        if old_owner is not None:
             self.corral_window.hide()
             self.corral_window.reparent(self.parking_window, 0, 0)
-        self.controlling_view = view
-        if self.controlling_view is not None:
-            assert self.controlling_view.flags() & gtk.REALIZED
-            # We can reparent to (0, 0), even though that's probably not the
-            # right place, because _update_client_geometry will move us to the
-            # proper location.
-            self.corral_window.reparent(self.controlling_view.window, 0, 0)
+        self._internal_set_property("owner", winner)
+        if winner is not None:
+            winner.take_window(self, self.corral_window)
             self._update_client_geometry()
-            self.corral_window.lower()
             self.corral_window.show_unraised()
         trap.swallow(parti.lowlevel.sendConfigureNotify, self.client_window)
 
-    def _unregister_view(self, view):
-        if view.flags() & gtk.MAPPED:
-            self._view_unmapped(view)
-        self.views.remove(view)
-
-    def _register_view(self, view):
-        assert view not in self.views
-        self.views.add(view)
-        if view.flags() & gtk.MAPPED:
-            self._view_mapped(view)
-
-    def new_view(self):
-        return WindowView(self)
-
-    def _view_unmapped(self, view):
-        assert view in self.views
-        if self.controlling_view is view:
-            for other in self.views:
-                if other.flags() & gtk.MAPPED and other is not view:
-                    self._set_controlling_view(other)
-                    break
-            else:
-                self._set_controlling_view(None)
-
-    def _view_mapped(self, view):
-        assert view in self.views
-        if self.controlling_view is None:
-            self._set_controlling_view(view)
-
-    def _view_reallocated(self, view):
-        assert view in self.views
-        if self.controlling_view is view:
+    def maybe_recalculate_geometry_for(self, maybe_owner):
+        if owner and self.get_property("owner") is owner:
             self._update_client_geometry()
 
     def _update_client_geometry(self):
-        if self.controlling_view is not None:
-            (base_x, base_y, allocated_w, allocated_h) = self.controlling_view.allocation
+        owner = self.get_property("owner")
+        if owner is not None:
+            (allocated_w, allocated_h) = owner.window_size(self)
             hints = self.get_property("size-hints")
             size = parti.lowlevel.calc_constrained_size(allocated_w,
                                                         allocated_h,
                                                         hints)
             (w, h, wvis, hvis) = size
-            (x, y) = self.controlling_view._get_offset_for(w, h)
+            (x, y) = owner.window_position(self, w, h)
             self.corral_window.move_resize(x, y, w, h)
             trap.swallow(parti.lowlevel.configureAndNotify,
                          self.client_window, 0, 0, w, h)
             self._internal_set_property("actual-size", (w, h))
             self._internal_set_property("user-friendly-size", (wvis, hvis))
-            for view in self.views:
-                view._invalidate_all()
 
     def do_configure_request_event(self, event):
         # Ignore the request, but as per ICCCM 4.1.5, send back a synthetic
@@ -434,10 +496,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         # FIXME: consider handling attempts to change stacking order here.
         # (In particular, I believe that a request to jump to the top is
         # meaningful and should perhaps even be respected.)
-
-    def _handle_damage(self, event):
-        for view in self.views:
-            view._handle_damage(event)
 
     ################################
     # Property reading
@@ -761,36 +819,17 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
 
 gobject.type_register(WindowModel)
 
-# There may be many views for the same window.  Only one can actually work
-# (receive mouse events).  We assign this to the "highest priority" widget,
-# where the following give widgets priority, from most to least:
-#   -- has focus (or has mouse-over?)
-#   -- is visible in a tray/other window, and the tray/other window is visible
-#      -- and is focusable
-#      -- and is not focusable
-#   -- is visible in a tray, and the tray/other window is not visible
-#      -- and is focusable
-#      -- and is not focusable
-#   -- is not visible
-# Ties are broken by the size of the widget.
-#
-# Unmapped views cannot own the client.
-#
-# Widget.get_ancestor(my.Tray) will give us the nearest ancestor that
-# isinstance(my.Tray), if any...
-#
-# FIXME: AS A HACK, instead for now I am just saying that there is an explicit
-# call for a widget to steal control, and when the widget that has control
-# disappears, it is given to some other random widget.  We should actually
-# implement the above, or something like it.  Let's see what happens with tray
-# layout stuff first.
 
 class WindowView(gtk.Widget):
     def __init__(self, model):
-        base(self).__init__(self)
+        gtk.Widget.__init__(self)
         
         self._image_window = None
-        self.model = model
+        self._model = model
+        self._redraw_handle = self._model.connect("redraw-needed",
+                                                  self._redraw_needed)
+        self._election_handle = self._model.connect("owner-election",
+                                                    self._vote_for_pedro)
 
         # Standard GTK double-buffering is useless for us, because it's on our
         # "official" window, and we don't draw to that.
@@ -798,15 +837,12 @@ class WindowView(gtk.Widget):
         # FIXME: make this dependent on whether the client accepts input focus
         self.set_property("can-focus", True)
 
-        self.model._register_view(self)
 
     def do_destroy(self):
-        self.model._unregister_view(self)
-        self.model = None
-        base(self).do_destroy(self)
-
-    def steal_control(self):
-        self.model._set_controlling_view(self)
+        self._model.disconnect(self._redraw_handle)
+        self._model.disconnect(self._election_handle)
+        self._model = None
+        gtk.Widget.do_destroy(self)
 
     def _invalidate_all(self):
         self._image_window.invalidate_rect(gtk.gdk.Rectangle(width=100000,
@@ -815,8 +851,8 @@ class WindowView(gtk.Widget):
 
     def _get_transform_matrix(self):
         m = cairo.Matrix()
-        size = self.model.get_property("actual-size")
-        if self.model.controlling_view is self:
+        size = self._model.get_property("actual-size")
+        if self._model.controlling_view is self:
             m.translate(*self._get_offset_for(*size))
         else:
             scale_factor = min(self.allocation[2] * 1.0 / size[0],
@@ -847,15 +883,21 @@ class WindowView(gtk.Widget):
             m.scale(scale_factor, scale_factor)
         return m
 
-    def _handle_damage(self, event):
+    def _vote_for_pedro(self):
+        if self.flags() & gtk.MAPPED:
+            return (1, self)
+        else:
+            return (-1, self)
+
+    def _redraw_needed(self, event):
         if not self.flags() & gtk.MAPPED:
             return
         m = self._get_transform_matrix()
         # This is the right way to convert an integer-space bounding box into
         # another integer-space bounding box:
-        (x1, y1) = m.transform_point(event.area.x, event.area.y)
-        (x2, y2) = m.transform_point(event.area.x + event.area.width,
-                                     event.area.y + event.area.height)
+        (x1, y1) = m.transform_point(event.x, event.y)
+        (x2, y2) = m.transform_point(event.x + event.width,
+                                     event.y + event.height)
         x1i = int(math.floor(x1))
         y1i = int(math.floor(y1))
         x2i = int(math.ceil(x2))
@@ -908,16 +950,9 @@ class WindowView(gtk.Widget):
         
         cr.save()
         cr.set_matrix(self._get_transform_matrix())
-        # FIXME: This doesn't work, because of pygtk bug #491256:
-        #cr.set_source_pixmap(self.model.client_window, 0, 0)
-        # Hacky workaround.  Note that we have to hold on to a handle to the
-        # cairo context we create, because once it is destructed the surface
-        # we got might stop working (I'm actually not sure whether it will or
-        # not).
-        source_cr = self.model.corral_window.cairo_create()
-        source = source_cr.get_target()
 
-        cr.set_source_surface(source, 0, 0)
+        cr.set_source_pixmap(self._model.get_property("client-contents"),
+                             0, 0)
         # Super slow (copies everything out of the server and then back
         # again), but an option for working around Cairo/X bugs:
         #tmpsrf = cairo.ImageSurface(cairo.FORMAT_ARGB32,
@@ -930,7 +965,7 @@ class WindowView(gtk.Widget):
         
         cr.paint()
 
-        icon = self.model.get_property("icon")
+        icon = self._model.get_property("icon")
         if icon is not None:
             cr.set_source_pixmap(icon, 0, 0)
             cr.paint_with_alpha(0.3)
@@ -957,6 +992,11 @@ class WindowView(gtk.Widget):
             cr.fill()
             cr.restore()
 
+    def window_position(self, model, w, h):
+        assert self.flags() & gtk.REALIZED
+        # These can come out negative; that's okay.
+        return ((self.allocation.width - w) // 2,
+                (self.allocation.height - h) // 2)
 
     def do_size_request(self, requisition):
         # FIXME if we ever need to do automatic layout of these sorts of
@@ -973,8 +1013,17 @@ class WindowView(gtk.Widget):
             self._image_window.resize(allocation.width, allocation.height)
             self._image_window.input_shape_combine_region(gtk.gdk.Region(),
                                                           0, 0)
-        self.model._view_reallocated(self)
+        self._model.maybe_recalculate_geometry_for(self)
     
+    def window_size(self, model):
+        assert self.flags() & gtk.REALIZED
+        return (self.allocation.width, self.allocation.height)
+
+    def take_window(self, model, window):
+        assert self.flags() & gtk.REALIZED
+        window.reparent(self.window, 0, 0)
+        window.lower()
+
     def do_realize(self):
         print "Realizing (allocation = %r)" % (tuple(self.allocation),)
 
@@ -1011,7 +1060,7 @@ class WindowView(gtk.Widget):
             return
         print "Mapping"
         self.set_flags(gtk.MAPPED)
-        self.model._view_mapped(self)
+        self._model.ownership_election()
         self.window.show_unraised()
         print "Mapped"
 
@@ -1021,7 +1070,7 @@ class WindowView(gtk.Widget):
         print "Unmapping"
         self.unset_flags(gtk.MAPPED)
         self.window.hide()
-        self.model._view_unmapped(self)
+        self._model.ownership_election()
         print "Unmapped"
             
     def do_unrealize(self):
@@ -1030,18 +1079,12 @@ class WindowView(gtk.Widget):
         # do_unmap, etc.
         self.unmap()
         
-        assert self.model.controlling_view is not self
+        assert self._model.controlling_view is not self
         self.unset_flags(gtk.REALIZED)
         # Break circular reference
         if self.window:
             self.window.set_user_data(None)
         self._image_window = None
         print "Unrealized"
-
-    def _get_offset_for(self, w, h):
-        assert self.flags() & gtk.REALIZED
-        # These can come out negative; that's okay.
-        return ((self.allocation.width - w) // 2,
-                (self.allocation.height - h) // 2)
             
 gobject.type_register(WindowView)

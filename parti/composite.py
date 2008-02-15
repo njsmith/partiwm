@@ -1,5 +1,5 @@
 import gobject
-from parti.util import one_arg_signal
+from parti.util import one_arg_signal, AutoPropGObjectMixin
 from parti.error import *
 from parti.lowlevel import (xcomposite_redirect_window,
                             xcomposite_unredirect_window,
@@ -7,7 +7,7 @@ from parti.lowlevel import (xcomposite_redirect_window,
                             xdamage_start,
                             xdamage_stop)
 
-class CompositeHelper(gobject.GObject):
+class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
     __gsignals__ = {
         "redraw-needed": one_arg_signal,
 
@@ -16,13 +16,18 @@ class CompositeHelper(gobject.GObject):
         "parti-configure-event": one_arg_signal,
         }
 
+    __gproperties__ = {
+        "window-contents-handle": (gobject.TYPE_PYOBJECT,
+                                   "", "", gobject.PARAM_READABLE),
+        }        
+
     def __init__(self, window, already_composited):
-        gobject.GObject.__init__(self)
+        super(CompositeHelper, self).__init__()
         self._window = window
         self._already_composited = already_composited
         if not self.already_composited:
             xcomposite_redirect_window(window)
-        self._pixmap_handle = None
+        self.refresh_pixmap()
         self._damage_handle = xdamage_start(window)
         self._window.set_data("parti-route-damage-to", self)
 
@@ -30,14 +35,12 @@ class CompositeHelper(gobject.GObject):
         if not self.already_composited:
             trap.swallow(xcomposite_unredirect_window, self._window)
         trap.swallow(xdamage_stop, self._window, self._damage_handle)
-        self._pixmap_handle.destroy()
+        self._internal_set_property("window-contents-handle", None)
         self._window.set_data("parti-route-damage-to", None)
 
     def refresh_pixmap(self):
-        if self._pixmap_handle is not None:
-            self._pixmap_handle.destroy()
-        self._pixmap_handle = trap.swallow(xcomposite_name_window_pixmap,
-                                           window)
+        handle = trap.swallow(xcomposite_name_window_pixmap, window))
+        self._internal_set_property("window-contents-handle", handle)
 
     def do_parti_map_event(self):
         self.refresh_pixmap()
@@ -46,7 +49,7 @@ class CompositeHelper(gobject.GObject):
         self.refresh_pixmap()
 
     def do_parti_damage_event(self, event):
-        event.pixmap = self._pixmap_handle.pixmap
+        event.pixmap_handle = self.get_property("window-contents-handle")
         self.emit("redraw-needed", event)
 
 gobject.type_register(CompositeHelper)

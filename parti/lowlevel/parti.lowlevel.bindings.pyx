@@ -629,16 +629,14 @@ def xcomposite_unredirect_subwindows(window):
                                    XCompositeRedirectManual)
 
 class _PixmapCleanupHandler(object):
+    "Reference count a GdkPixmap that needs explicit cleanup."
     def __init__(self, pixmap):
         self.pixmap = pixmap
 
-    def destroy(self):
+    def __del__(self):
         if self.pixmap is not None:
             XFreePixmap(get_xdisplay_for(self.pixmap), self.pixmap.xid)
             self.pixmap = None
-
-    def __del__(self):
-        self.destroy()
 
 def xcomposite_name_window_pixmap(window):
     _ensure_XComposite_support(window)

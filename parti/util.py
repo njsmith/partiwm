@@ -70,7 +70,14 @@ class LameStruct(object):
         return ("<%s object, contents: %r>"
                 % (type(self).__name__, self.__dict__))
 
+def n_arg_signal(n):
+    return (gobject.SIGNAL_RUN_LAST,
+            gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,) * n)
+no_arg_signal = n_arg_signal(0)
+one_arg_signal = n_arg_signal(1)
 
-no_arg_signal = (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ())
-one_arg_signal = (gobject.SIGNAL_RUN_LAST,
-                  gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
+
+def list_accumulator(ihint, return_accu, handler_return):
+    if return_accu is None:
+        return_accu = []
+    return True, return_accu + [handler_return]
