@@ -25,21 +25,21 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
         super(CompositeHelper, self).__init__()
         self._window = window
         self._already_composited = already_composited
-        if not self.already_composited:
+        if not self._already_composited:
             xcomposite_redirect_window(window)
         self.refresh_pixmap()
         self._damage_handle = xdamage_start(window)
         self._window.set_data("parti-route-damage-to", self)
 
     def destroy(self):
-        if not self.already_composited:
+        if not self._already_composited:
             trap.swallow(xcomposite_unredirect_window, self._window)
         trap.swallow(xdamage_stop, self._window, self._damage_handle)
         self._internal_set_property("window-contents-handle", None)
         self._window.set_data("parti-route-damage-to", None)
 
     def refresh_pixmap(self):
-        handle = trap.swallow(xcomposite_name_window_pixmap, window))
+        handle = trap.swallow(xcomposite_name_window_pixmap, self._window)
         self._internal_set_property("window-contents-handle", handle)
 
     def do_parti_map_event(self):

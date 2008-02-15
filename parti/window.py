@@ -61,7 +61,7 @@ from parti.composite import CompositeHelper
 # the code is that they always take up exactly the same space on the screen.
 # They get reparented back and forth between widgets, and when there are no
 # widgets, they get reparented to a "parking area".  For now, we're just using
-# the root window as a parking area, so we also map/unmap the expose window
+# the root window as a parking area, so we also map/unmap the corral window
 # depending on whether we are parked or not; the corral and client windows are
 # left mapped at all times.
 #
@@ -80,18 +80,18 @@ from parti.composite import CompositeHelper
 #
 # Finally, there is the 'image' window.  This is a window that always remains
 # in the widget window, and is used to draw what the client currently looks
-# like.  It needs to receive endogenous expose events so it knows if it has
-# been literally exposed (not just when the window it is displaying has
-# changed), and the easiest way to arrange for this is to make it exactly the
-# same size as the parent 'widget' window.  Then the widget window never
-# receives expose events (because it is occluded), and we can arrange for the
-# image window's expose events to be delivered to the WindowView widget, and
-# they will be in the right coordinate space.  If the widget is controlling
-# the client, then the image window goes on top of the client window.  Why
-# don't we just draw onto the widget window?  Because there is no way to ask
-# Cairo to use IncludeInferiors drawing mode -- so if we were drawing onto the
-# widget window, and the client were present in the widget window, then the
-# blank black 'expose catcher' window would obscure the image of the client.
+# like.  It needs to receive expose events so it knows if it has been exposed
+# (not just when the window it is displaying has changed), and the easiest way
+# to arrange for this is to make it exactly the same size as the parent
+# 'widget' window.  Then the widget window never receives expose events
+# (because it is occluded), and we can arrange for the image window's expose
+# events to be delivered to the WindowView widget, and they will be in the
+# right coordinate space.  If the widget is controlling the client, then the
+# image window goes on top of the client window.  Why don't we just draw onto
+# the widget window?  Because there is no way to ask Cairo to use
+# IncludeInferiors drawing mode -- so if we were drawing onto the widget
+# window, and the client were present in the widget window, then the blank
+# black 'expose catcher' window would obscure the image of the client.
 #
 # All clear?
 
@@ -316,12 +316,12 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
 
         # We enable PROPERTY_CHANGE_MASK so that we can call
         # x11_get_server_time on this window.
-        self.corral_window = gtk.gdk.Window(self.expose_window,
+        self.corral_window = gtk.gdk.Window(self.parking_window,
                                             width=100,
                                             height=100,
                                             window_type=gtk.gdk.WINDOW_CHILD,
                                             wclass=gtk.gdk.INPUT_OUTPUT,
-                                            event_mask=gtk.gdk.PROPERTY_CHANGE_MASK
+                                            event_mask=gtk.gdk.PROPERTY_CHANGE_MASK)
         parti.lowlevel.substructureRedirect(self.corral_window)
 
         def setup_client():

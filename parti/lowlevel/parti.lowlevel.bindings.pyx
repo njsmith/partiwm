@@ -595,7 +595,7 @@ def _ensure_XComposite_support(display_source):
     cdef int major
     cdef int minor
     display = get_display_for(display_source)
-    if display.get("XComposite-support") is None:
+    if display.get_data("XComposite-support") is None:
         display.set_data("XComposite-support", False)
         if XCompositeQueryExtension(get_xdisplay_for(display),
                                     &ignored, &ignored):
@@ -611,22 +611,22 @@ def _ensure_XComposite_support(display_source):
 def xcomposite_redirect_window(window):
     _ensure_XComposite_support(window)
     XCompositeRedirectWindow(get_xdisplay_for(window), get_xwindow(window),
-                             XCompositeRedirectManual)
+                             CompositeRedirectManual)
 
 def xcomposite_redirect_subwindows(window):
     _ensure_XComposite_support(window)
     XCompositeRedirectSubwindows(get_xdisplay_for(window), get_xwindow(window),
-                                 XCompositeRedirectManual)
+                                 CompositeRedirectManual)
 
 def xcomposite_unredirect_window(window):
     _ensure_XComposite_support(window)
     XCompositeUnredirectWindow(get_xdisplay_for(window), get_xwindow(window),
-                               XCompositeRedirectManual)
+                               CompositeRedirectManual)
 
 def xcomposite_unredirect_subwindows(window):
     _ensure_XComposite_support(window)
     XCompositeUnredirectSubwindows(get_xdisplay_for(window), get_xwindow(window),
-                                   XCompositeRedirectManual)
+                                   CompositeRedirectManual)
 
 class _PixmapCleanupHandler(object):
     "Reference count a GdkPixmap that needs explicit cleanup."
@@ -650,6 +650,11 @@ def xcomposite_name_window_pixmap(window):
 # Xdamage
 ###################################
 
+cdef extern from *:
+    ctypedef struct XRectangle:
+        short x, y
+        unsigned short width, height
+
 cdef extern from "X11/extensions/Xfixes.h":
     ctypedef XID XserverRegion
     XserverRegion XFixesCreateRegion(Display *, XRectangle *, int nrectangles)
@@ -659,9 +664,6 @@ cdef extern from "X11/extensions/Xdamage.h":
     ctypedef XID Damage
     unsigned int XDamageReportDeltaRectangles
     unsigned int XDamageNotify
-    ctypedef struct XRectangle:
-        short x, y
-        unsigned short width, height
     ctypedef struct XDamageNotifyEvent:
         Damage damage
         int level
@@ -680,7 +682,7 @@ def _ensure_XDamage_support(display_source):
     cdef int major
     cdef int minor
     display = get_display_for(display_source)
-    if display.get("XDamage-support") is None:
+    if display.get_data("XDamage-support") is None:
         display.set_data("XDamage-support", False)
         if XDamageQueryExtension(get_xdisplay_for(display),
                                  &event_base, &ignored):
@@ -956,6 +958,7 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                                     GdkEvent * gdk_event,
                                     void * userdata):
     cdef XEvent * e
+    cdef XDamageNotifyEvent * damage_e
     e = <XEvent*>e_gdk
     try:
         d = wrap(<cGObject*>gdk_x11_lookup_xdisplay(e.xany.display))
@@ -1024,7 +1027,6 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     pyev.data = tuple(pieces)
                 elif e.type == damage_type:
                     print "DamageNotify received"
-                    cdef XDamageNotifyEvent* damage_e
                     damage_e = <XDamageNotifyEvent*>e
                     pyev.window = _gw(d, e.xany.window)
                     pyev.damage = damage_e.damage
@@ -1052,9 +1054,9 @@ _gdk_event_signals = {
                               "parti-property-notify-event", None),
     gtk.gdk.UNMAP: (_default_ev_key, "parti-unmap-event", None),
     gtk.gdk.DESTROY: (_default_ev_key, "parti-destroy-event", None),
-    gtk.gdk.GDK_MAP: (_damage_helper_key, "parti-map-event", None),
-    gtk.gdk.GDK_CONFIGURE: (_damage_helper_key, "parti-configure-event", None),
-    gtk.gdk.GDK_KEYPRESS: ("parti-hotkey-manager", "key-press-event", None),
+    gtk.gdk.MAP: (_damage_helper_key, "parti-map-event", None),
+    gtk.gdk.CONFIGURE: (_damage_helper_key, "parti-configure-event", None),
+    gtk.gdk.KEY_PRESS: ("parti-hotkey-manager", "key-press-event", None),
     }
 
 def _dispatch_gdk_event(event):

@@ -39,7 +39,8 @@ setup(
   download_url="http://partiwm.org/static/downloads/",
   
   scripts=["scripts/parti", "scripts/parti-repl"],
-  packages=["parti", "parti.trays", "parti.addons", "parti.scripts"],
+  packages=["parti", "parti.trays", "parti.addons", "parti.scripts",
+            "parti.lowlevel"],
   ext_modules=[ 
     Extension("parti.lowlevel.bindings",
               ["parti/lowlevel/parti.lowlevel.bindings.pyx"],
