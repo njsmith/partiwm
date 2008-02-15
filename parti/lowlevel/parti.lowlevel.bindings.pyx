@@ -639,16 +639,6 @@ class _PixmapCleanupHandler(object):
             XFreePixmap(get_xdisplay_for(self.pixmap), self.pixmap.xid)
             self.pixmap = None
 
-cdef extern from *:
-    cGObject * gdk_pixmap_foreign_new_for_display(cGdkDisplay *, Pixmap)
-    Status XGetGeometry(Display *, Drawable, Window * root,
-                        int * x, int * y, unsigned int * width,
-                        unsigned int * height,
-                        unsigned int * border, unsigned int * depth)
-
-def raw_xcnwp(window):
-    return 
-
 def xcomposite_name_window_pixmap(window):
     _ensure_XComposite_support(window)
     xpixmap = XCompositeNameWindowPixmap(get_xdisplay_for(window),
@@ -657,7 +647,10 @@ def xcomposite_name_window_pixmap(window):
                                                      xpixmap)
     if gpixmap is None:
         # Can't always actually get a pixmap, e.g. if window is not yet mapped
-        # or if it has disappeared.
+        # or if it has disappeared.  In such cases we might not actually see
+        # an X error yet, but xpixmap will actually point to an invalid
+        # Pixmap, and pixmap_foreign_new_for_display will fail when it tries
+        # to look up that pixmap's dimensions, and return None.
         return None
     else:
         gpixmap.set_colormap(window.get_colormap())
