@@ -292,7 +292,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         self.corral_window.show_unraised()
 
         def setup_client():
-            # Start listening for important property changes
+            # Start listening for important events
             self.client_window.set_events(self.client_window.get_events()
                                           | gtk.gdk.STRUCTURE_MASK
                                           | gtk.gdk.PROPERTY_CHANGE_MASK)

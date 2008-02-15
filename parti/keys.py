@@ -1,6 +1,6 @@
 import gobject
 import gtk
-from parti.util import base, one_arg_signal
+from parti.util import one_arg_signal
 from parti.error import *
 from parti.lowlevel import (get_display_for,
                             get_modifier_map, grab_key, ungrab_all_keys)

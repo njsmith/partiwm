@@ -608,43 +608,37 @@ def _ensure_XComposite_support(display_source):
     if not display.get_data("XComposite-support"):
         raise ValueError, "Composite not supported, or insufficiently supported"
 
-def _manual_mode(manual_redraw):
-    if manual_redraw:
-        return CompositeRedirectManual
-    else:
-        return CompositeRedirectAutomatic
-
-def xcomposite_redirect_window(window, manual_redraw):
+def xcomposite_redirect_window(window):
     _ensure_XComposite_support(window)
     XCompositeRedirectWindow(get_xdisplay_for(window), get_xwindow(window),
-                             _manual_mode(mode))
+                             XCompositeRedirectManual)
 
-def xcomposite_redirect_subwindows(window, manual_redraw):
+def xcomposite_redirect_subwindows(window):
     _ensure_XComposite_support(window)
     XCompositeRedirectSubwindows(get_xdisplay_for(window), get_xwindow(window),
-                                 _manual_mode(mode))
+                                 XCompositeRedirectManual)
 
-def xcomposite_unredirect_window(window, manual_redraw):
+def xcomposite_unredirect_window(window):
     _ensure_XComposite_support(window)
     XCompositeUnredirectWindow(get_xdisplay_for(window), get_xwindow(window),
-                               _manual_mode(mode))
+                               XCompositeRedirectManual)
 
-def xcomposite_unredirect_subwindows(window, manual_redraw):
+def xcomposite_unredirect_subwindows(window):
     _ensure_XComposite_support(window)
     XCompositeUnredirectSubwindows(get_xdisplay_for(window), get_xwindow(window),
-                                   _manual_mode(mode))
+                                   XCompositeRedirectManual)
 
 class _PixmapCleanupHandler(object):
     def __init__(self, pixmap):
         self.pixmap = pixmap
 
-    def cleanup(self):
+    def destroy(self):
         if self.pixmap is not None:
             XFreePixmap(get_xdisplay_for(self.pixmap), self.pixmap.xid)
             self.pixmap = None
 
     def __del__(self):
-        self.cleanup()
+        self.destroy()
 
 def xcomposite_name_window_pixmap(window):
     _ensure_XComposite_support(window)
@@ -923,7 +917,7 @@ def _maybe_send_event(handler, signal, event):
         print ("Handler %r has no '%s' signal; ignoring event"
                % (handler, signal))
 
-def _route_event(event, signal, parent_signal):
+def _route_event(event, key, signal, parent_signal):
     # Sometimes we get GDK events with event.window == None, because they are
     # for windows we have never created a GdkWindow object for, and GDK
     # doesn't do so just for this event.  As far as I can tell this only
@@ -932,25 +926,29 @@ def _route_event(event, signal, parent_signal):
     if event.window is None:
         assert event.type in (gtk.gdk.UNMAP, gtk.gdk.DESTROY)
         return
-    handler = event.window.get_data("parti-route-events-to")
+    handler = event.window.get_data(key)
     if handler is not None:
-        print "  sending event to event.window's handler"
+        print "  sending event to event.window's %s handler" % key
         _maybe_send_event(handler, signal, event)
     elif parent_signal is not None:
-        handler = event.parent.get_data("parti-route-events-to")
+        handler = event.parent.get_data(key)
         if handler is not None:
-            print "  sending event to event.parent's handler"
+            print "  sending event to event.parent's %s handler" % key
             print handler, parent_signal, event
             _maybe_send_event(handler, parent_signal, event)
 
+_default_ev_key = "parti-route-events-to"
+_damage_helper_key = "parti-route-damage-to"
 _x_event_signals = {
-    MapRequest: ("map-request-event", "child-map-request-event"),
-    ConfigureRequest: ("configure-request-event",
+    MapRequest: (_default_ev_key,
+                 "map-request-event", "child-map-request-event"),
+    ConfigureRequest: (_default_ev_key,
+                       "configure-request-event",
                        "child-configure-request-event"),
-    FocusIn: ("parti-focus-in-event", None),
-    FocusOut: ("parti-focus-out-event", None),
-    ClientMessage: ("parti-client-message-event", None),
-    "XDamageNotify": ("parti-damage-event", None),
+    FocusIn: (_default_ev_key, "parti-focus-in-event", None),
+    FocusOut: (_default_ev_key, "parti-focus-out-event", None),
+    ClientMessage: (_default_ev_key, "parti-client-message-event", None),
+    "XDamageNotify": (_damage_helper_key, "parti-damage-event", None),
     }
 
 def _gw(display, xwin):
@@ -1031,10 +1029,14 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     cdef XDamageNotifyEvent* damage_e
                     damage_e = <XDamageNotifyEvent*>e
                     pyev.window = _gw(d, e.xany.window)
+                    pyev.damage = damage_e.damage
                     pyev.x = damage_e.area.x
                     pyev.y = damage_e.area.y
                     pyev.width = damage_e.area.width
                     pyev.height = damage_e.area.height
+                    xdamage_acknowledge(d, pyev.damage,
+                                        pyev.x, pyev.y,
+                                        pyev.width, pyev.height)
             except XError, e:
                 print ("Some window in our event disappeared before we could "
                        + "handle the event; so I'm just ignoring it instead.")
@@ -1048,13 +1050,13 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
 
 _gdk_event_signals = {
     # These other events are on client windows, mostly
-    gtk.gdk.PROPERTY_NOTIFY: "parti-property-notify-event",
-    gtk.gdk.UNMAP: "parti-unmap-event",
-    gtk.gdk.DESTROY: "parti-destroy-event",
-    # I can get CONFIGURE and MAP for client windows too,
-    # but actually I don't care ATM:
-    #gtk.gdk.GDK_MAP: "client-map-event",
-    #gtk.gdk.GDK_CONFIGURE: "client-configure-event",
+    gtk.gdk.PROPERTY_NOTIFY: (_default_ev_key,
+                              "parti-property-notify-event", None),
+    gtk.gdk.UNMAP: (_default_ev_key, "parti-unmap-event", None),
+    gtk.gdk.DESTROY: (_default_ev_key, "parti-destroy-event", None),
+    gtk.gdk.GDK_MAP: (_damage_helper_key, "parti-map-event", None),
+    gtk.gdk.GDK_CONFIGURE: (_damage_helper_key, "parti-configure-event", None),
+    gtk.gdk.GDK_KEYPRESS: ("parti-hotkey-manager", "key-press-event", None),
     }
 
 def _dispatch_gdk_event(event):
@@ -1062,12 +1064,7 @@ def _dispatch_gdk_event(event):
     # want to just pass on to GTK, but some we are especially interested
     # in...
     if event.type in _gdk_event_signals:
-        _route_event(event, _gdk_event_signals[event.type], None)
-    if (event.window is not None
-        and event.type == gtk.gdk.KEY_PRESS):
-        hotkey_manager = event.window.get_data("parti-hotkey-manager")
-        if hotkey_manager is not None:
-            hotkey_manager.emit("key-press-event", event)
+        _route_event(event, *_gdk_event_signals[event.type])
     gtk.main_do_event(event)
 
 def _install_global_event_filters():
