@@ -196,7 +196,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         "client-window": (gobject.TYPE_PYOBJECT,
                           "gtk.gdk.Window representing the client toplevel", "",
                           gobject.PARAM_READABLE),
-        # NB notify never fires for the client-contents properties:
+        # NB "notify" signal never fires for the client-contents properties:
         "client-contents": (gobject.TYPE_PYOBJECT,
                             "gtk.gdk.Pixmap containing the window contents", "",
                             gobject.PARAM_READABLE),
@@ -929,9 +929,7 @@ class WindowView(gtk.Widget):
         # Create a temporary buffer and draw onto that.  It might in some
         # vague sense be cleaner (and perhaps slightly less code) to just call
         # begin_paint_rect and end_paint on our target window, but this works
-        # well *and* for some reason gives us a workaround for:
-        #   https://bugs.freedesktop.org/show_bug.cgi?id=12996
-        # Apparently push_group forces a Render-based "slow" path.
+        # fine.
         #
         # Note about push_group():
         #   "<cworth> njs: It's [the temporary buffer push_group allocates] as
@@ -963,7 +961,6 @@ class WindowView(gtk.Widget):
         #tmpcr.set_operator(cairo.OPERATOR_SOURCE)
         #tmpcr.paint()
         #cr.set_source_surface(tmpsrf, 0, 0)
-        
         cr.paint()
 
         icon = self.model.get_property("icon")
