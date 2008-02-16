@@ -56,6 +56,17 @@ fetch the new stacking order, and deliver the events to be interpreted
 against stacking order B.  This appears to be unavoidable, though,
 so... oh well.
 
+The other really tricky bit is translating keyboard events from client
+to server.  I think the approach to take is: client just packs up
+events into logical form (including "nuisance" bits!) and sends them
+off.  Server unpacks them into keycode/mask, then uses XQueryPointer
+(!) to determine the current mask, and then issues keystrokes to
+adjust the mask to what it should be, and then issues the actual
+keystroke.
+
+NOTE: MOTION_NOTIFY and BUTTON_PRESS (and BUTTON_RELEASE) all include
+mask bits too, so they should all use the above logic as well.
+
 
 WM-side logic:
   -- register as WM, so we will be able to rearrange children of the
