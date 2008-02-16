@@ -39,6 +39,24 @@ The tricky parts for the client side are: just completeness, mostly --
 grokking focus and grabs, positioning windows, enabling cursors, etc.
 
 
+The trickiest thing overall, actually, may be maintaining stacking
+order sync.  Before processing any mouse event, stacking order must be
+accurate.  But how to achieve this?  On the client side, it's probably
+not actually possible.  We get basically *nothing* to work with -- we
+can work out the stacking order by hand, using a giant storm of
+XQueryTree calls, but the problem with this approach is that we have
+no way to get reliable notification when the stacking order has
+changed.  (Well, we could select for ConfigureNotify and some other
+stuff on like every window in the world, but that probably isn't
+useful.)  So the only thing we actually have to work with is
+_NET_CLIENT_LIST_STACKING.  We can be notified when this is changed,
+but then there's a race condition -- we get the notification that it's
+changed (A), the mouse sends some events, it changes again (B), we
+fetch the new stacking order, and deliver the events to be interpreted
+against stacking order B.  This appears to be unavoidable, though,
+so... oh well.
+
+
 WM-side logic:
   -- register as WM, so we will be able to rearrange children of the
      root with impunity, knowing that no other wm dare mess with us
