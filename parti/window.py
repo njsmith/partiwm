@@ -798,7 +798,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     # Killing clients:
     ################################
     
-    def request_quit(self):
+    def request_close(self):
         if "WM_DELETE_WINDOW" in self.get_property("protocols"):
             trap.swallow(parti.lowlevel.send_wm_delete_window,
                          self.client_window)
@@ -859,24 +859,6 @@ class WindowView(gtk.Widget):
                                self.allocation[3] * 1.0 / size[1])
             if 0.95 < scale_factor:
                 scale_factor = 1
-            # FIXME: Disable translation for now, because at least the
-            # following X servers have (different) bugs handling scaling +
-            # translation for composited windows:
-            #   Xephyr with XAA
-            #   Xephyr with -fakexa
-            #   intel with XAA
-            # Intel with EXA is known to work.
-            #
-            # See, for instance:
-            #   https://bugs.freedesktop.org/show_bug.cgi?id=13115
-            #   https://bugs.freedesktop.org/show_bug.cgi?id=13116
-            #   https://bugs.freedesktop.org/show_bug.cgi?id=13117
-            # I bet everyone else has bugs in this too, though.
-            #
-            # Using NameWindowPixmap and then compositing the pixmap instead
-            # of the window directly might or might not be a workaround --
-            # have to try it to find out.
-            # 
             offset = self.window_position(self.model,
                                           size[0] * scale_factor,
                                           size[1] * scale_factor)
