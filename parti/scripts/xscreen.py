@@ -36,7 +36,7 @@ class Protocol(object):
         return self._accept_packets
 
     def queue_packet(self, packet):
-        if self._accept_packets
+        if self._accept_packets:
             data = bencode(packet)
             if self._compressor is not None:
                 data = self._compressor.compress(data)
@@ -99,7 +99,7 @@ class Protocol(object):
             print "Unhandled error while processing packet from peer"
             dump_exc()
             # Ignore and continue, maybe things will work out anyway
-        return return consumed
+        return consumed
 
     def _socket_write(self):
         sent = self._sock.send(self._write_buf)
