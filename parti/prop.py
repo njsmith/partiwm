@@ -112,6 +112,8 @@ def _read_image(disp, stream):
     except Exception, e:
         print "Weird corruption in _NET_WM_ICON: %s" % (e,)
         return None
+    # Cairo wants a native-endian array here, and since the icon is
+    # transmitted as CARDINALs, that's what we get.
     bytes_as_array = array.array("c", bytes)
     local_surf = cairo.ImageSurface.create_for_data(bytes_as_array,
                                                     cairo.FORMAT_ARGB32,

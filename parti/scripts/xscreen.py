@@ -1,8 +1,10 @@
 # Todo:
+#   separate map, unmap, move, resize (map, resize require refills)
 #   stacking order
 #   keycode mapping
 #   button press, motion events, mask
 #   override-redirect windows
+#   xsync resize stuff
 
 import gtk
 import gobject
@@ -12,6 +14,7 @@ import socket
 import os
 import os.path
 import zlib
+import struct
 
 from parti.wm import Wm
 from parti.world_window import WorldWindow
@@ -121,6 +124,8 @@ class Protocol(object):
         try:
             print "got %s" % (dump_packet(decoded),)
             self._process_packet_cb(decoded)
+        except KeyboardInterrupt:
+            raise
         except:
             print "Unhandled error while processing packet from peer"
             dump_exc()
@@ -293,21 +298,29 @@ class XScreenServer(object):
         del self._id_to_window[id]
 
     def _redraw_needed(self, window, event):
-        self._send_damage_packet(window,
+        self._send_draw_packet(window,
                                  event.x, event.y, event.width, event.height)
 
-    def _send_damage_packet(self, window, x, y, width, height):
+    def _send_draw_packet(self, window, x, y, width, height):
         id = self._window_to_id[window]
         pixmap = window.get_property("client-contents")
-        target_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
-        # Tricky trick to get an XlibSurface out of pycairo:
-        source_cr = pixmap.cairo_create()
-        source_surface = source_cr.get_target()
-        cr = cairo.Context(target_surface)
-        cr.set_source_surface(source_surface, x, y)
-        cr.paint()
-        data = str(target_surface.get_data())
-        packet = ["draw", id, x, y, width, height, "argb", data]
+        # Originally this used Cairo and an ImageSurface, but for some reason
+        # the resulting surface basically always contained nonsense.  This is
+        # actually less code, too:
+        pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, False, 8, width, height)
+        pixbuf.get_from_drawable(pixmap, pixmap.get_colormap(),
+                                 x, y, 0, 0, width, height)
+        raw_data = pixbuf.get_pixels()
+        rowwidth = width * 3
+        rowstride = pixbuf.get_rowstride()
+        if rowwidth == rowstride:
+            data = raw_data
+        else:
+            rows = []
+            for i in xrange(height):
+                rows.append(raw_data[i*rowstride : i*rowstride+rowwidth])
+            data = "".join(rows)
+        packet = ["draw", id, x, y, width, height, "rgb24", data]
         self._protocol.queue_packet(packet)
 
     def _process_hello(self, packet):
@@ -325,7 +338,7 @@ class XScreenServer(object):
         (_, id, x, y, width, height) = packet
         window = self._id_to_window[id]
         self._desktop_manager.show_window(window, x, y, width, height)
-        self._send_damage_packet(window, x, y, width, height)
+        self._send_draw_packet(window, 0, 0, width, height)
 
     def _process_window_order(self, packet):
         (_, ids_bottom_to_top) = packet
@@ -375,7 +388,7 @@ class ClientWindow(gtk.Window):
         gtk.Window.__init__(self)
         self._client = client
         self._id = id
-        self._backing = cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1)
+        self._new_backing(1, 1)
 
         if "title" in attrs:
             self.set_title(attrs["title"].decode("utf-8"))
@@ -393,43 +406,51 @@ class ClientWindow(gtk.Window):
         if hints:
             self.set_geometry_hints(None, **hints)
         self.set_default_size(attrs["width"], attrs["height"])
+        self._geometry = (-1, -1, -1, -1)
 
         self.set_app_paintable(True)
 
-    def draw(self, x, y, width, height, argb_data):
-        data_array = array.array("c", argb_data)
-        source = cairo.ImageSurface.create_for_data(data_array,
-                                                    cairo.FORMAT_ARGB32,
-                                                    width, height, 0)
-        cr = cairo.Context(self._backing)
-        cr.set_source_surface(source, 0, 0)
-        cr.translate(x, y)
-        cr.paint()
+    def _new_backing(self, w, h):
+        self._backing = gtk.gdk.Pixmap(gtk.gdk.get_default_root_window(),
+                                       w, h)
+
+    def draw(self, x, y, width, height, rgb_data):
+        assert len(rgb_data) == width * height * 3
+        gc = self._backing.new_gc()
+        self._backing.draw_rgb_image(gc, x, y, width, height,
+                                     gtk.gdk.RGB_DITHER_NONE, rgb_data)
         self.window.invalidate_rect(gtk.gdk.Rectangle(x, y, width, height),
                                     False)
 
     def do_expose_event(self, event):
         if not self.flags() & gtk.MAPPED:
             return
-        print "Expose event"
         cr = self.window.cairo_create()
         cr.rectangle(event.area)
-        #cr.clip()
-        cr.set_source_surface(self._backing, 0, 0)
+        cr.clip()
+        cr.set_source_pixmap(self._backing, 0, 0)
+        cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.paint()
         return False
 
     def do_map_event(self, event):
         print "Got map event"
         gtk.Window.do_map_event(self, event)
-        self._client.send_configure_window_packet(self)
+        self._maybe_send_configure(True)
+
+    def _maybe_send_configure(self, force):
+        (x, y) = self.window.get_origin()
+        (_, _, w, h, _) = self.window.get_geometry()
+        if (x, y, w, h) != self._geometry or force:
+            self._client.send_configure_window_packet(self, x, y, w, h)
+        self._geometry = (x, y, w, h)
 
     def do_configure_event(self, event):
         print "Got configure event"
         gtk.Window.do_configure_event(self, event)
-        self._client.send_configure_window_packet(self)
-        self._backing = cairo.ImageSurface(cairo.FORMAT_ARGB32,
-                                           event.width, event.height)
+        if (event.width, event.height) != (self._geometry[2], self._geometry[3]):
+            self._new_backing(event.width, event.height)
+        self._maybe_send_configure(False)
 
     def do_delete_event(self, event):
         self._client.send_close_window_packet(self)
@@ -450,9 +471,8 @@ class XScreenClient(object):
         self._protocol.accept_packets()
         self._protocol.queue_packet(["hello", list(CAPABILITIES)])
 
-    def send_configure_window_packet(self, window):
+    def send_configure_window_packet(self, window, x, y, w, h):
         id = self._window_to_id[window]
-        (x, y, w, h, d) = window.window.get_geometry()
         self._protocol.queue_packet(["configure-window", id, x, y, w, h])
 
     def send_close_window_packet(self, window):
@@ -481,7 +501,7 @@ class XScreenClient(object):
     def _process_draw(self, packet):
         (_, id, x, y, width, height, coding, data) = packet
         window = self._id_to_window[id]
-        assert coding == "argb"
+        assert coding == "rgb24"
         window.draw(x, y, width, height, data)
 
     def _process_connection_lost(self, packet):
