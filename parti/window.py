@@ -249,10 +249,14 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         "group-leader": (gobject.TYPE_PYOBJECT,
                          "Window group leader (opaque identifier)", "",
                          gobject.PARAM_READABLE),
+        # Toggling this property does not actually make the window iconified,
+        # i.e. make it appear or disappear from the screen -- it merely
+        # updates the various window manager properties that inform the world
+        # whether or not the window is iconified.
         "iconic": (gobject.TYPE_BOOLEAN,
                    "ICCCM 'iconic' state -- any sort of 'not on desktop'.", "",
                    False,
-                   gobject.PARAM_READABLE),
+                   gobject.PARAM_READWRITE),
         "state": (gobject.TYPE_PYOBJECT,
                   "State, as per _NET_WM_STATE", "",
                   gobject.PARAM_READABLE),

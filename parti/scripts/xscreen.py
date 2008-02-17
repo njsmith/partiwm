@@ -1,5 +1,5 @@
 # Todo:
-#   separate map, unmap, move, resize (map, resize require refills)
+#   write queue management
 #   stacking order
 #   keycode mapping
 #   button press, motion events, mask
@@ -64,6 +64,7 @@ class Protocol(object):
                 data += self._compressor.flush(zlib.Z_SYNC_FLUSH)
             self._write_buf += data
             self._reset_watch()
+            self._socket_write()
         else:
             print "not sending %s" (dump_packet(packet),)
 
@@ -171,10 +172,17 @@ class DesktopManager(gtk.Widget):
         self._models[model].geom = (x, y, w, h)
         model.ownership_election()
         model.maybe_recalculate_geometry_for(self)
+        if model.get_property("iconic"):
+            model.set_property("iconic", False)
 
     def hide_window(self, model):
+        if not model.get_property("iconic"):
+            model.set_property("iconic", True)
         self._models[model].shown = False
         model.ownership_election()
+
+    def visible(self, model):
+        return self._models[model].shown
 
     def reorder_windows(self, models_bottom_to_top):
         for model in models_bottom_to_top:
@@ -187,7 +195,7 @@ class DesktopManager(gtk.Widget):
         del self._models[model]
 
     def _elect_me(self, model):
-        if self._models[model]:
+        if self.visible(model):
             return (1, self)
         else:
             return (-1, self)
@@ -259,6 +267,8 @@ class XScreenServer(object):
     def _new_window_signaled(self, wm, window):
         self._add_new_window(window)
 
+    _window_export_properties = ("title", "size-hints")
+
     def _add_new_window(self, window):
         id = self._max_window_id
         self._max_window_id += 1
@@ -266,30 +276,49 @@ class XScreenServer(object):
         self._id_to_window[id] = window
         window.connect("redraw-needed", self._redraw_needed)
         window.connect("unmanaged", self._lost_window)
+        for prop in self._window_export_properties:
+            window.connect("notify::%s" % prop, self._update_metadata)
         (x, y, w, h, depth) = window.get_property("client-window").get_geometry()
         self._desktop_manager.add_window(window, x, y, w, h)
         self._send_new_window_packet(window)
             
+    def _make_metadata(self, window, propname):
+        if propname == "title":
+            if window.get_property("title") is not None:
+                return {"title": window.get_property("title").encode("utf-8")}
+            else:
+                return {}
+        elif propname == "size-hints":
+            metadata = {}
+            hints = window.get_property("size-hints")
+            for attr, metakey in [
+                ("max_size", "size-constraint:maximum-size"),
+                ("min_size", "size-constraint:minimum-size"),
+                ("base_size", "size-constraint:base-size"),
+                ("resize_inc", "size-constraint:increment"),
+                ]:
+                if getattr(hints, attr) is not None:
+                    metadata[metakey] = getattr(hints, attr)
+            if hints.min_aspect is not None:
+                # Need a way to send doubles, or recover the original integer
+                # fractional form.
+                print "FIXME: ignoring aspect ratio constraint, things will likely break"
+            return metadata
+        else:
+            assert False
+
     def _send_new_window_packet(self, window):
         id = self._window_to_id[window]
-        attrs = {}
         (x, y, w, h) = self._desktop_manager.window_geometry(window)
-        attrs.update({"x": x, "y": y, "width": w, "height": h})
-        attrs["title"] = window.get_property("title").encode("utf-8")
-        hints = window.get_property("size-hints")
-        if hints.max_size is not None:
-            attrs["size-constraint:maximum-size"] = hints.max_size
-        if hints.min_size is not None:
-            attrs["size-constraint:minimum-size"] = hints.min_size
-        if hints.base_size is not None:
-            attrs["size-constraint:base-size"] = hints.base_size
-        if hints.resize_inc is not None:
-            attrs["size-constraint:increment"] = hints.resize_inc
-        if hints.min_aspect is not None:
-            # Need a way to send doubles, or recover the original integer
-            # fractional form.
-            print "FIXME: ignoring aspect ratio constraint, things will likely break"
-        self._protocol.queue_packet(["new-window", id, attrs])
+        metadata = {}
+        metadata.update(self._make_metadata(window, "title"))
+        metadata.update(self._make_metadata(window, "size-hints"))
+        self._protocol.queue_packet(["new-window", id, x, y, w, h, metadata])
+
+    def _update_metadata(self, window, pspec):
+        id = self._window_to_id[window]
+        metadata = self._make_metadata(window, pspec.name)
+        self._protocol.queue_packet(["window-metadata", id, metadata])
 
     def _lost_window(self, window, wm_exiting):
         id = self._window_to_id[window]
@@ -298,8 +327,9 @@ class XScreenServer(object):
         del self._id_to_window[id]
 
     def _redraw_needed(self, window, event):
-        self._send_draw_packet(window,
-                                 event.x, event.y, event.width, event.height)
+        if self._desktop_manager.visible(window):
+            self._send_draw_packet(window,
+                                   event.x, event.y, event.width, event.height)
 
     def _send_draw_packet(self, window, x, y, width, height):
         id = self._window_to_id[window]
@@ -334,11 +364,28 @@ class XScreenServer(object):
             self._desktop_manager.hide_window(window)
             self._send_new_window_packet(window)
 
-    def _process_configure_window(self, packet):
+    def _process_map_window(self, packet):
         (_, id, x, y, width, height) = packet
         window = self._id_to_window[id]
         self._desktop_manager.show_window(window, x, y, width, height)
         self._send_draw_packet(window, 0, 0, width, height)
+
+    def _process_unmap_window(self, packet):
+        (_, id) = packet
+        window = self._id_to_window[id]
+        self._desktop_manager.hide_window(window)
+
+    def _process_move_window(self, packet):
+        (_, id, x, y) = packet
+        window = self._id_to_window[id]
+        (_, _, w, h) = self._desktop_manager.window_geometry(window)
+        self._desktop_manager.show_window(window, x, y, w, h)
+
+    def _process_resize_window(self, packet):
+        (_, id, w, h) = packet
+        window = self._id_to_window[id]
+        (x, y, _, _) = self._desktop_manager.window_geometry(window)
+        self._desktop_manager.show_window(window, x, y, w, h)
 
     def _process_window_order(self, packet):
         (_, ids_bottom_to_top) = packet
@@ -370,7 +417,10 @@ class XScreenServer(object):
 
     _packet_handlers = {
         "hello": _process_hello,
-        "configure-window": _process_configure_window,
+        "map-window": _process_map_window,
+        "unmap-window": _process_unmap_window,
+        "move-window": _process_move_window,
+        "resize-window": _process_resize_window,
         "window-order": _process_window_order,
         "close-window": _process_close_window,
         "mouse-position": _process_mouse_position,
@@ -384,16 +434,30 @@ class XScreenServer(object):
 
 
 class ClientWindow(gtk.Window):
-    def __init__(self, client, id, attrs):
+    def __init__(self, protocol, id, x, y, w, h, metadata):
         gtk.Window.__init__(self)
-        self._client = client
+        self._protocol = protocol
         self._id = id
+        self._pos = (-1, -1)
+        self._size = (1, 1)
+        self._backing = None
+        self._metadata = {}
         self._new_backing(1, 1)
+        self.update_metadata(metadata)
+        
+        self.set_app_paintable(True)
 
-        if "title" in attrs:
-            self.set_title(attrs["title"].decode("utf-8"))
-        else:
-            self.set_title("XScreen forwarded window %s" % self._id)
+        # FIXME: It's possible in X to request a starting position for a
+        # window, but I don't know how to do it from GTK.
+        self.set_default_size(w, h)
+
+    def update_metadata(self, metadata):
+        self._metadata.update(metadata)
+        
+        self.set_title(u"%s (via XScreen)"
+                       % self._metadata.get("title",
+                                            "<untitled window>"
+                                            ).decode("utf-8"))
         hints = {}
         for (a, h1, h2) in [
             ("size-constraint:maximum-size", "max_width", "max_height"),
@@ -401,21 +465,35 @@ class ClientWindow(gtk.Window):
             ("size-constraint:base-size", "base_width", "base_height"),
             ("size-constraint:increment", "width_inc", "height_inc"),
             ]:
-            if a in attrs:
-                hints[h1], hints[h2] = attrs[a]
+            if a in self._metadata:
+                hints[h1], hints[h2] = self._metadata[a]
         if hints:
             self.set_geometry_hints(None, **hints)
-        self.set_default_size(attrs["width"], attrs["height"])
-        self._geometry = (-1, -1, -1, -1)
-
-        self.set_app_paintable(True)
 
     def _new_backing(self, w, h):
+        old_backing = self._backing
         self._backing = gtk.gdk.Pixmap(gtk.gdk.get_default_root_window(),
                                        w, h)
+        if old_backing is not None:
+            # Really we should respect bit-gravity here but... meh.
+            cr = self._backing.cairo_create()
+            cr.set_operator(cairo.OPERATOR_SOURCE)
+            cr.set_source_pixmap(old_backing, 0, 0)
+            cr.paint()
+            old_w, old_h = old_backing.get_size()
+            cr.move_to(old_w, 0)
+            cr.line_to(w, 0)
+            cr.line_to(w, h)
+            cr.line_to(0, h)
+            cr.line_to(0, old_h)
+            cr.line_to(old_w, old_h)
+            cr.close_path()
+            cr.set_source_rgb(1, 1, 1)
+            cr.fill()
 
     def draw(self, x, y, width, height, rgb_data):
         assert len(rgb_data) == width * height * 3
+        (my_width, my_height) = self.window.get_size()
         gc = self._backing.new_gc()
         self._backing.draw_rgb_image(gc, x, y, width, height,
                                      gtk.gdk.RGB_DITHER_NONE, rgb_data)
@@ -433,27 +511,36 @@ class ClientWindow(gtk.Window):
         cr.paint()
         return False
 
+    def _geometry(self):
+        (x, y) = self.window.get_origin()
+        (_, _, w, h, _) = self.window.get_geometry()
+        return (x, y, w, h)
+
     def do_map_event(self, event):
         print "Got map event"
         gtk.Window.do_map_event(self, event)
-        self._maybe_send_configure(True)
-
-    def _maybe_send_configure(self, force):
-        (x, y) = self.window.get_origin()
-        (_, _, w, h, _) = self.window.get_geometry()
-        if (x, y, w, h) != self._geometry or force:
-            self._client.send_configure_window_packet(self, x, y, w, h)
-        self._geometry = (x, y, w, h)
+        x, y, w, h = self._geometry()
+        self._protocol.queue_packet(["map-window", self._id, x, y, w, h])
+        self._pos = (x, y)
+        self._size = (w, h)
 
     def do_configure_event(self, event):
         print "Got configure event"
         gtk.Window.do_configure_event(self, event)
-        if (event.width, event.height) != (self._geometry[2], self._geometry[3]):
-            self._new_backing(event.width, event.height)
-        self._maybe_send_configure(False)
+        x, y, w, h = self._geometry()
+        if (x, y) != self._pos:
+            self._pos = (x, y)
+            self._protocol.queue_packet(["move-window", self._id, x, y])
+        if (w, h) != self._size:
+            self._size = (w, h)
+            self._protocol.queue_packet(["resize-window", self._id, w, h])
+            self._new_backing(w, h)
+
+    def do_unmap_event(self, event):
+        self._protocol.queue_packet(["unmap-window", self._id])
 
     def do_delete_event(self, event):
-        self._client.send_close_window_packet(self)
+        self._protocol.queue_packet(["close-window", self._id])
         return True
 
 gobject.type_register(ClientWindow)
@@ -471,25 +558,28 @@ class XScreenClient(object):
         self._protocol.accept_packets()
         self._protocol.queue_packet(["hello", list(CAPABILITIES)])
 
-    def send_configure_window_packet(self, window, x, y, w, h):
-        id = self._window_to_id[window]
-        self._protocol.queue_packet(["configure-window", id, x, y, w, h])
-
-    def send_close_window_packet(self, window):
-        id = self._window_to_id[window]
-        self._protocol.queue_packet(["close-window", id])
-
     def _process_hello(self, packet):
         (_, capabilities) = packet
         if "deflate" in capabilities:
             self._protocol.enable_deflate()
 
     def _process_new_window(self, packet):
-        (_, id, attrs) = packet
-        window = ClientWindow(self, id, attrs)
+        (_, id, x, y, w, h, metadata) = packet
+        window = ClientWindow(self._protocol, id, x, y, w, h, metadata)
         self._id_to_window[id] = window
         self._window_to_id[window] = id
         window.show_all()
+
+    def _process_draw(self, packet):
+        (_, id, x, y, width, height, coding, data) = packet
+        window = self._id_to_window[id]
+        assert coding == "rgb24"
+        window.draw(x, y, width, height, data)
+
+    def _process_window_metadata(self, packet):
+        (_, id, metadata) = packet
+        window = self._id_to_window[id]
+        window.update_metadata(metadata)
 
     def _process_lost_window(self, packet):
         (_, id) = packet
@@ -498,19 +588,14 @@ class XScreenClient(object):
         del self._window_to_id[window]
         window.destroy()
 
-    def _process_draw(self, packet):
-        (_, id, x, y, width, height, coding, data) = packet
-        window = self._id_to_window[id]
-        assert coding == "rgb24"
-        window.draw(x, y, width, height, data)
-
     def _process_connection_lost(self, packet):
         gtk.main_quit()
 
     _packet_handlers = {
         "hello": _process_hello,
-        "draw": _process_draw,
         "new-window": _process_new_window,
+        "draw": _process_draw,
+        "window-metadata": _process_window_metadata,
         "lost-window": _process_lost_window,
         Protocol.CONNECTION_LOST: _process_connection_lost,
         }
