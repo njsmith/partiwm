@@ -396,7 +396,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                % (event.send_event, self.pending_unmaps))
         assert self.pending_unmaps >= 0
         if event.send_event or self.pending_unmaps == 0:
-            self.unmanage_window()
+            self.unmanage()
         else:
             self.pending_unmaps -= 1
 
@@ -409,7 +409,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         # made with the annoying unmap heuristics we have to use above.  I
         # love the smell of XDestroyWindow in the morning.  It makes for
         # simple code:
-        self.unmanage_window()
+        self.unmanage()
 
     def unmanage(self, exiting=False):
         self.emit("unmanaged", exiting)

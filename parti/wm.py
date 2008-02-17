@@ -196,7 +196,7 @@ class Wm(gobject.GObject):
         self._update_window_list()
         self.emit("new-window", win)
 
-    def _handle_client_unmanaged(self, window):
+    def _handle_client_unmanaged(self, window, wm_exiting):
         gdkwindow = window.get_property("client-window")
         assert gdkwindow in self._windows
         del self._windows[gdkwindow]
@@ -231,7 +231,7 @@ class Wm(gobject.GObject):
 
     def do_quit(self):
         for win in self._windows.itervalues():
-            win.unmanage_window(True)
+            win.unmanage(True)
 
     def do_child_map_request_event(self, event):
         print "Found a potential client"

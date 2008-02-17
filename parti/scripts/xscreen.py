@@ -1,3 +1,9 @@
+# Todo:
+#   stacking order
+#   keycode mapping
+#   button press, motion events, mask
+#   override-redirect windows
+
 import gtk
 import gobject
 import cairo
@@ -14,9 +20,20 @@ from parti.lowlevel import xtest_fake_button, xtest_fake_key
 
 from bencode import bencode, bdecode
 
-CAPABILITIES = set("zlib")
+CAPABILITIES = set(["deflate"])
+
+def repr_ellipsized(obj, limit):
+    if isinstance(obj, str) and len(obj) > limit:
+        return repr(obj[:limit]) + "..."
+    else:
+        return repr(obj)
+
+def dump_packet(packet):
+    return "[" + ", ".join([repr_ellipsized(x, 50) for x in packet]) + "]"
 
 class Protocol(object):
+    CONNECTION_LOST = object()
+
     def __init__(self, sock, process_packet_cb):
         self._sock = sock
         self._process_packet_cb = process_packet_cb
@@ -37,16 +54,25 @@ class Protocol(object):
 
     def queue_packet(self, packet):
         if self._accept_packets:
+            print "sending %s" % (dump_packet(packet),)
             data = bencode(packet)
             if self._compressor is not None:
                 data = self._compressor.compress(data)
                 data += self._compressor.flush(zlib.Z_SYNC_FLUSH)
             self._write_buf += data
             self._reset_watch()
+        else:
+            print "not sending %s" (dump_packet(packet),)
 
-    def enable_zlib(self):
+    def enable_deflate(self):
         self._compressor = zlib.compressobj()
         self._decompressor = zlib.decompressobj()
+
+    def close(self):
+        if self._sock_tag is not None:
+            gobject.source_remove(self._sock_tag)
+            self._sock_tag = None
+        self._sock.close()
 
     def _reset_watch(self):
         wanted = gobject.IO_IN
@@ -61,28 +87,27 @@ class Protocol(object):
             self._sock_status = wanted
 
     def _socket_live(self, sock, condition):
-        if condition == gobject.IO_IN:
+        if condition & gobject.IO_IN:
             self._socket_read()
-        else:
-            assert condition == gobject.IO_OUT
+        if condition & gobject.IO_OUT:
             self._socket_write()
         return True
 
     def _socket_read(self):
-        buf = self._sock.read(4096)
+        buf = self._sock.recv(4096)
         if not buf:
             self._accept_packets = False
-            self._process_packet_cb(None)
+            self._process_packet_cb([Protocol.CONNECTION_LOST, self])
             return False
         if self._decompressor is not None:
             buf = self._decompressor.decompress(buf)
         self._read_buf += buf
         while True:
-            had_zlib = (self._decompressor is not None)
+            had_deflate = (self._decompressor is not None)
             consumed = self._consume_packet(self._read_buf)
             self._read_buf = self._read_buf[consumed:]
-            if not had_zlib and (self._decompressor is not None):
-                # zlib was just enabled: so decompress the data currently
+            if not had_deflate and (self._decompressor is not None):
+                # deflate was just enabled: so decompress the data currently
                 # waiting in the read buffer
                 self._read_buf = self._decompressor.decompress(self._read_buf)
             if consumed == 0:
@@ -94,6 +119,7 @@ class Protocol(object):
         except ValueError:
             return 0
         try:
+            print "got %s" % (dump_packet(decoded),)
             self._process_packet_cb(decoded)
         except:
             print "Unhandled error while processing packet from peer"
@@ -106,10 +132,18 @@ class Protocol(object):
         self._write_buf = self._write_buf[sent:]
         self._reset_watch()
 
+class DummyProtocol(object):
+    def queue_packet(self, packet):
+        pass
+
+    def close(self):
+        pass
+
 class DesktopManager(gtk.Widget):
     def __init__(self):
         gtk.Widget.__init__(self)
         self.set_property("can-focus", True)
+        self.set_flags(gtk.NO_WINDOW)
         self._models = {}
 
     ## For communicating with the main WM:
@@ -128,13 +162,13 @@ class DesktopManager(gtk.Widget):
         return self._models[model].geom
 
     def show_window(self, model, x, y, w, h):
-        self._model_shown[model] = True
-        self._model_geom[model] = (x, y, w, h)
+        self._models[model].shown = True
+        self._models[model].geom = (x, y, w, h)
         model.ownership_election()
         model.maybe_recalculate_geometry_for(self)
 
     def hide_window(self, model):
-        self._model_shown[model] = False
+        self._models[model].shown = False
         model.ownership_election()
 
     def reorder_windows(self, models_bottom_to_top):
@@ -144,7 +178,7 @@ class DesktopManager(gtk.Widget):
                 win.raise_()
 
     ## For communicating with WindowModels:
-    def _unmanaged(self, model):
+    def _unmanaged(self, model, wm_exiting):
         del self._models[model]
 
     def _elect_me(self, model):
@@ -186,6 +220,8 @@ class XScreenServer(object):
         # Window id 0 is reserved for "not a window"
         self._max_window_id = 1
 
+        self._protocol = DummyProtocol()
+
         for window in self._wm.get_property("windows"):
             self._add_new_window(window)
 
@@ -194,20 +230,23 @@ class XScreenServer(object):
             name = name[1:]
         sockdir = os.path.expanduser("~/.xscreen")
         if not os.path.exists(sockdir):
-            os.mkdir(sockdir, mode=0700)
+            os.mkdir(sockdir, 0700)
         sockpath = os.path.join(sockdir, name)
+        if os.path.exists(sockpath) and replace_other_wm:
+            os.unlink(sockpath)
         self._listener = socket.socket(socket.AF_UNIX)
         self._listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._listener.bind(sockpath)
         self._listener.listen(5)
         gobject.io_add_watch(self._listener, gobject.IO_IN,
                              self._new_connection)
-        self._protocol = None
 
     def _new_connection(self, *args):
-        self._reset_connection()
-        sock = self._listener.accept()
+        # Just drop any existing connection
+        self._protocol.close()
+        sock, addr = self._listener.accept()
         self._protocol = Protocol(sock, self.process_packet)
+        return True
 
     def _focus_dropped(self, *args):
         self._world_window.reset_x_focus()
@@ -222,9 +261,9 @@ class XScreenServer(object):
         self._id_to_window[id] = window
         window.connect("redraw-needed", self._redraw_needed)
         window.connect("unmanaged", self._lost_window)
-        self._send_new_window_packet(window)
         (x, y, w, h, depth) = window.get_property("client-window").get_geometry()
         self._desktop_manager.add_window(window, x, y, w, h)
+        self._send_new_window_packet(window)
             
     def _send_new_window_packet(self, window):
         id = self._window_to_id[window]
@@ -247,7 +286,7 @@ class XScreenServer(object):
             print "FIXME: ignoring aspect ratio constraint, things will likely break"
         self._protocol.queue_packet(["new-window", id, attrs])
 
-    def _lost_window(self, window):
+    def _lost_window(self, window, wm_exiting):
         id = self._window_to_id[window]
         self._protocol.queue_packet(["lost-window", id])
         del self._window_to_id[window]
@@ -260,21 +299,24 @@ class XScreenServer(object):
     def _send_damage_packet(self, window, x, y, width, height):
         id = self._window_to_id[window]
         pixmap = window.get_property("client-contents")
-        tmpsrf = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
-        tmpcr = cairo.Context(tmpsrf)
-        tmpcr.set_source_pixmap(pixmap, x, y)
-        tmpcr.paint()
-        data = str(tmpsrf.get_data())
-        packet = ["draw", id, x, y, width, height, "rgba", data]
+        target_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+        # Tricky trick to get an XlibSurface out of pycairo:
+        source_cr = pixmap.cairo_create()
+        source_surface = source_cr.get_target()
+        cr = cairo.Context(target_surface)
+        cr.set_source_surface(source_surface, x, y)
+        cr.paint()
+        data = str(target_surface.get_data())
+        packet = ["draw", id, x, y, width, height, "argb", data]
         self._protocol.queue_packet(packet)
 
     def _process_hello(self, packet):
         client_capabilities = set(packet[1])
-        capabilities = CAPABILITIES.intersect(client_capabilities)
+        capabilities = CAPABILITIES.intersection(client_capabilities)
         self._protocol.accept_packets()
         self._protocol.queue_packet(["hello", list(capabilities)])
-        if "zlib" in capabilities:
-            self._protocol.enable_zlib()
+        if "deflate" in capabilities:
+            self._protocol.enable_deflate()
         for window in self._window_to_id.keys():
             self._desktop_manager.hide_window(window)
             self._send_new_window_packet(window)
@@ -305,6 +347,14 @@ class XScreenServer(object):
         (_, button, pressed) = packet
         xtest_fake_button(gtk.gdk.display_get_default(), button, pressed)
 
+    def _process_connection_lost(self, packet):
+        (_, protocol) = packet
+        if protocol is self._protocol:
+            self._protocol.close()
+            self._protocol = DummyProtocol()
+        else:
+            print "stale connection lost message"
+
     _packet_handlers = {
         "hello": _process_hello,
         "configure-window": _process_configure_window,
@@ -312,11 +362,10 @@ class XScreenServer(object):
         "close-window": _process_close_window,
         "mouse-position": _process_mouse_position,
         "button-event": _process_button_event,
+        Protocol.CONNECTION_LOST: _process_connection_lost,
         }
 
     def process_packet(self, packet):
-        if packet is None:
-            return
         packet_type = packet[0]
         self._packet_handlers[packet_type](self, packet)
 
@@ -329,7 +378,7 @@ class ClientWindow(gtk.Window):
         self._backing = cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1)
 
         if "title" in attrs:
-            self.set_title(title.decode("utf-8"))
+            self.set_title(attrs["title"].decode("utf-8"))
         else:
             self.set_title("XScreen forwarded window %s" % self._id)
         hints = {}
@@ -341,8 +390,11 @@ class ClientWindow(gtk.Window):
             ]:
             if a in attrs:
                 hints[h1], hints[h2] = attrs[a]
-        self.set_geometry_hints(None, **hints)
-        self.set_default_size(attrs["x"], attrs["y"])
+        if hints:
+            self.set_geometry_hints(None, **hints)
+        self.set_default_size(attrs["width"], attrs["height"])
+
+        self.set_app_paintable(True)
 
     def draw(self, x, y, width, height, argb_data):
         data_array = array.array("c", argb_data)
@@ -351,24 +403,30 @@ class ClientWindow(gtk.Window):
                                                     width, height, 0)
         cr = cairo.Context(self._backing)
         cr.set_source_surface(source, 0, 0)
+        cr.translate(x, y)
         cr.paint()
-        self.window.invalidate_rect(gtk.gdk.Rectangle(x, y, width, height))
+        self.window.invalidate_rect(gtk.gdk.Rectangle(x, y, width, height),
+                                    False)
 
     def do_expose_event(self, event):
         if not self.flags() & gtk.MAPPED:
             return
+        print "Expose event"
         cr = self.window.cairo_create()
         cr.rectangle(event.area)
-        cr.clip()
+        #cr.clip()
         cr.set_source_surface(self._backing, 0, 0)
         cr.paint()
+        return False
 
     def do_map_event(self, event):
-        gtk.Window.do_map_event(event)
+        print "Got map event"
+        gtk.Window.do_map_event(self, event)
         self._client.send_configure_window_packet(self)
 
     def do_configure_event(self, event):
-        gtk.Window.do_configure_event(self)
+        print "Got configure event"
+        gtk.Window.do_configure_event(self, event)
         self._client.send_configure_window_packet(self)
         self._backing = cairo.ImageSurface(cairo.FORMAT_ARGB32,
                                            event.width, event.height)
@@ -387,6 +445,7 @@ class XScreenClient(object):
         address = os.path.expanduser("~/.xscreen/%s" % (name,))
         sock = socket.socket(socket.AF_UNIX)
         sock.connect(address)
+        print "Connected"
         self._protocol = Protocol(sock, self.process_packet)
         self._protocol.accept_packets()
         self._protocol.queue_packet(["hello", list(CAPABILITIES)])
@@ -402,8 +461,8 @@ class XScreenClient(object):
 
     def _process_hello(self, packet):
         (_, capabilities) = packet
-        if "zlib" in capabilities:
-            self._protocol.enable_zlib()
+        if "deflate" in capabilities:
+            self._protocol.enable_deflate()
 
     def _process_new_window(self, packet):
         (_, id, attrs) = packet
@@ -425,16 +484,18 @@ class XScreenClient(object):
         assert coding == "argb"
         window.draw(x, y, width, height, data)
 
+    def _process_connection_lost(self, packet):
+        gtk.main_quit()
+
     _packet_handlers = {
         "hello": _process_hello,
         "draw": _process_draw,
         "new-window": _process_new_window,
         "lost-window": _process_lost_window,
+        Protocol.CONNECTION_LOST: _process_connection_lost,
         }
     
     def process_packet(self, packet):
-        if packet is None:
-            gtk.main_quit()
         packet_type = packet[0]
         self._packet_handlers[packet_type](self, packet)
 
@@ -442,7 +503,7 @@ class XScreenClient(object):
 if __name__ == "__main__":
     import sys
     if sys.argv[1] == "serve":
-        app = XScreenServer(False)
+        app = XScreenServer(True)
     elif sys.argv[1] == "connect":
         app = XScreenClient(sys.argv[2])
     else:
