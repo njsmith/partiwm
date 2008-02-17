@@ -1,6 +1,6 @@
 ^build
 ^install
-^parti/lowlevel/parti.lowlevel.bindings.c$
-^parti/lowlevel/constants.pxi$
+^wimpiggy/lowlevel/wimpiggy.lowlevel.bindings.c$
+^wimpiggy/lowlevel/constants.pxi$
 ^MANIFEST$
 ^dist

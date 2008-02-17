@@ -9,8 +9,8 @@ import gobject
 import gtk
 import gtk.gdk
 
-from parti.util import dump_exc, LameStruct
-from parti.error import trap, XError
+from wimpiggy.util import dump_exc, LameStruct
+from wimpiggy.error import trap, XError
 
 ###################################
 # Headers, python magic
@@ -857,7 +857,7 @@ def configureAndNotify(pywindow, x, y, width, height, fields=None):
 #       PropertyNotify
 #       Unmap
 #       Destroy
-# Our hooks in any case use the "parti-route-events-to" GObject user data
+# Our hooks in any case use the "wimpiggy-route-events-to" GObject user data
 # field of the gtk.gdk.Window's involved.  For the SubstructureRedirect
 # events, we use this field of either the window that is making the request,
 # or, if its field is unset, to the window that actually has
@@ -866,7 +866,7 @@ def configureAndNotify(pywindow, x, y, width, height, fields=None):
 #
 # So basically, to use this code:
 #   -- Import this module to install the global event filters
-#   -- Call win.set_data("parti-route-events-to", obj) on random windows.
+#   -- Call win.set_data("wimpiggy-route-events-to", obj) on random windows.
 #   -- Call addXSelectInput or its convenience wrappers, substructureRedirect
 #      and selectFocusChange.
 #   -- Receive interesting signals on 'obj'.
@@ -946,18 +946,18 @@ def _route_event(event, key, signal, parent_signal):
             print handler, parent_signal, event
             _maybe_send_event(handler, parent_signal, event)
 
-_default_ev_key = "parti-route-events-to"
-_damage_helper_key = "parti-route-damage-to"
+_default_ev_key = "wimpiggy-route-events-to"
+_damage_helper_key = "wimpiggy-route-damage-to"
 _x_event_signals = {
     MapRequest: (_default_ev_key,
                  "map-request-event", "child-map-request-event"),
     ConfigureRequest: (_default_ev_key,
                        "configure-request-event",
                        "child-configure-request-event"),
-    FocusIn: (_default_ev_key, "parti-focus-in-event", None),
-    FocusOut: (_default_ev_key, "parti-focus-out-event", None),
-    ClientMessage: (_default_ev_key, "parti-client-message-event", None),
-    "XDamageNotify": (_damage_helper_key, "parti-damage-event", None),
+    FocusIn: (_default_ev_key, "wimpiggy-focus-in-event", None),
+    FocusOut: (_default_ev_key, "wimpiggy-focus-out-event", None),
+    ClientMessage: (_default_ev_key, "wimpiggy-client-message-event", None),
+    "XDamageNotify": (_damage_helper_key, "wimpiggy-damage-event", None),
     }
 
 def _gw(display, xwin):
@@ -1060,12 +1060,12 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
 _gdk_event_signals = {
     # These other events are on client windows, mostly
     gtk.gdk.PROPERTY_NOTIFY: (_default_ev_key,
-                              "parti-property-notify-event", None),
-    gtk.gdk.UNMAP: (_default_ev_key, "parti-unmap-event", None),
-    gtk.gdk.DESTROY: (_default_ev_key, "parti-destroy-event", None),
-    gtk.gdk.MAP: (_damage_helper_key, "parti-map-event", None),
-    gtk.gdk.CONFIGURE: (_damage_helper_key, "parti-configure-event", None),
-    gtk.gdk.KEY_PRESS: ("parti-hotkey-manager", "key-press-event", None),
+                              "wimpiggy-property-notify-event", None),
+    gtk.gdk.UNMAP: (_default_ev_key, "wimpiggy-unmap-event", None),
+    gtk.gdk.DESTROY: (_default_ev_key, "wimpiggy-destroy-event", None),
+    gtk.gdk.MAP: (_damage_helper_key, "wimpiggy-map-event", None),
+    gtk.gdk.CONFIGURE: (_damage_helper_key, "wimpiggy-configure-event", None),
+    gtk.gdk.KEY_PRESS: ("wimpiggy-hotkey-manager", "key-press-event", None),
     }
 
 def _dispatch_gdk_event(event):

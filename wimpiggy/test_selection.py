@@ -1,6 +1,6 @@
-from parti.test import *
-from parti.selection import ManagerSelection, AlreadyOwned
-import parti.lowlevel
+from wimpiggy.test import *
+from wimpiggy.selection import ManagerSelection, AlreadyOwned
+import wimpiggy.lowlevel
 
 import struct
 
@@ -32,7 +32,7 @@ class TestSelection(TestWithSession, MockEventReceiver):
         assert selection_lost_fired[m1]
         assert not selection_lost_fired[m2]
 
-    def do_parti_client_message_event(self, event):
+    def do_wimpiggy_client_message_event(self, event):
         self.event = event
         gtk.main_quit()
     def test_notification(self):
@@ -41,7 +41,7 @@ class TestSelection(TestWithSession, MockEventReceiver):
         d2 = self.clone_display()
         root2 = d2.get_default_screen().get_root_window()
         root2.set_events(gtk.gdk.STRUCTURE_MASK)
-        root2.set_data("parti-route-events-to", self)
+        root2.set_data("wimpiggy-route-events-to", self)
         d2.flush()
         self.event = None
 
@@ -58,11 +58,11 @@ class TestSelection(TestWithSession, MockEventReceiver):
         # 0 = timestamp
         # FIXME: how to check this?
         # 1 = manager atom
-        assert self.event.data[1] == parti.lowlevel.get_xatom(root2, "WM_S0")
+        assert self.event.data[1] == wimpiggy.lowlevel.get_xatom(root2, "WM_S0")
         # 2 = window belonging to manager.  We just check that it really is a
         # window.
-        assert parti.lowlevel.get_pywindow(root2, self.event.data[2]) is not None
-        assert parti.lowlevel.myGetSelectionOwner(root2, "WM_S0") == self.event.data[2]
+        assert wimpiggy.lowlevel.get_pywindow(root2, self.event.data[2]) is not None
+        assert wimpiggy.lowlevel.myGetSelectionOwner(root2, "WM_S0") == self.event.data[2]
         # 3, 4 = 0
         assert self.event.data[3] == 0
         assert self.event.data[4] == 0

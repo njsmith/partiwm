@@ -9,7 +9,7 @@ import errno
 import gobject
 import gtk
 import gtk.gdk
-from parti.util import one_arg_signal
+from wimpiggy.util import one_arg_signal
 
 # Skip contents of this file when looking for tests
 __test__ = False
@@ -106,7 +106,7 @@ class Session(object):
             or not self._alive(self._dbus.pid)
             or not self._x_really_running()):
             self.destroy()
-            self._x11 = subprocess.Popen(["Xvfb-for-parti", self.display_name,
+            self._x11 = subprocess.Popen(["Xvfb-for-wimpiggy", self.display_name,
                                           "-ac",
                                           #"-audit", "10",
                                           "+extension", "Composite",
@@ -115,7 +115,7 @@ class Session(object):
                                           "-screen", "0", "1024x768x24+32"],
                                          executable="Xvfb",
                                          stderr=open("/dev/null", "w"))
-            self._dbus = subprocess.Popen(["dbus-daemon-for-parti", "--session",
+            self._dbus = subprocess.Popen(["dbus-daemon-for-wimpiggy", "--session",
                                            "--nofork", "--print-address"],
                                           executable="dbus-daemon",
                                           stdout=subprocess.PIPE)
@@ -196,9 +196,9 @@ class MockEventReceiver(gobject.GObject):
         "child-map-request-event": one_arg_signal,
         "configure-request-event": one_arg_signal,
         "child-configure-request-event": one_arg_signal,
-        "parti-focus-in-event": one_arg_signal,
-        "parti-focus-out-event": one_arg_signal,
-        "parti-client-message-event": one_arg_signal,
+        "wimpiggy-focus-in-event": one_arg_signal,
+        "wimpiggy-focus-out-event": one_arg_signal,
+        "wimpiggy-client-message-event": one_arg_signal,
         }
     def do_map_request_event(self, event):
         print "do_map_request_event"
@@ -212,14 +212,14 @@ class MockEventReceiver(gobject.GObject):
     def do_child_configure_request_event(self, event):
         print "do_child_configure_request_event"
         assert False
-    def do_parti_focus_in_event(self, event):
-        print "do_parti_focus_in_event"
+    def do_wimpiggy_focus_in_event(self, event):
+        print "do_wimpiggy_focus_in_event"
         assert False
-    def do_parti_focus_out_event(self, event):
-        print "do_parti_focus_out_event"
+    def do_wimpiggy_focus_out_event(self, event):
+        print "do_wimpiggy_focus_out_event"
         assert False
-    def do_parti_client_message_event(self, event):
-        print "do_parti_client_message_event"
+    def do_wimpiggy_client_message_event(self, event):
+        print "do_wimpiggy_client_message_event"
         assert False
 gobject.type_register(MockEventReceiver)
 

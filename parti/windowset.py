@@ -1,8 +1,8 @@
 import gtk
 import gobject
 
-from parti.util import base
-from parti.window import WindowModel, Unmanageable
+from wimpiggy.util import base
+from wimpiggy.window import WindowModel, Unmanageable
 
 class WindowSet(gobject.GObject):
     __gsignals__ = {

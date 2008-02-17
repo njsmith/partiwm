@@ -1,7 +1,7 @@
 import gtk
 import gtk.gdk
-import parti.lowlevel
-from parti.util import base
+import wimpiggy.lowlevel
+from wimpiggy.util import base
 
 class PseudoclientWindow(gtk.Window):
     """A gtk.Window that acts like an ordinary client.

@@ -2,10 +2,6 @@ import gtk
 import gtk.gdk
 import parti.tray
 
-# For take_focus
-import parti.lowlevel
-import parti.error
-
 class SimpleTabTray(parti.tray.Tray, gtk.HPaned):
     def __init__(self, trayset, tag):
         super(SimpleTabTray, self).__init__(trayset, tag)

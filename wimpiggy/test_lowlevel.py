@@ -1,7 +1,7 @@
-from parti.test import *
-import parti.lowlevel as l
+from wimpiggy.test import *
+import wimpiggy.lowlevel as l
 import gtk
-from parti.error import *
+from wimpiggy.error import *
 
 class TestLowlevel(TestWithSession):
     def root(self, disp=None):
@@ -155,7 +155,7 @@ class TestLowlevelMisc(TestLowlevel):
 
 
 class TestFocusStuff(TestLowlevel, MockEventReceiver):
-    def do_parti_focus_in_event(self, event):
+    def do_wimpiggy_focus_in_event(self, event):
         if event.window is self.w1:
             assert self.w1_got is None
             self.w1_got = event
@@ -163,7 +163,7 @@ class TestFocusStuff(TestLowlevel, MockEventReceiver):
             assert self.w2_got is None
             self.w2_got = event
         gtk.main_quit()
-    def do_parti_focus_out_event(self, event):
+    def do_wimpiggy_focus_out_event(self, event):
         if event.window is self.w1:
             assert self.w1_lost is None
             self.w1_lost = event
@@ -181,8 +181,8 @@ class TestFocusStuff(TestLowlevel, MockEventReceiver):
         self.w1_lost, self.w2_lost = None, None
         l.selectFocusChange(self.w1)
         l.selectFocusChange(self.w2)
-        self.w1.set_data("parti-route-events-to", self)
-        self.w2.set_data("parti-route-events-to", self)
+        self.w1.set_data("wimpiggy-route-events-to", self)
+        self.w2.set_data("wimpiggy-route-events-to", self)
 
         gtk.gdk.flush()
         l.XSetInputFocus(self.w1)
@@ -227,7 +227,7 @@ class TestFocusStuff(TestLowlevel, MockEventReceiver):
         self.w2_lost = None
         
 class TestClientMessageAndXSelectInputStuff(TestLowlevel, MockEventReceiver):
-    def do_parti_client_message_event(self, event):
+    def do_wimpiggy_client_message_event(self, event):
         print "got clientmessage"
         self.evs.append(event)
         gtk.main_quit()
@@ -237,8 +237,8 @@ class TestClientMessageAndXSelectInputStuff(TestLowlevel, MockEventReceiver):
         self.w = self.window()
         gtk.gdk.flush()
 
-        self.w.set_data("parti-route-events-to", self)
-        self.root().set_data("parti-route-events-to", self)
+        self.w.set_data("wimpiggy-route-events-to", self)
+        self.root().set_data("wimpiggy-route-events-to", self)
 
         data = (0x01020304, 0x05060708, 0x090a0b0c, 0x0d0e0f10, 0x11121314)
         l.sendClientMessage(self.root(), False, 0, "NOMASK", *data)
@@ -269,7 +269,7 @@ class TestClientMessageAndXSelectInputStuff(TestLowlevel, MockEventReceiver):
     def test_send_wm_take_focus(self):
         self.evs = []
         win = self.window()
-        win.set_data("parti-route-events-to", self)
+        win.set_data("wimpiggy-route-events-to", self)
         gtk.gdk.flush()
 
         l.send_wm_take_focus(win, 1234)
@@ -286,8 +286,8 @@ class TestClientMessageAndXSelectInputStuff(TestLowlevel, MockEventReceiver):
 # myGetSelectionOwner gets tested in test_selection.py
 
 class TestSendConfigureNotify(TestLowlevel):
-    # This test stomps on Parti's global event handler, so make sure not to
-    # try receiving parti events in it.
+    # This test stomps on Wimpiggy's global event handler, so make sure not to
+    # try receiving wimpiggy events in it.
     def test_sendConfigureNotify(self):
         # GDK discards ConfigureNotify's sent to child windows, so we can't
         # use self.window():
@@ -379,7 +379,7 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
         gtk.gdk.flush()
         w1 = l.get_pywindow(self.display, l.get_xwindow(w2))
 
-        root.set_data("parti-route-events-to", self)
+        root.set_data("wimpiggy-route-events-to", self)
         l.substructureRedirect(root)
         gtk.gdk.flush()
 
@@ -407,7 +407,7 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
         # If we have a handler installed on the child, it takes precedence:
         self.child_map_ev = None
         self.child_conf_ev = None
-        w1.set_data("parti-route-events-to", self)
+        w1.set_data("wimpiggy-route-events-to", self)
         w2.show()
         while None in (self.map_ev, self.conf_ev):
             gtk.main()
@@ -469,7 +469,7 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
         w1_client = self.window(client)
         gtk.gdk.flush()
         w1_wm = l.get_pywindow(self.display, l.get_xwindow(w1_client))
-        w1_wm.set_data("parti-route-events-to", self)
+        w1_wm.set_data("wimpiggy-route-events-to", self)
 
         l.configureAndNotify(w1_client, 11, 12, 13, 14)
         gtk.main()

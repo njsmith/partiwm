@@ -1,7 +1,7 @@
 import gobject
-from parti.util import one_arg_signal, AutoPropGObjectMixin
-from parti.error import *
-from parti.lowlevel import (xcomposite_redirect_window,
+from wimpiggy.util import one_arg_signal, AutoPropGObjectMixin
+from wimpiggy.error import *
+from wimpiggy.lowlevel import (xcomposite_redirect_window,
                             xcomposite_unredirect_window,
                             xcomposite_name_window_pixmap,
                             xdamage_start,
@@ -11,9 +11,9 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
     __gsignals__ = {
         "redraw-needed": one_arg_signal,
 
-        "parti-damage-event": one_arg_signal,
-        "parti-map-event": one_arg_signal,
-        "parti-configure-event": one_arg_signal,
+        "wimpiggy-damage-event": one_arg_signal,
+        "wimpiggy-map-event": one_arg_signal,
+        "wimpiggy-configure-event": one_arg_signal,
         }
 
     __gproperties__ = {
@@ -29,14 +29,14 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
             xcomposite_redirect_window(window)
         self.refresh_pixmap()
         self._damage_handle = xdamage_start(window)
-        self._window.set_data("parti-route-damage-to", self)
+        self._window.set_data("wimpiggy-route-damage-to", self)
 
     def destroy(self):
         if not self._already_composited:
             trap.swallow(xcomposite_unredirect_window, self._window)
         trap.swallow(xdamage_stop, self._window, self._damage_handle)
         self._internal_set_property("window-contents-handle", None)
-        self._window.set_data("parti-route-damage-to", None)
+        self._window.set_data("wimpiggy-route-damage-to", None)
 
     def refresh_pixmap(self):
         def set_pixmap():
@@ -44,13 +44,13 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
             self._internal_set_property("window-contents-handle", handle)
         trap.swallow(set_pixmap)
 
-    def do_parti_map_event(self, *args):
+    def do_wimpiggy_map_event(self, *args):
         self.refresh_pixmap()
 
-    def do_parti_configure_event(self, *args):
+    def do_wimpiggy_configure_event(self, *args):
         self.refresh_pixmap()
 
-    def do_parti_damage_event(self, event):
+    def do_wimpiggy_damage_event(self, event):
         event.pixmap_handle = self.get_property("window-contents-handle")
         self.emit("redraw-needed", event)
 

@@ -16,12 +16,12 @@ import os.path
 import zlib
 import struct
 
-from parti.wm import Wm
-from parti.world_window import WorldWindow
-from parti.util import dump_exc, LameStruct
-from parti.lowlevel import xtest_fake_button, xtest_fake_key
+from wimpiggy.wm import Wm
+from wimpiggy.world_window import WorldWindow
+from wimpiggy.util import dump_exc, LameStruct
+from wimpiggy.lowlevel import xtest_fake_button, xtest_fake_key
 
-from bencode import bencode, bdecode
+from xscreen.bencode import bencode, bdecode
 
 CAPABILITIES = set(["deflate"])
 

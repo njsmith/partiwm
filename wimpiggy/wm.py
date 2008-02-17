@@ -3,19 +3,18 @@ import gobject
 
 from sets import ImmutableSet
 
-import parti.selection
-import parti.lowlevel
-from parti.prop import prop_set
-from parti.util import base, no_arg_signal, one_arg_signal
+import wimpiggy.selection
+import wimpiggy.lowlevel
+from wimpiggy.prop import prop_set
+from wimpiggy.util import base, no_arg_signal, one_arg_signal
 
-from parti.window import WindowModel, Unmanageable
+from wimpiggy.window import WindowModel, Unmanageable
 
 class Wm(gobject.GObject):
     _NET_SUPPORTED = [
         "_NET_SUPPORTED", # a bit redundant, perhaps...
         "_NET_SUPPORTING_WM_CHECK",
         "_NET_WM_FULL_PLACEMENT",
-        "_PARTI_WM_HAS_TABS",
         "_NET_WM_HANDLED_ICONS",
         "_NET_CLIENT_LIST",
         "_NET_CLIENT_LIST_STACKING",
@@ -117,9 +116,9 @@ class Wm(gobject.GObject):
         # Mostly intended for internal use:
         "child-map-request-event": one_arg_signal,
         "child-configure-request-event": one_arg_signal,
-        "parti-focus-in-event": one_arg_signal,
-        "parti-focus-out-event": one_arg_signal,
-        "parti-client-message-event": one_arg_signal,
+        "wimpiggy-focus-in-event": one_arg_signal,
+        "wimpiggy-focus-out-event": one_arg_signal,
+        "wimpiggy-client-message-event": one_arg_signal,
         }
 
     def __init__(self, name, replace_other_wm, display=None):
@@ -139,7 +138,7 @@ class Wm(gobject.GObject):
         self._windows_in_order = []
 
         # Become the Official Window Manager of this year's display:
-        self._wm_selection = parti.selection.ManagerSelection(self._display, "WM_S0")
+        self._wm_selection = wimpiggy.selection.ManagerSelection(self._display, "WM_S0")
         self._wm_selection.connect("selection-lost", self._lost_wm_selection)
         # May throw AlreadyOwned:
         self._wm_selection.acquire(force=replace_other_wm)
@@ -157,19 +156,19 @@ class Wm(gobject.GObject):
 
         # Okay, ready to select for SubstructureRedirect and then load in all
         # the existing clients.
-        self._root.set_data("parti-route-events-to", self)
-        parti.lowlevel.substructureRedirect(self._root)
+        self._root.set_data("wimpiggy-route-events-to", self)
+        wimpiggy.lowlevel.substructureRedirect(self._root)
 
-        for w in parti.lowlevel.get_children(self._root):
+        for w in wimpiggy.lowlevel.get_children(self._root):
             # Checking for FOREIGN here filters out anything that we've
             # created ourselves (like, say, the world window), and checking
             # for mapped filters out any withdrawn windows.
             if (w.get_window_type() == gtk.gdk.WINDOW_FOREIGN
-                and parti.lowlevel.is_mapped(w)):
+                and wimpiggy.lowlevel.is_mapped(w)):
                 self._manage_client(w)
 
         # Also watch for focus change events on the root window
-        parti.lowlevel.selectFocusChange(self._root)
+        wimpiggy.lowlevel.selectFocusChange(self._root)
 
         # FIXME:
         # Need viewport abstraction for _NET_CURRENT_DESKTOP...
@@ -211,7 +210,7 @@ class Wm(gobject.GObject):
         prop_set(self._root, "_NET_CLIENT_LIST_STACKING",
                  ["window"], self._windows_in_order)
 
-    def do_parti_client_message_event(self, event):
+    def do_wimpiggy_client_message_event(self, event):
         # FIXME
         # Need to listen for:
         #   _NET_CLOSE_WINDOW
@@ -247,26 +246,26 @@ class Wm(gobject.GObject):
         # accurate info on what the app is actually requesting.
         assert event.window not in self._windows
         print "Reconfigure on withdrawn window"
-        parti.lowlevel.configureAndNotify(event.window,
+        wimpiggy.lowlevel.configureAndNotify(event.window,
                                           event.x, event.y,
                                           event.width, event.height,
                                           event.value_mask)
 
-    def do_parti_focus_in_event(self, event):
+    def do_wimpiggy_focus_in_event(self, event):
         # The purpose of this function is to detect when the focus mode has
         # gone to PointerRoot or None, so that it can be given back to
         # something real.  This is easy to detect -- a FocusIn event with
         # detail PointerRoot or None is generated on the root window.
         print "FocusIn on root"
         print event
-        if event.detail in (parti.lowlevel.const["NotifyPointerRoot"],
-                            parti.lowlevel.const["NotifyDetailNone"]):
+        if event.detail in (wimpiggy.lowlevel.const["NotifyPointerRoot"],
+                            wimpiggy.lowlevel.const["NotifyDetailNone"]):
             print "PointerRoot or None?  This won't do... someone should get focus!"
             self.emit("focus-got-dropped")
 
-    def do_parti_focus_out_event(self, event):
+    def do_wimpiggy_focus_out_event(self, event):
         print "Focus left root, FYI"
-        parti.lowlevel.printFocus(self._display)
+        wimpiggy.lowlevel.printFocus(self._display)
 
     def do_desktop_list_changed(self, desktops):
         prop_set(self._root, "_NET_NUMBER_OF_DESKTOPS", "u32", len(desktops))

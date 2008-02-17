@@ -1,7 +1,7 @@
 import gobject
 import gtk
 
-from parti.util import base
+from wimpiggy.util import base
 
 # FIXME: The current design here is lame... these should probably be models of
 # some sort, or possibly hold many models, so that one can cycle through

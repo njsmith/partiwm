@@ -1,10 +1,10 @@
-from parti.test import *
+from wimpiggy.test import *
 import struct
 import gtk
 import cairo
-import parti.prop as p
-import parti.lowlevel
-import parti.error
+import wimpiggy.prop as p
+import wimpiggy.lowlevel
+import wimpiggy.error
 
 class TestProp(TestWithSession):
     def setUp(self):
@@ -37,17 +37,17 @@ class TestProp(TestWithSession):
         self.enc("u32", 0xffffffff, struct.pack("@i", 0xffffffff))
         self.enc(["u32"], [1, 2], struct.pack("@ii", 1, 2))
         self.enc("window", self.win,
-                 struct.pack("@i", parti.lowlevel.get_xwindow(self.win)))
+                 struct.pack("@i", wimpiggy.lowlevel.get_xwindow(self.win)))
         self.enc(["window"], [self.win, self.win2],
-                 struct.pack("@ii", *map(parti.lowlevel.get_xwindow,
+                 struct.pack("@ii", *map(wimpiggy.lowlevel.get_xwindow,
                                          (self.win, self.win2))))
 
     def test_prop_get_set_errors(self):
         assert p.prop_get(self.win, "SADFSAFDSADFASDF", "utf8") is None
         self.win2.destroy()
         gtk.gdk.flush()
-        assert_raises(parti.error.XError,
-                      parti.error.trap.call,
+        assert_raises(wimpiggy.error.XError,
+                      wimpiggy.error.trap.call,
                       p.prop_set, self.win2, "ASDF", "utf8", u"")
 
         assert p.prop_get(self.win2, "ASDF", "utf8") is None

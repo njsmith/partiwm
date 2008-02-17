@@ -2,5 +2,5 @@
 
 set -e
 rm -rf build install
-python make-constants-pxi.py parti/lowlevel/constants.txt parti/lowlevel/constants.pxi
+python make-constants-pxi.py wimpiggy/lowlevel/constants.txt wimpiggy/lowlevel/constants.pxi
 CFLAGS=-O0 python setup.py install --home=install

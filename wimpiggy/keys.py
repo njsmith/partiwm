@@ -1,9 +1,9 @@
 import gobject
 import gtk
-from parti.util import one_arg_signal
-from parti.error import *
-from parti.lowlevel import (get_display_for,
-                            get_modifier_map, grab_key, ungrab_all_keys)
+from wimpiggy.util import one_arg_signal
+from wimpiggy.error import *
+from wimpiggy.lowlevel import (get_display_for,
+                               get_modifier_map, grab_key, ungrab_all_keys)
 
 class HotkeyManager(gobject.GObject):
     __gsignals__ = {
@@ -22,7 +22,7 @@ class HotkeyManager(gobject.GObject):
         self.keymap_id = self.keymap.connect("keys-changed",
                                              self._keys_changed)
         self._keys_changed()
-        self.window.set_data("parti-hotkey-manager", self)
+        self.window.set_data("wimpiggy-hotkey-manager", self)
 
     def destroy(self):
         self.keymap.disconnect(self.keymap_id)
@@ -30,7 +30,7 @@ class HotkeyManager(gobject.GObject):
         self.keymap_id = None
 
         trap.swallow(self.unbind_all)
-        self.window.set_data("parti-hotkey-manager", None)
+        self.window.set_data("wimpiggy-hotkey-manager", None)
         self.window = None
 
     def _keys_changed(self, *args):

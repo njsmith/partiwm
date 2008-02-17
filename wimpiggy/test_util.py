@@ -1,13 +1,13 @@
-from parti.test import *
+from wimpiggy.test import *
 import gobject
-import parti.util
+import wimpiggy.util
 
 class TestUtil(object):
     def test_base(self):
         class OldStyle:
             pass
-        assert_raises(AssertionError, parti.util.base, OldStyle)
-        assert_raises(AssertionError, parti.util.base, OldStyle())
+        assert_raises(AssertionError, wimpiggy.util.base, OldStyle)
+        assert_raises(AssertionError, wimpiggy.util.base, OldStyle())
         class NewStyleBase(object):
             pass
         class NewStyle(NewStyleBase):
@@ -16,11 +16,11 @@ class TestUtil(object):
             pass
         class NewStyleMixed(NewStyleBase, NewStyleMixin):
             pass
-        assert_raises(AssertionError, parti.util.base, NewStyle)
-        assert parti.util.base(NewStyle()) is NewStyleBase
-        assert_raises(AssertionError, parti.util.base, NewStyleMixed())
+        assert_raises(AssertionError, wimpiggy.util.base, NewStyle)
+        assert wimpiggy.util.base(NewStyle()) is NewStyleBase
+        assert_raises(AssertionError, wimpiggy.util.base, NewStyleMixed())
 
-class APTestClass(parti.util.AutoPropGObjectMixin, gobject.GObject):
+class APTestClass(wimpiggy.util.AutoPropGObjectMixin, gobject.GObject):
     __gproperties__ = {
         "readwrite": (gobject.TYPE_PYOBJECT,
                       "blah", "baz", gobject.PARAM_READWRITE),

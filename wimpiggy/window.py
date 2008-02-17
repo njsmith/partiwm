@@ -11,12 +11,12 @@ import cairo
 import math
 import os
 from socket import gethostname
-import parti.lowlevel
-from parti.util import (AutoPropGObjectMixin,
+import wimpiggy.lowlevel
+from wimpiggy.util import (AutoPropGObjectMixin,
                         one_arg_signal, n_arg_signal, list_accumulator)
-from parti.error import *
-from parti.prop import prop_get, prop_set
-from parti.composite import CompositeHelper
+from wimpiggy.error import *
+from wimpiggy.prop import prop_get, prop_set
+from wimpiggy.composite import CompositeHelper
 
 # Todo:
 #   client focus hints
@@ -282,9 +282,9 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
 
         "map-request-event": one_arg_signal,
         "configure-request-event": one_arg_signal,
-        "parti-property-notify-event": one_arg_signal,
-        "parti-unmap-event": one_arg_signal,
-        "parti-destroy-event": one_arg_signal,
+        "wimpiggy-property-notify-event": one_arg_signal,
+        "wimpiggy-unmap-event": one_arg_signal,
+        "wimpiggy-destroy-event": one_arg_signal,
         }
         
     def __init__(self, parking_window, client_window):
@@ -294,13 +294,13 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         managed, for whatever reason.  ATM, this mostly means that the window
         died somehow before we could do anything with it."""
 
-        parti.lowlevel.printFocus(client_window)
+        wimpiggy.lowlevel.printFocus(client_window)
 
         super(WindowModel, self).__init__()
         self.parking_window = parking_window
         self.client_window = client_window
         self._internal_set_property("client-window", client_window)
-        self.client_window.set_data("parti-route-events-to", self)
+        self.client_window.set_data("wimpiggy-route-events-to", self)
 
         # We count how many times we have asked that the child be unmapped, so
         # that when the server tells us that the child has been unmapped, we
@@ -326,7 +326,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                                             window_type=gtk.gdk.WINDOW_CHILD,
                                             wclass=gtk.gdk.INPUT_OUTPUT,
                                             event_mask=gtk.gdk.PROPERTY_CHANGE_MASK)
-        parti.lowlevel.substructureRedirect(self.corral_window)
+        wimpiggy.lowlevel.substructureRedirect(self.corral_window)
 
         def setup_client():
             # Start listening for important events
@@ -349,7 +349,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             # For now, we never use the Iconic state at all.
             self._internal_set_property("iconic", False)
 
-            parti.lowlevel.XAddToSaveSet(self.client_window)
+            wimpiggy.lowlevel.XAddToSaveSet(self.client_window)
             self.client_window.reparent(self.corral_window, 0, 0)
             client_size = self.client_window.get_geometry()[2:4]
             self.corral_window.resize(*client_size)
@@ -385,7 +385,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         # request.
         pass
 
-    def do_parti_unmap_event(self, event):
+    def do_wimpiggy_unmap_event(self, event):
         assert event.window is self.client_window
         # The client window got unmapped.  The question is, though, was that
         # because it was withdrawn/destroyed, or was it because we unmapped it
@@ -404,7 +404,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         else:
             self.pending_unmaps -= 1
 
-    def do_parti_destroy_event(self, event):
+    def do_wimpiggy_destroy_event(self, event):
         assert event.window is self.client_window
         # This is somewhat redundant with the unmap signal, because if you
         # destroy a mapped window, then a UnmapNotify is always generated.
@@ -425,12 +425,12 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             self._scrub_withdrawn_window()
             self.client_window.reparent(gtk.gdk.get_default_root_window(),
                                         0, 0)
-            parti.lowlevel.sendConfigureNotify(self.client_window)
+            wimpiggy.lowlevel.sendConfigureNotify(self.client_window)
             if exiting:
                 self.client_window.show_unraised()
         trap.swallow(unmanageit)
         print "destroying self"
-        self.client_window.set_data("parti-route-events-to", None)
+        self.client_window.set_data("wimpiggy-route-events-to", None)
         self._composite.disconnect(self._damage_forward_handle)
         self._composite.destroy()
 
@@ -453,7 +453,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             winner.take_window(self, self.corral_window)
             self._update_client_geometry()
             self.corral_window.show_unraised()
-        trap.swallow(parti.lowlevel.sendConfigureNotify, self.client_window)
+        trap.swallow(wimpiggy.lowlevel.sendConfigureNotify, self.client_window)
 
     def maybe_recalculate_geometry_for(self, maybe_owner):
         if maybe_owner and self.get_property("owner") is maybe_owner:
@@ -464,13 +464,13 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         if owner is not None:
             (allocated_w, allocated_h) = owner.window_size(self)
             hints = self.get_property("size-hints")
-            size = parti.lowlevel.calc_constrained_size(allocated_w,
+            size = wimpiggy.lowlevel.calc_constrained_size(allocated_w,
                                                         allocated_h,
                                                         hints)
             (w, h, wvis, hvis) = size
             (x, y) = owner.window_position(self, w, h)
             self.corral_window.move_resize(x, y, w, h)
-            trap.swallow(parti.lowlevel.configureAndNotify,
+            trap.swallow(wimpiggy.lowlevel.configureAndNotify,
                          self.client_window, 0, 0, w, h)
             self._internal_set_property("actual-size", (w, h))
             self._internal_set_property("user-friendly-size", (wvis, hvis))
@@ -478,21 +478,21 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     def do_configure_request_event(self, event):
         # Ignore the request, but as per ICCCM 4.1.5, send back a synthetic
         # ConfigureNotify telling the client that nothing has happened.
-        trap.swallow(parti.lowlevel.sendConfigureNotify,
+        trap.swallow(wimpiggy.lowlevel.sendConfigureNotify,
                      event.window)
 
         # Also potentially update our record of what the app has requested:
         (x, y) = self.get_property("requested-position")
-        if event.value_mask & parti.lowlevel.const["CWX"]:
+        if event.value_mask & wimpiggy.lowlevel.const["CWX"]:
             x = event.x
-        if event.value_mask & parti.lowlevel.const["CWY"]:
+        if event.value_mask & wimpiggy.lowlevel.const["CWY"]:
             y = event.y
         self._internal_set_property("requested-position", (x, y))
 
         (w, h) = self.get_property("requested-size")
-        if event.value_mask & parti.lowlevel.const["CWWidth"]:
+        if event.value_mask & wimpiggy.lowlevel.const["CWWidth"]:
             w = event.width
-        if event.value_mask & parti.lowlevel.const["CWHeight"]:
+        if event.value_mask & wimpiggy.lowlevel.const["CWHeight"]:
             h = event.height
         self._internal_set_property("requested-size", (w, h))
         self._update_client_geometry()
@@ -505,7 +505,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     # Property reading
     ################################
     
-    def do_parti_property_notify_event(self, event):
+    def do_wimpiggy_property_notify_event(self, event):
         assert event.window is self.client_window
         self._handle_property_change(str(event.atom))
 
@@ -741,14 +741,14 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         if self.get_property("iconic"):
             trap.swallow(prop_set, self.client_window, "WM_STATE",
                          ["u32"],
-                         [parti.lowlevel.const["IconicState"],
-                          parti.lowlevel.const["XNone"]])
+                         [wimpiggy.lowlevel.const["IconicState"],
+                          wimpiggy.lowlevel.const["XNone"]])
             self._state_add("_NET_WM_STATE_HIDDEN")
         else:
             trap.swallow(prop_set, self.client_window, "WM_STATE",
                          ["u32"],
-                         [parti.lowlevel.const["NormalState"],
-                          parti.lowlevel.const["XNone"]])
+                         [wimpiggy.lowlevel.const["NormalState"],
+                          wimpiggy.lowlevel.const["XNone"]])
             self._state_remove("_NET_WM_STATE_HIDDEN")
 
     def _write_initial_properties_and_setup(self):
@@ -770,7 +770,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                   ]
         def doit():
             for prop in remove:
-                parti.lowlevel.XDeleteProperty(self.client_window, prop)
+                wimpiggy.lowlevel.XDeleteProperty(self.client_window, prop)
         trap.swallow(doit)
 
     
@@ -791,11 +791,11 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         now = gtk.gdk.x11_get_server_time(self.corral_window)
         if "WM_TAKE_FOCUS" in self.get_property("protocols"):
             print "... using WM_TAKE_FOCUS"
-            trap.swallow(parti.lowlevel.send_wm_take_focus,
+            trap.swallow(wimpiggy.lowlevel.send_wm_take_focus,
                          self.client_window, now)
         else:
             print "... using XSetInputFocus"
-            trap.swallow(parti.lowlevel.XSetInputFocus,
+            trap.swallow(wimpiggy.lowlevel.XSetInputFocus,
                          self.client_window, now)
 
     ################################
@@ -804,7 +804,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     
     def request_close(self):
         if "WM_DELETE_WINDOW" in self.get_property("protocols"):
-            trap.swallow(parti.lowlevel.send_wm_delete_window,
+            trap.swallow(wimpiggy.lowlevel.send_wm_delete_window,
                          self.client_window)
         else:
             # You don't wanna play ball?  Then no more Mr. Nice Guy!
@@ -819,7 +819,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                 os.kill(pid, 9)
             except OSError:
                 print "failed to kill() client with pid %s" % (pid,)
-        trap.swallow(parti.lowlevel.XKillClient, self.client_window)
+        trap.swallow(wimpiggy.lowlevel.XKillClient, self.client_window)
 
 gobject.type_register(WindowModel)
 

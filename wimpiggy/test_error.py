@@ -1,7 +1,7 @@
-from parti.test import *
-from parti.error import *
+from wimpiggy.test import *
+from wimpiggy.error import *
 # Need a way to generate X errors...
-import parti.lowlevel
+import wimpiggy.lowlevel
 
 import gtk.gdk
 
@@ -13,7 +13,7 @@ class TestError(TestWithSession):
                              wclass=gtk.gdk.INPUT_OUTPUT,
                              event_mask=0)
         win.destroy()
-        parti.lowlevel.XAddToSaveSet(win)
+        wimpiggy.lowlevel.XAddToSaveSet(win)
         return 3
 
     def test_call(self):
@@ -22,7 +22,7 @@ class TestError(TestWithSession):
         try:
             trap.call(self.cause_badwindow)
         except XError, e:
-            assert e.args == (parti.lowlevel.const["BadWindow"],)
+            assert e.args == (wimpiggy.lowlevel.const["BadWindow"],)
 
     def test_swallow(self):
         assert trap.swallow(lambda: 0) is None

@@ -16,8 +16,9 @@ import gtk.gdk
 from struct import pack, unpack
 import time
 
-from parti.util import base
-import parti.lowlevel
+from wimpiggy.util import base
+from wimpiggy.lowlevel import (get_xatom, sendClientMessage,
+                               myGetSelectionOwner, const)
 
 class AlreadyOwned(Exception):
     pass
@@ -64,19 +65,14 @@ class ManagerSelection(gobject.GObject):
         ts_data = self.clipboard.wait_for_contents("TIMESTAMP").data
         ts_num = unpack("@i", ts_data[:4])[0]
         # Calculate the X atom for this selection:
-        selection_xatom = parti.lowlevel.get_xatom(self.clipboard, self.atom)
+        selection_xatom = get_xatom(self.clipboard, self.atom)
         # Ask X what window we used:
-        owner_window = parti.lowlevel.myGetSelectionOwner(self.clipboard, self.atom)
+        owner_window = myGetSelectionOwner(self.clipboard, self.atom)
         
         root = self.clipboard.get_display().get_default_screen().get_root_window()
-        parti.lowlevel.sendClientMessage(root,
-                                         False,
-                                         parti.lowlevel.const["StructureNotifyMask"],
-                                         "MANAGER",
-                                         ts_num,
-                                         selection_xatom,
-                                         owner_window,
-                                         0, 0)
+        sendClientMessage(root, False, const["StructureNotifyMask"],
+                          "MANAGER",
+                          ts_num, selection_xatom, owner_window, 0, 0)
 
         if was_owned:
             # Give the previous wm a little time to clear out (really we

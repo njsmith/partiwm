@@ -1,6 +1,6 @@
 import gtk
 import parti.tray
-from parti.window import WindowView
+from wimpiggy.window import WindowView
 
 class CompositeTest(parti.tray.Tray, gtk.HPaned):
     def __init__(self, trayset, tag):

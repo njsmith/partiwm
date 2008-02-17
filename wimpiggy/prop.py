@@ -8,11 +8,11 @@ import array
 from cStringIO import StringIO
 import gtk.gdk
 import cairo
-from parti.lowlevel import \
+from wimpiggy.lowlevel import \
      XGetWindowProperty, XChangeProperty, PropertyError, \
      get_xatom, get_pyatom, get_xwindow, get_pywindow, const, \
      get_display_for
-from parti.error import trap, XError
+from wimpiggy.error import trap, XError
 
 def unsupported(*args):
     raise UnsupportedException
@@ -264,7 +264,7 @@ def prop_get(target, key, type):
         return _prop_decode(target, type, data)
     except:
         print (("Error parsing property %s (type %s); this may be a\n"
-                + "  misbehaving application, or bug in Parti\n"
+                + "  misbehaving application, or bug in Wimpiggy\n"
                 + "  Data: %r[...?]") % (key, type, data[:100],))
         raise
         return None

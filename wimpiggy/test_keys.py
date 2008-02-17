@@ -1,7 +1,7 @@
-from parti.test import *
+from wimpiggy.test import *
 import subprocess
-import parti.keys
-from parti.lowlevel import xtest_fake_key
+import wimpiggy.keys
+from wimpiggy.lowlevel import xtest_fake_key
 
 # FIXME: test the actual keybinding stuff!  But this require XTest support.
 
@@ -40,7 +40,7 @@ class TestKeys(TestWithSession):
 
     def test_grok_modifier_map(self):
         self.clear_xmodmap()
-        mm = parti.keys.grok_modifier_map(self.display)
+        mm = wimpiggy.keys.grok_modifier_map(self.display)
         print mm
         assert mm == {"shift": 1, "lock": 2, "control": 4,
                       "mod1": 8, "mod2": 16, "mod3": 32, "mod4": 64,
@@ -54,7 +54,7 @@ class TestKeys(TestWithSession):
                         add Mod4 = Alt_R Meta_R Super_L
                         add Mod5 = Scroll_Lock Super_R
                         """)
-        mm = parti.keys.grok_modifier_map(self.display)
+        mm = wimpiggy.keys.grok_modifier_map(self.display)
         print mm
         assert mm["scroll"] == 128
         assert mm["num"] == 8
@@ -74,38 +74,38 @@ class TestKeys(TestWithSession):
                         keycode 240 = p P
                         """)
         gtk.gdk.flush()
-        mm = parti.keys.grok_modifier_map(self.display)
+        mm = wimpiggy.keys.grok_modifier_map(self.display)
         keymap = gtk.gdk.keymap_get_for_display(self.display)
 
         o_keyval = gtk.gdk.keyval_from_name("o")
         o_keycode = keymap.get_entries_for_keyval(o_keyval)[0][0]
 
-        assert parti.keys.parse_key("o", keymap, mm) == (0, [o_keycode])
-        assert parti.keys.parse_key("O", keymap, mm) == (0, [o_keycode])
-        assert parti.keys.parse_key("<alt>O", keymap, mm) == (8, [o_keycode])
-        assert parti.keys.parse_key("<ALT>O", keymap, mm) == (8, [o_keycode])
-        assert parti.keys.parse_key("<meTa>O", keymap, mm) == (8, [o_keycode])
-        assert parti.keys.parse_key("<meTa><mod5>O", keymap, mm) == (8, [o_keycode])
-        assert parti.keys.parse_key("<mod2>O", keymap, mm) == (16, [o_keycode])
-        assert (parti.keys.parse_key("<mod4><mod3><MOD1><mod3>O", keymap, mm)
+        assert wimpiggy.keys.parse_key("o", keymap, mm) == (0, [o_keycode])
+        assert wimpiggy.keys.parse_key("O", keymap, mm) == (0, [o_keycode])
+        assert wimpiggy.keys.parse_key("<alt>O", keymap, mm) == (8, [o_keycode])
+        assert wimpiggy.keys.parse_key("<ALT>O", keymap, mm) == (8, [o_keycode])
+        assert wimpiggy.keys.parse_key("<meTa>O", keymap, mm) == (8, [o_keycode])
+        assert wimpiggy.keys.parse_key("<meTa><mod5>O", keymap, mm) == (8, [o_keycode])
+        assert wimpiggy.keys.parse_key("<mod2>O", keymap, mm) == (16, [o_keycode])
+        assert (wimpiggy.keys.parse_key("<mod4><mod3><MOD1><mod3>O", keymap, mm)
                 == (8 | 32 | 64, [o_keycode]))
 
         p_keyval = gtk.gdk.keyval_from_name("p")
         p_keycodes = [entry[0]
                       for entry in keymap.get_entries_for_keyval(p_keyval)]
         assert len(p_keycodes) > 1
-        assert parti.keys.parse_key("P", keymap, mm) == (0, p_keycodes)
-        assert parti.keys.parse_key("<alt>p", keymap, mm) == (8, p_keycodes)
+        assert wimpiggy.keys.parse_key("P", keymap, mm) == (0, p_keycodes)
+        assert wimpiggy.keys.parse_key("<alt>p", keymap, mm) == (8, p_keycodes)
 
-        assert parti.keys.unparse_key(0, o_keycode, keymap, mm) == "o"
-        assert parti.keys.unparse_key(8, o_keycode, keymap, mm) == "<alt>o"
-        assert parti.keys.unparse_key(16, o_keycode, keymap, mm) == "<mod2>o"
-        assert parti.keys.unparse_key(32, o_keycode, keymap, mm) == "<super>o"
-        assert (parti.keys.unparse_key(16 | 32, o_keycode, keymap, mm)
+        assert wimpiggy.keys.unparse_key(0, o_keycode, keymap, mm) == "o"
+        assert wimpiggy.keys.unparse_key(8, o_keycode, keymap, mm) == "<alt>o"
+        assert wimpiggy.keys.unparse_key(16, o_keycode, keymap, mm) == "<mod2>o"
+        assert wimpiggy.keys.unparse_key(32, o_keycode, keymap, mm) == "<super>o"
+        assert (wimpiggy.keys.unparse_key(16 | 32, o_keycode, keymap, mm)
                 == "<mod2><super>o")
-        assert (parti.keys.unparse_key(8 | 32, o_keycode, keymap, mm)
+        assert (wimpiggy.keys.unparse_key(8 | 32, o_keycode, keymap, mm)
                 == "<super><alt>o")
-        assert (parti.keys.unparse_key(1 | 2 | 4, o_keycode, keymap, mm)
+        assert (wimpiggy.keys.unparse_key(1 | 2 | 4, o_keycode, keymap, mm)
                 == "<shift><control>o")
         
     def test_HotkeyManager_end_to_end(self):
@@ -124,7 +124,7 @@ class TestKeys(TestWithSession):
             keyval = gtk.gdk.keyval_from_name(name)
             return keymap.get_entries_for_keyval(keyval)[0][0]
 
-        m = parti.keys.HotkeyManager(root)
+        m = wimpiggy.keys.HotkeyManager(root)
         m.add_hotkeys({"<shift><alt>r": "shift-alt-r",
                        "<mod4>r": "mod4-r"})
 

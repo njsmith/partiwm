@@ -1,4 +1,4 @@
-from parti.test import *
+from wimpiggy.test import *
 import parti.bus
 import gtk
 

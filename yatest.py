@@ -62,23 +62,31 @@ def ispkg(path):
 
 class YaTest(object):
     def main(self):
-        parser = OptionParser(usage="%prog PATH-TO-PACKAGE [TEST-NAMES]")
+        parser = OptionParser(usage="%prog -p PATH-TO-PACKAGE [TEST-NAMES]")
         parser.add_option("-S", "--nocapture",
                           dest="capture_output",
                           action="store_false", default=True,
                           help="disable capture of stdout/stderr from tests")
+        parser.add_option("-p", "--package",
+                          dest="packages",
+                          action="append",
+                          help="package(s) to scan for tests")
         (opts, args) = parser.parse_args()
         if len(args) < 1:
             parser.error("Requires at least 1 argument")
             
-        pkg_path = args[0]
-        assert ispkg(pkg_path)
+        pkg_paths = opts.packages
+           
+        assert pkg_paths
+        for pkg in pkg_paths:
+            assert ispkg(pkg_path)
 
-        test_names = args[1:]
+        test_names = args
 
         # Set up environment:
-        pkg_dir, pkg_name = os.path.split(pkg_path)
-        sys.path.insert(0, pkg_dir)
+        for pkg in pkg_path:
+            pkg_dir, pkg_name = os.path.split(pkg)
+            sys.path.insert(0, pkg_dir)
 
         if "DBUS_SESSION_BUS_ADDRESS" in os.environ:
             del os.environ["DBUS_SESSION_BUS_ADDRESS"]
@@ -99,7 +107,9 @@ class YaTest(object):
             magic_invoke(assertion=1)
             # Go.
             reporter = Reporter()
-            Runner(reporter, opts.capture_output).scan_pkg(pkg_path, pkg_name, test_names)
+            for pkg in pkg_paths:
+                pkg_dir, pkg_name = os.path.split(pkg)
+                Runner(reporter, opts.capture_output).scan_pkg(pkg, pkg_name, test_names)
             reporter.close()
         finally:
             magic_revoke(assertion=1)

@@ -2,10 +2,12 @@
 
 . do-build
 
-#/usr/bin/nosetests -w install/lib/python/parti "$@"
-#py.test install/lib/python "$@"
 #RUNNER="valgrind python"
 #RUNNER="gdb --args python"
 #RUNNER="pydb --trace"
 RUNNER=python
-$RUNNER "-Wignore:could not open display" ./yatest.py install/lib/python/parti "$@"
+$RUNNER "-Wignore:could not open display" \
+  ./yatest.py -p install/lib/python/wimpiggy \
+              -p install/lib/python/parti \
+              -p install/lib/python/xscreen \
+              "$@"

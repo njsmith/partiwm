@@ -1,7 +1,7 @@
 import os
 import gobject
 import gtk
-from parti.test import *
+from wimpiggy.test import *
 
 class TestTest(object):
     def test_test_with_session(self):

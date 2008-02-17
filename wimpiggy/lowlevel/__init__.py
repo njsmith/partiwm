@@ -1,4 +1,4 @@
-from parti.lowlevel.bindings import *
+from wimpiggy.lowlevel.bindings import *
 
 def send_wm_take_focus(target, time):
     print "sending WM_TAKE_FOCUS"

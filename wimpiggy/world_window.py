@@ -1,12 +1,12 @@
 import gtk
 import gobject
-import parti.lowlevel
-import parti.window
-import parti.prop
-from parti.util import base
-from parti.error import trap
+import wimpiggy.lowlevel
+import wimpiggy.window
+import wimpiggy.prop
+from wimpiggy.util import base
+from wimpiggy.error import trap
 
-# This file defines Parti's top-level widget.  It is a magic window that
+# This file defines Wimpiggy's top-level widget.  It is a magic window that
 # always and exactly covers the entire screen (possibly crossing multiple
 # screens, in the Xinerama case); it also mediates between the GTK+ and X
 # focus models.
@@ -91,7 +91,7 @@ class WorldWindow(gtk.Window):
         print "sizing world to %sx%s" % (x, y)
         self.set_size_request(x, y)
         self.resize(x, y)
-        parti.prop.prop_set(gtk.gdk.get_default_root_window(),
+        wimpiggy.prop.prop_set(gtk.gdk.get_default_root_window(),
                             "_NET_DESKTOP_GEOMETRY",
                             ["u32"], [x, y])
 
@@ -123,8 +123,8 @@ class WorldWindow(gtk.Window):
             # (ICCCM violating) to use CurrentTime in a WM_TAKE_FOCUS message,
             # but GTK doesn't happen to care, and this guarantees that we
             # *will* get the focus, and thus a real FocusIn event.
-            parti.lowlevel.send_wm_take_focus(self.window,
-                                              parti.lowlevel.const["CurrentTime"])
+            current_time = wimpiggy.lowlevel.const["CurrentTime"]
+            wimpiggy.lowlevel.send_wm_take_focus(self.window, current_time)
 
     def do_focus_in_event(self, *args):
         print "world window got focus"
@@ -148,22 +148,22 @@ class WorldWindow(gtk.Window):
         # an XSetInputFocus on itself.  Note not swallowing errors here, this
         # should always succeed.
         now = gtk.gdk.x11_get_server_time(self.window)
-        parti.lowlevel.send_wm_take_focus(self.window, now)
+        wimpiggy.lowlevel.send_wm_take_focus(self.window, now)
 
     def reset_x_focus(self):
         focus = self.get_focus()
         print focus
-        if isinstance(focus, parti.window.WindowView):
+        if isinstance(focus, wimpiggy.window.WindowView):
             # FIXME: ugly:
             focus.model.give_client_focus()
-            trap.swallow(parti.prop.prop_set, gtk.gdk.get_default_root_window(),
+            trap.swallow(wimpiggy.prop.prop_set, gtk.gdk.get_default_root_window(),
                          "_NET_ACTIVE_WINDOW", "window",
                          focus.model.get_property("client-window"))
         else:
             self._take_focus()
-            parti.prop.prop_set(gtk.gdk.get_default_root_window(),
-                                "_NET_ACTIVE_WINDOW", "u32",
-                                parti.lowlevel.const["XNone"])
+            wimpiggy.prop.prop_set(gtk.gdk.get_default_root_window(),
+                                   "_NET_ACTIVE_WINDOW", "u32",
+                                   wimpiggy.lowlevel.const["XNone"])
 
     def _after_set_focus(self, *args):
         # GTK focus has changed.  See comment in __init__ for why this isn't a

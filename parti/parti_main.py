@@ -1,10 +1,10 @@
 import gtk
 
-import parti.lowlevel
+import wimpiggy.lowlevel
 
-from parti.wm import Wm
+from wimpiggy.wm import Wm
 
-from parti.world_window import WorldWindow
+from wimpiggy.world_window import WorldWindow
 from parti.world_organizer import WorldOrganizer
 
 from parti.windowset import WindowSet
@@ -15,7 +15,7 @@ from parti.addons.ipython_embed import spawn_repl_window
 
 from parti.bus import PartiDBusService
 
-from parti.keys import HotkeyManager
+from wimpiggy.keys import HotkeyManager
 
 class Parti(object):
     def __init__(self, replace_other_wm):
@@ -74,5 +74,5 @@ class Parti(object):
                            "wm": self._wm,
                            "windows": self._wm.get_property("windows"),
                            "trays": self._trays,
-                           "lowlevel": parti.lowlevel})
+                           "lowlevel": wimpiggy.lowlevel})
 
