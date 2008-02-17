@@ -78,7 +78,7 @@ setup(
   description="'screen for X' -- a tool to detach/reattach running X programs",
   download_url="http://partiwm.org/static/downloads/",
   
-  scripts=[],
+  scripts=["scripts/xscreen"],
   packages=["xscreen",
             ],
 )
