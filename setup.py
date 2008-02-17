@@ -28,28 +28,56 @@ def pkgconfig(*packages, **kw):
             kw[k] = list(set(v))
     return kw
 
+import wimpiggy
+import parti
+import xscreen
+assert wimpiggy.__version__ == parti.__version__ == xscreen.__version__
 
 setup(
-  name = 'parti',
+    name="wimpiggy",
+    author="Nathaniel Smith",
+    author_email="parti-discuss@partiwm.org",
+    version=wimpiggy.__version__,
+    url="http://partiwm.org",
+    description="A library for writing window managers, using GTK+",
+    download_url="http://partiwm.org/static/downloads/",
+
+    packages=["wimpiggy", "wimpiggy.lowlevel",]
+    ext_modules=[ 
+      Extension("wimpiggy.lowlevel.bindings",
+                ["wimpiggy/lowlevel/wimpiggy.lowlevel.bindings.pyx"],
+                **pkgconfig("pygobject-2.0", "gdk-x11-2.0", "gtk+-x11-2.0",
+                            "xtst")
+                ),
+      ],
+    # Turn on Pyrex-sensitivity:
+    cmdclass = {'build_ext': build_ext}
+    )
+
+setup(
+  name = "parti",
   author="Nathaniel Smith",
   author_email="parti-discuss@partiwm.org",
-  version="0.0.2",
+  version=parti.__version__,
   url="http://partiwm.org",
   description="A tabbing/tiling window manager using GTK+",
   download_url="http://partiwm.org/static/downloads/",
   
   scripts=["scripts/parti", "scripts/parti-repl"],
-  packages=["wimpiggy", "wimpiggy.lowlevel",
-            "parti", "parti.trays", "parti.addons", "parti.scripts",
-            "xscreen",
+  packages=["parti", "parti.trays", "parti.addons", "parti.scripts",
             ],
-  ext_modules=[ 
-    Extension("wimpiggy.lowlevel.bindings",
-              ["wimpiggy/lowlevel/wimpiggy.lowlevel.bindings.pyx"],
-              **pkgconfig("pygobject-2.0", "gdk-x11-2.0", "gtk+-x11-2.0",
-                          "xtst")
-              ),
-    ],
-  # Turn on Pyrex-sensitivity:
-  cmdclass = {'build_ext': build_ext}
+)
+
+setup(
+  name = "xscreen",
+  author="Nathaniel Smith",
+  author_email="parti-discuss@partiwm.org",
+  version=xscreen.__version__,
+  url="http://partiwm.org",
+  description="'screen for X' -- a tool to detach/reattach running X programs",
+  download_url="http://partiwm.org/static/downloads/",
+  
+  scripts=[],
+  packages=["xscreen",
+            ],
 )
