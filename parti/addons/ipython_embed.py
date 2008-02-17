@@ -1,5 +1,5 @@
 import gtk
-from parti.pseudoclient import PseudoclientWindow
+from wimpiggy.pseudoclient import PseudoclientWindow
 from parti.addons.ipython_view import IPythonView
 
 def spawn_repl_window(wm, namespace):

@@ -72,19 +72,17 @@ class YaTest(object):
                           action="append",
                           help="package(s) to scan for tests")
         (opts, args) = parser.parse_args()
-        if len(args) < 1:
-            parser.error("Requires at least 1 argument")
             
         pkg_paths = opts.packages
            
         assert pkg_paths
         for pkg in pkg_paths:
-            assert ispkg(pkg_path)
+            assert ispkg(pkg)
 
         test_names = args
 
         # Set up environment:
-        for pkg in pkg_path:
+        for pkg in pkg_paths:
             pkg_dir, pkg_name = os.path.split(pkg)
             sys.path.insert(0, pkg_dir)
 

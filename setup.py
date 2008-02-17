@@ -42,7 +42,8 @@ setup(
     description="A library for writing window managers, using GTK+",
     download_url="http://partiwm.org/static/downloads/",
 
-    packages=["wimpiggy", "wimpiggy.lowlevel",]
+    packages=["wimpiggy", "wimpiggy.lowlevel",
+              ],
     ext_modules=[ 
       Extension("wimpiggy.lowlevel.bindings",
                 ["wimpiggy/lowlevel/wimpiggy.lowlevel.bindings.pyx"],
