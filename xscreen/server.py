@@ -3,6 +3,7 @@
 #   keycode mapping
 #   button press, motion events, mask
 #   override-redirect windows
+#   copy/paste (dnd?)
 #   xsync resize stuff
 #   icons
 #   any other interesting metadata? _NET_WM_TYPE, WM_TRANSIENT_FOR, etc.?
@@ -191,11 +192,15 @@ class XScreenServer(object):
         for window in self._wm.get_property("windows"):
             self._add_new_window(window)
 
-        self._listener = server_sock(replace_other_wm)
+        self._listener, self._socketpath = server_sock(replace_other_wm)
         gobject.io_add_watch(self._listener, gobject.IO_IN,
                              self._new_connection)
 
+    def __del__(self):
+        os.unlink(self._socketpath)
+
     def _new_connection(self, *args):
+        print "New connection received"
         sock, addr = self._listener.accept()
         self._maybe_protocols.append(Protocol(sock, self.process_packet))
         return True
@@ -283,6 +288,7 @@ class XScreenServer(object):
             self._damage(window, event.x, event.y, event.width, event.height)
 
     def _process_hello(self, proto, packet):
+        print "Handshake complete; enabling connection"
         # Drop any existing protocol
         if self._protocol is not None:
             self._protocol.close()
@@ -335,6 +341,7 @@ class XScreenServer(object):
         window.request_close()
 
     def _process_connection_lost(self, proto, packet):
+        print "Connection lost"
         proto.close()
         if proto in self._maybe_protocols:
             self._maybe_protocols.remove(proto)

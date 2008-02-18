@@ -53,7 +53,7 @@ def server_sock(clobber):
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(path)
     sock.listen(5)
-    return sock
+    return sock, path
 
 def client_sock(display_name):
     path = sockpath(display_name)

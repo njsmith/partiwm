@@ -5,6 +5,8 @@ import socket
 import os
 import os.path
 
+from wimpiggy.util import one_arg_signal
+
 from xscreen.address import client_sock
 from xscreen.protocol import Protocol, CAPABILITIES
 
@@ -143,10 +145,21 @@ class ClientWindow(gtk.Window):
 
 gobject.type_register(ClientWindow)
 
-class XScreenClient(object):
+class XScreenClient(gobject.GObject):
+    __gsignals__ = {
+        "wimpiggy-property-notify-event": one_arg_signal,
+        }
+
     def __init__(self, name):
         self._window_to_id = {}
         self._id_to_window = {}
+
+        if not gtk.gdk.net_wm_supports("_NET_CLIENT_LIST_STACKING"):
+            assert False, "this program requires an EWMH-compliant window manager"
+
+        root = gtk.gdk.get_default_root_window()
+        root.set_events(gtk.gdk.PROPERTY_NOTIFY)
+        root.set_data("wimpiggy-route-events-to", self)
 
         sock = client_sock(name)
         print "Connected"
@@ -156,6 +169,20 @@ class XScreenClient(object):
 
     def send(self, packet):
         self._protocol.source.queue_packet(packet)
+
+    def do_wimpiggy_property_notify_event(self, event):
+        root = gtk.gdk.get_default_root_window()
+        assert event.window is root
+        if str(event.atom) == "_NET_CLIENT_LIST_STACKING":
+            stacking = prop_get(root, "_NET_CLIENT_LIST_STACKING", ["window"])
+            our_windows = dict([(w.window, id)
+                                for (w, id) in self._window_to_id.iteritems()])
+            if None in our_windows:
+                del our_windows[None]
+            our_stacking = [our_windows[win]
+                            for win in stacking
+                            if win in our_windows]
+            self.send(["window-order", our_stacking])
 
     def _process_hello(self, packet):
         (_, capabilities) = packet
@@ -188,6 +215,7 @@ class XScreenClient(object):
         window.destroy()
 
     def _process_connection_lost(self, packet):
+        print "Connection lost"
         gtk.main_quit()
 
     _packet_handlers = {
@@ -202,3 +230,5 @@ class XScreenClient(object):
     def process_packet(self, proto, packet):
         packet_type = packet[0]
         self._packet_handlers[packet_type](self, packet)
+
+gobject.type_register(XScreenClient)

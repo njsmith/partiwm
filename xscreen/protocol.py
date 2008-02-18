@@ -43,11 +43,11 @@ class Protocol(object):
         if want_write == write_armed:
             return
         if want_write:
-            print "Arming writes"
+            #print "Arming writes"
             self._write_tag = gobject.io_add_watch(self._sock, gobject.IO_OUT,
                                                    self._socket_writeable)
         else:
-            print "Disarming writes"
+            #print "Disarming writes"
             gobject.source_remove(self._write_tag)
             self._write_tag = None
 
@@ -65,7 +65,6 @@ class Protocol(object):
                 self._write_buf += data
 
     def _socket_writeable(self, *args):
-        print "WRITEABLE"
         if not self._write_buf:
             # Underflow: refill buffer from source.
             # We can't get here unless either _write_buf is non-empty, or
@@ -79,10 +78,7 @@ class Protocol(object):
         return True
 
     def _socket_readable(self, *args):
-        print "READABLE"
-        print "(write_tag = %r)" % (self._write_tag,)
         buf = self._sock.recv(4096)
-        print "buf = %r" % buf
         if not buf:
             self._accept_packets = False
             self._process_packet_cb(self, [Protocol.CONNECTION_LOST])
@@ -93,7 +89,6 @@ class Protocol(object):
         while True:
             had_deflate = (self._decompressor is not None)
             consumed = self._consume_packet(self._read_buf)
-            print consumed
             self._read_buf = self._read_buf[consumed:]
             if not had_deflate and (self._decompressor is not None):
                 # deflate was just enabled: so decompress the data currently
