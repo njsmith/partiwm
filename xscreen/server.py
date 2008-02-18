@@ -241,6 +241,8 @@ class XScreenServer(object):
             "alt": "Alt_L",
             }
 
+        self._has_focus = 0
+
     def _new_connection(self, *args):
         print "New connection received"
         sock, addr = self._listener.accept()
@@ -310,11 +312,13 @@ class XScreenServer(object):
                            keycode(self._keyname_for_mod[modifier]), True)
 
     def _focus(self, id):
-        if id == 0:
-            self._world_window.reset_x_focus()
-        else:
-            window = self._id_to_window[id]
-            window.give_client_focus()
+        if self._has_focus != id:
+            if id == 0:
+                self._world_window.reset_x_focus()
+            else:
+                window = self._id_to_window[id]
+                window.give_client_focus()
+            self._has_focus = id
 
     def _move_pointer(self, pos):
         (x, y) = pos
@@ -407,10 +411,13 @@ class XScreenServer(object):
                                  for id in ids_bottom_to_top]
         self._desktop_manager.reorder_windows(windows_bottom_to_top)
 
+    def _process_focus(self, proto, packet):
+        (_, id) = packet
+        self._focus(id)
+
     def _process_key_action(self, proto, packet):
-        (_, id, keyname, depressed, pointer, modifiers) = packet
+        (_, id, keyname, depressed, modifiers) = packet
         self._make_keymask_match(modifiers)
-        self._move_pointer(pointer)
         self._focus(id)
         xtest_fake_key(gtk.gdk.display_get_default(),
                        self._keycode(keyname), depressed)
@@ -450,6 +457,7 @@ class XScreenServer(object):
         "move-window": _process_move_window,
         "resize-window": _process_resize_window,
         "window-order": _process_window_order,
+        "focus": _process_focus,
         "key-action": _process_key_action,
         "button-action": _process_button_action,
         "pointer-position": _process_pointer_position,

@@ -7,9 +7,11 @@ import os.path
 
 from wimpiggy.util import one_arg_signal
 from wimpiggy.prop import prop_get
+from wimpiggy.keys import grok_modifier_map
 
 from xscreen.address import client_sock
 from xscreen.protocol import Protocol, CAPABILITIES
+from xscreen.keys import mask_to_names
 
 class ClientSource(object):
     def __init__(self, protocol):
@@ -45,6 +47,8 @@ class ClientWindow(gtk.Window):
         # FIXME: It's possible in X to request a starting position for a
         # window, but I don't know how to do it from GTK.
         self.set_default_size(w, h)
+
+        self.connect("notify::has-toplevel-focus", self._focus_change)
 
     def update_metadata(self, metadata):
         self._metadata.update(metadata)
@@ -144,6 +148,40 @@ class ClientWindow(gtk.Window):
         self._client.send(["close-window", self._id])
         return True
 
+    def _key_action(self, event, depressed):
+        modifiers = self._client.mask_to_names(event.state)
+        self._client.send(["key-action", self._id, depressed, modifiers])
+
+    def do_key_press_event(self, event):
+        self._key_action(event, True)
+
+    def do_key_release_event(self, event):
+        self._key_action(event, False)
+
+    def _pointer_modifiers(self, event):
+        pointer = (event.root_x, root_y)
+        modifiers = self._client.mask_to_names(event.state)
+        return pointer, modifiers
+
+    def do_motion_notify_event(self, event):
+        (pointer, modifiers) = self._pointer_modifiers(event)
+        self._client.send(["pointer-position", pointer, modifiers])
+        
+    def _button_action(self, event, depressed):
+        (pointer, modifiers) = self._pointer_modifiers(event)
+        self._client.send(["button-action", event.button, depressed,
+                           pointer, modifiers])
+
+    def do_button_press_event(self, event):
+        self._button_action(event, True)
+
+    def do_button_release_event(self, event):
+        self._button_action(event, False)
+
+    def _focus_change(self, *args):
+        self._client.update_focus(self._id,
+                                  self.get_property("has-toplevel-focus"))
+
 gobject.type_register(ClientWindow)
 
 class XScreenClient(gobject.GObject):
@@ -169,6 +207,26 @@ class XScreenClient(gobject.GObject):
         self._protocol = Protocol(sock, self.process_packet)
         ClientSource(self._protocol)
         self.send(["hello", list(CAPABILITIES)])
+
+        self._keymap = gtk.gdk.keymap_get_default()
+        self._keymap.connect("keys-changed", self._keys_changed)
+        self._keys_changed()
+
+        self._focused = None
+
+    def _keys_changed(self):
+        self._modifier_map = grok_modifier_map(gtk.gdk.display_get_default())
+
+    def update_focus(self, id, gotit):
+        if gotit and self._focused is not id:
+            self.send(["focus", id])
+            self._focused = id
+        if not gotit and self._focused is id:
+            self.send(["focus", 0])
+            self._focused = None
+
+    def mask_to_names(self, mask):
+        return mask_to_names(mask, self._modifier_map)
 
     def send(self, packet):
         self._protocol.source.queue_packet(packet)
