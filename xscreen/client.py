@@ -161,9 +161,7 @@ class XScreenClient(gobject.GObject):
             assert False, "this program requires an EWMH-compliant window manager"
 
         root = gtk.gdk.get_default_root_window()
-        print hex(int(root.get_events()))
         root.set_events(gtk.gdk.PROPERTY_NOTIFY)
-        print hex(int(root.get_events()))
         root.set_data("wimpiggy-route-events-to", self)
 
         sock = client_sock(name)

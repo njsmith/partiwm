@@ -171,8 +171,8 @@ class ServerSource(object):
         return (x, y, width, height, data)
 
 class XScreenServer(object):
-    def __init__(self, replace_other_wm):
-        self._wm = Wm("XScreen", replace_other_wm)
+    def __init__(self, socketpath, clobber):
+        self._wm = Wm("XScreen", clobber)
         self._wm.connect("focus-got-dropped", self._focus_dropped)
         self._wm.connect("new-window", self._new_window_signaled)
 
@@ -192,16 +192,14 @@ class XScreenServer(object):
         for window in self._wm.get_property("windows"):
             self._add_new_window(window)
 
-        self._listener, self._socketpath = server_sock(replace_other_wm)
+        self._socketpath = socketpath
+        self._listener = socket.socket(socket.AF_UNIX)
+        self._listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        print self._socketpath
+        self._listener.bind(self._socketpath)
+        self._listener.listen(5)
         gobject.io_add_watch(self._listener, gobject.IO_IN,
                              self._new_connection)
-
-    def cleanup(self):
-        print "removing socket"
-        try:
-            os.unlink(self._socketpath)
-        except:
-            pass
 
     def _new_connection(self, *args):
         print "New connection received"

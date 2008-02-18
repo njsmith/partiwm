@@ -42,18 +42,14 @@ def server_state(path):
         return LIVE
     return UNKNOWN
 
-def server_sock(clobber):
-    path = sockpath(gtk.gdk.display_get_default().get_name())
+def server_sock(display_name, clobber):
+    path = sockpath(display_name)
     state = server_state(path)
     if state is not DEAD and not clobber:
         raise ServerSockInUse, (state, path)
     if os.path.exists(path):
         os.unlink(path)
-    sock = socket.socket(socket.AF_UNIX)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(path)
-    sock.listen(5)
-    return sock, path
+    return path
 
 def client_sock(display_name):
     path = sockpath(display_name)

@@ -1,11 +1,13 @@
 import gtk
 import subprocess
+import sys
 import os
 import os.path
 import atexit
 import signal
 
 from xscreen.server import XScreenServer
+from xscreen.address import server_sock
 
 _cleanups = []
 def run_cleanups():
@@ -38,26 +40,46 @@ def run_server(parser, opts, extra_args):
     signal.signal(signal.SIGINT, deadly_signal)
     signal.signal(signal.SIGTERM, deadly_signal)
 
+
+    sockpath = server_sock(display_name, False)
+    logpath = sockpath + ".log"
+
     # Daemonize:
     if opts.daemon:
+        # Do some work up front, so any errors don't get lost.
+        logfd = os.open(logpath, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0666)
+        assert logfd > 2
+        for display in gtk.gdk.display_manager_get().list_displays():
+            display.close()
         os.chdir("/")
+
         if os.fork():
             os._exit(0)
         os.setsid()
         if os.fork():
             os._exit(0)
-#         if os.path.exists("/proc/self/fd"):
-#             for fd_str in os.listdir("/proc/self/fd"):
-#                 os.close(int(fd_str))
-#         else:
-#             print "Uh-oh, can't close fds, please port me to your system..."
-#         fd = os.open("/dev/null")
-#         os.dup2(fd, 3)
-#         os.close(fd)
-#         os.dup2(fd, 0)
-#         os.dup2(fd, 1)
-#         os.dup2(fd, 2)
-#         os.close(3)
+        if os.path.exists("/proc/self/fd"):
+            for fd_str in os.listdir("/proc/self/fd"):
+                try:
+                    fd = int(fd_str)
+                    if fd != logfd:
+                        os.close(fd)
+                except OSError:
+                    # This exception happens inevitably, because the fd used
+                    # by listdir() is already closed.
+                    pass
+        else:
+            print "Uh-oh, can't close fds, please port me to your system..."
+        fd0 = os.open("/dev/null", os.O_RDONLY)
+        if fd0 != 0:
+            os.dup2(fd0, 0)
+            os.close(fd0)
+        os.dup2(logfd, 1)
+        os.dup2(logfd, 2)
+        os.close(logfd)
+        # Make these line-buffered:
+        sys.stdout = os.fdopen(1, "w", 1)
+        sys.stderr = os.fdopen(2, "w", 1)
 
     xauthority = os.environ.get("XAUTHORITY",
                                 os.path.expanduser("~/.Xauthority"))
@@ -88,6 +110,13 @@ def run_server(parser, opts, extra_args):
         default_display.close()
     manager.set_default_display(display)
 
-    app = XScreenServer(False)
-    _cleanups.append(app.cleanup)
+    app = XScreenServer(sockpath, False)
+    def cleanup_socket(self):
+        print "removing socket"
+        try:
+            os.unlink(sockpath)
+        except:
+            pass
+    _cleanups.append(cleanup_socket)
+
     gtk.main()

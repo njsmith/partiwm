@@ -1,9 +1,7 @@
+import gtk
 from optparse import OptionParser
 
 import xscreen
-from xscreen.scripts.server import run_server
-from xscreen.client import XScreenClient
-from xscreen.proxy import XScreenProxy
 
 # FIXME: make this UI more screen-like?
 # FIXME: add ssh support
@@ -30,13 +28,16 @@ def main(cmdline):
     else:
         parser.error("invalid mode '%s'" % mode)
 
+from xscreen.scripts.server import run_server
 
+from xscreen.client import XScreenClient
 def run_client(parser, opts, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     app = XScreenClient(extra_args[0])
     gtk.main()
 
+from xscreen.proxy import XScreenProxy
 def run_proxy(parser, opts, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
