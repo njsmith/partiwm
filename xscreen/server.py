@@ -196,8 +196,12 @@ class XScreenServer(object):
         gobject.io_add_watch(self._listener, gobject.IO_IN,
                              self._new_connection)
 
-    def __del__(self):
-        os.unlink(self._socketpath)
+    def cleanup(self):
+        print "removing socket"
+        try:
+            os.unlink(self._socketpath)
+        except:
+            pass
 
     def _new_connection(self, *args):
         print "New connection received"
