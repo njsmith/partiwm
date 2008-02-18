@@ -1,5 +1,4 @@
 # Todo:
-#   stacking order
 #   keycode mapping
 #   button press, motion events, mask
 #   override-redirect windows
@@ -13,14 +12,20 @@ import gobject
 import os
 import os.path
 import socket
+import subprocess
 
 from wimpiggy.wm import Wm
 from wimpiggy.world_window import WorldWindow
 from wimpiggy.util import LameStruct
-from wimpiggy.lowlevel import get_rectangle_from_region
+from wimpiggy.lowlevel import (get_rectangle_from_region,
+                               get_current_keyboard_mask,
+                               xtest_fake_key,
+                               xtest_fake_button)
+from wimpiggy.keys import grok_modifier_map
 
 from xscreen.address import server_sock
 from xscreen.protocol import Protocol, CAPABILITIES
+from xscreen.keys import mask_to_names
 
 class DesktopManager(gtk.Widget):
     def __init__(self):
@@ -201,6 +206,41 @@ class XScreenServer(object):
         gobject.io_add_watch(self._listener, gobject.IO_IN,
                              self._new_connection)
 
+        self._keymap = gtk.gdk.keymap_get_default()
+        self._keymap.connect("keys-changed", self._keys_changed)
+        self._keys_changed()
+
+        xmodmap = subprocess.Popen(["xmodmap", "-"], stdin=subprocess.PIPE)
+        xmodmap.communicate("""clear Lock
+                               clear Shift
+                               clear Control
+                               clear Mod1
+                               clear Mod2
+                               clear Mod3
+                               clear Mod4
+                               clear Mod5
+                               keycode any = Shift_L
+                               keycode any = Control_L
+                               keycode any = Meta_L
+                               keycode any = Alt_L
+                               keycode any = Hyper_L
+                               keycode any = Super_L
+                               add Shift = Shift_L
+                               add Control = Control_L
+                               add Mod1 = Meta_L
+                               add Mod2 = Alt_L
+                               add Mod3 = Hyper_L
+                               add Mod4 = Super_L
+                            """)
+        self._keyname_for_mod = {
+            "shift": "Shift_L",
+            "control": "Control_L",
+            "meta": "Meta_L",
+            "super": "Super_L",
+            "hyper": "Hyper_L",
+            "alt": "Alt_L",
+            }
+
     def _new_connection(self, *args):
         print "New connection received"
         sock, addr = self._listener.accept()
@@ -209,6 +249,9 @@ class XScreenServer(object):
 
     def _focus_dropped(self, *args):
         self._world_window.reset_x_focus()
+
+    def _keys_changed(self, *args):
+        self._modifier_map = grok_modifier_map(gtk.gdk.display_get_default())
 
     def _new_window_signaled(self, wm, window):
         self._add_new_window(window)
@@ -250,6 +293,33 @@ class XScreenServer(object):
             return metadata
         else:
             assert False
+
+    def _keycode(keyname):
+        keyval = gtk.gdk.keyval_from_name(keyname)
+        return self._keymap.get_entries_for_keyval(keyval)[0][0]
+
+    def _make_keymask_match(self, modifier_list):
+        current_mask = get_current_keyboard_mask(gtk.gdk.display_get_default())
+        current = set(mask_to_names(current_mask, self._modifier_map))
+        wanted = set(modifier_list)
+        for modifier in current.difference(wanted):
+            xtest_fake_key(gtk.gdk.display_get_default(),
+                           keycode(self._keyname_for_mod[modifier]), False)
+        for modifier in wanted.difference(current):
+            xtest_fake_key(gtk.gdk.display_get_default(),
+                           keycode(self._keyname_for_mod[modifier]), True)
+
+    def _focus(self, id):
+        if id == 0:
+            self._world_window.reset_x_focus()
+        else:
+            window = self._id_to_window[id]
+            window.give_client_focus()
+
+    def _move_pointer(self, pos):
+        (x, y) = pos
+        display = gtk.gdk.display_get_default()
+        display.warp_pointer(display.get_default_screen(), x, y)
 
     def _send(self, packet):
         if self._protocol is not None:
@@ -337,6 +407,25 @@ class XScreenServer(object):
                                  for id in ids_bottom_to_top]
         self._desktop_manager.reorder_windows(windows_bottom_to_top)
 
+    def _process_key_action(self, proto, packet):
+        (_, id, keyname, depressed, pointer, modifiers) = packet
+        self._make_keymask_match(modifiers)
+        self._move_pointer(pointer)
+        self._focus(id)
+        xtest_fake_key(gtk.gdk.display_get_default(),
+                       self._keycode(keyname), depressed)
+
+    def _process_button_action(self, proto, packet):
+        (_, button, depressed, pointer, modifiers) = packet
+        self._make_keymask_match(modifiers)
+        self._move_pointer(pointer)
+        xtest_fake_button(gtk.gdk.display_get_default(), button, depressed)
+
+    def _process_pointer_position(self, proto, packet):
+        (_, pointer, modifiers) = packet
+        self._make_keymask_match(modifiers)
+        self._move_pointer(pointer)
+
     def _process_close_window(self, proto, packet):
         (_, id) = packet
         window = self._id_to_window[id]
@@ -361,6 +450,9 @@ class XScreenServer(object):
         "move-window": _process_move_window,
         "resize-window": _process_resize_window,
         "window-order": _process_window_order,
+        "key-action": _process_key_action,
+        "button-action": _process_button_action,
+        "pointer-position": _process_pointer_position,
         "close-window": _process_close_window,
         "shutdown-server": _process_shutdown_server,
         Protocol.CONNECTION_LOST: _process_connection_lost,
