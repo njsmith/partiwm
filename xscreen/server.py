@@ -1,5 +1,4 @@
 # Todo:
-#   compress motion notify events
 #   override-redirect windows
 #   copy/paste (dnd?)
 #   xsync resize stuff
