@@ -350,6 +350,10 @@ class XScreenServer(object):
         if proto is self._protocol:
             self._protocol = None
 
+    def _process_shutdown_server(self, proto, packet):
+        print "Shutting down in response to request"
+        gtk.main_quit()
+
     _packet_handlers = {
         "hello": _process_hello,
         "map-window": _process_map_window,
@@ -358,6 +362,7 @@ class XScreenServer(object):
         "resize-window": _process_resize_window,
         "window-order": _process_window_order,
         "close-window": _process_close_window,
+        "shutdown-server": _process_shutdown_server,
         Protocol.CONNECTION_LOST: _process_connection_lost,
         }
 

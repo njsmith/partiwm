@@ -19,7 +19,7 @@ def normalize_display_name(display_name):
 
 def sockpath(display_name):
     display_name = normalize_display_name(display_name)
-    return os.path.join(sockdir(), display_name.replace(":", "_"))
+    return os.path.join(sockdir(), display_name)
 
 class ServerSockInUse(Exception):
     pass
@@ -34,8 +34,8 @@ def server_state(path):
     try:
         sock.connect(path)
     except socket.error, e:
-        my_errno = e.args[0]
-        if my_errno in (errno.ECONNREFUSED, errno.ENOENT):
+        err = e.args[0]
+        if err in (errno.ECONNREFUSED, errno.ENOENT):
             return DEAD
     else:
         sock.close()

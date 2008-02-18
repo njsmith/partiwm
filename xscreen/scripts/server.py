@@ -89,7 +89,6 @@ def run_server(parser, opts, extra_args):
                              "-screen", "0", "2048x2048x24+32"],
                             executable="Xvfb")
     def kill_xvfb():
-        print "killing xvfb"
         # Close our display(s) first, so the server dying won't kill us.
         for display in gtk.gdk.display_manager_get().list_displays():
             display.close()
