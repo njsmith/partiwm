@@ -3,6 +3,7 @@ import gobject
 
 from sets import ImmutableSet
 
+from wimpiggy.error import *
 import wimpiggy.selection
 import wimpiggy.lowlevel
 from wimpiggy.prop import prop_set
@@ -204,11 +205,16 @@ class Wm(gobject.GObject):
         self.notify("windows")
 
     def _update_window_list(self, *args):
-        prop_set(self._root, "_NET_CLIENT_LIST",
-                 ["window"], self._windows_in_order)
+        # Ignore errors because not all the windows may still exist; if so,
+        # then it's okay to leave the lists out of date for a moment, because
+        # in a moment we'll get a signal telling us about the window that
+        # doesn't exist anymore, will remove it from the list, and then call
+        # _update_window_list again.
+        trap.swallow(prop_set, self._root, "_NET_CLIENT_LIST",
+                     ["window"], self._windows_in_order)
         # This is a lie, but we don't maintain a stacking order, so...
-        prop_set(self._root, "_NET_CLIENT_LIST_STACKING",
-                 ["window"], self._windows_in_order)
+        trap.swallow(prop_set, self._root, "_NET_CLIENT_LIST_STACKING",
+                     ["window"], self._windows_in_order)
 
     def do_wimpiggy_client_message_event(self, event):
         # FIXME
