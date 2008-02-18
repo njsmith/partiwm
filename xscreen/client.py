@@ -43,6 +43,11 @@ class ClientWindow(gtk.Window):
         self.update_metadata(metadata)
         
         self.set_app_paintable(True)
+        self.add_events(gtk.gdk.STRUCTURE_MASK
+                        | gtk.gdk.KEY_PRESS_MASK | gtk.gdk.KEY_RELEASE_MASK
+                        | gtk.gdk.POINTER_MOTION_MASK
+                        | gtk.gdk.BUTTON_PRESS_MASK
+                        | gtk.gdk.BUTTON_RELEASE_MASK)
 
         # FIXME: It's possible in X to request a starting position for a
         # window, but I don't know how to do it from GTK.
@@ -160,7 +165,7 @@ class ClientWindow(gtk.Window):
         self._key_action(event, False)
 
     def _pointer_modifiers(self, event):
-        pointer = (event.root_x, root_y)
+        pointer = (int(event.x_root), int(event.y_root))
         modifiers = self._client.mask_to_names(event.state)
         return pointer, modifiers
 
