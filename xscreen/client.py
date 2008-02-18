@@ -6,6 +6,7 @@ import os
 import os.path
 
 from wimpiggy.util import one_arg_signal
+from wimpiggy.prop import prop_get
 
 from xscreen.address import client_sock
 from xscreen.protocol import Protocol, CAPABILITIES
@@ -151,14 +152,18 @@ class XScreenClient(gobject.GObject):
         }
 
     def __init__(self, name):
+        gobject.GObject.__init__(self)
         self._window_to_id = {}
         self._id_to_window = {}
+        self._stacking = []
 
         if not gtk.gdk.net_wm_supports("_NET_CLIENT_LIST_STACKING"):
             assert False, "this program requires an EWMH-compliant window manager"
 
         root = gtk.gdk.get_default_root_window()
+        print hex(int(root.get_events()))
         root.set_events(gtk.gdk.PROPERTY_NOTIFY)
+        print hex(int(root.get_events()))
         root.set_data("wimpiggy-route-events-to", self)
 
         sock = client_sock(name)
@@ -174,6 +179,7 @@ class XScreenClient(gobject.GObject):
         root = gtk.gdk.get_default_root_window()
         assert event.window is root
         if str(event.atom) == "_NET_CLIENT_LIST_STACKING":
+            print "_NET_CLIENT_LIST_STACKING changed"
             stacking = prop_get(root, "_NET_CLIENT_LIST_STACKING", ["window"])
             our_windows = dict([(w.window, id)
                                 for (w, id) in self._window_to_id.iteritems()])
@@ -182,7 +188,9 @@ class XScreenClient(gobject.GObject):
             our_stacking = [our_windows[win]
                             for win in stacking
                             if win in our_windows]
-            self.send(["window-order", our_stacking])
+            if self._stacking != our_stacking and our_stacking:
+                self.send(["window-order", our_stacking])
+            self._stacking = our_stacking
 
     def _process_hello(self, packet):
         (_, capabilities) = packet
