@@ -1085,9 +1085,9 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
             except XError, e:
                 print ("Some window in our event disappeared before we could "
                        + "handle the event; so I'm just ignoring it instead.")
-
-            # Dispatch:
-            _route_event(pyev, *my_events[e.type])
+            else:
+                # Dispatch:
+                _route_event(pyev, *my_events[e.type])
     except:
         print "Unhandled exception in pyrex callback:"
         dump_exc()
