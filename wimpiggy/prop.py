@@ -33,8 +33,8 @@ class WMSizeHints(object):
          min_width, min_height,
          max_width, max_height,
          width_inc, height_inc,
-         min_aspect_num, min_aspect_den,
-         max_aspect_num, max_aspect_den,
+         min_aspect_num, min_aspect_denom,
+         max_aspect_num, max_aspect_denom,
          base_width, base_height,
          win_gravity) = struct.unpack("@" + "I" * 18, data)
         #print repr(data)
@@ -57,10 +57,13 @@ class WMSizeHints(object):
         else:
             self.resize_inc = None
         if flags & const["PAspect"]:
-            self.min_aspect = min_aspect_num * 1.0 / min_aspect_den
-            self.max_aspect = max_aspect_num * 1.0 / max_aspect_den
+            self.min_aspect = min_aspect_num * 1.0 / min_aspect_denom
+            self.min_aspect_ratio = (min_aspect_num, min_aspect_denom)
+            self.max_aspect = max_aspect_num * 1.0 / max_aspect_denom
+            self.max_aspect_ratio = (max_aspect_num,  max_aspect_denom)
         else:
             self.min_aspect, self.max_aspect = (None, None)
+            self.min_aspect_ratio, self.max_aspect_ratio = (None, None)
 
 class WMHints(object):
     def __init__(self, disp, data):

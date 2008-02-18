@@ -79,6 +79,6 @@ setup(
   download_url="http://partiwm.org/static/downloads/",
   
   scripts=["scripts/xscreen"],
-  packages=["xscreen",
+  packages=["xscreen", "xscreen.scripts",
             ],
 )

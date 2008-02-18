@@ -370,7 +370,11 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         self.emit("redraw-needed", event)
 
     def do_get_property_client_contents(self, name):
-        return self.get_property("client-contents-handle").pixmap
+        handle = self.get_property("client-contents-handle")
+        if handle is not None:
+            return handle.pixmap
+        else:
+            return None
 
     def do_get_property_client_contents_handle(self, name):
         return self._composite.get_property("window-contents-handle")

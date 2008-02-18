@@ -564,3 +564,24 @@ class TestGeometryConstraints(object):
         t(100, 150, hints(min_aspect=1, max_aspect=1,
                           base_size=(3, 4), resize_inc=(10, 10)),
           93, 94, 9, 9)
+
+
+class TestRegion(object):
+    def test_get_rectangle_from_region(self):
+        print 1
+        region = gtk.gdk.Region()
+        assert_raises(ValueError, l.get_rectangle_from_region, region)
+        print 2
+        rect1 = gtk.gdk.Rectangle(1, 2, 3, 4)
+        region = gtk.gdk.region_rectangle(rect1)
+        (x, y, w, h) = l.get_rectangle_from_region(region)
+        assert (x, y, w, h) == (1, 2, 3, 4)
+        print 3
+        region.union_with_rect(gtk.gdk.Rectangle(10, 11, 12, 13))
+        (x, y, w, h) = l.get_rectangle_from_region(region)
+        assert (x, y, w, h) in [(1, 2, 3, 4), (10, 11, 12, 13)]
+        print 4
+        region.subtract(gtk.gdk.region_rectangle(rect1))
+        (x, y, w, h) = l.get_rectangle_from_region(region)
+        assert (x, y, w, h) == (10, 11, 12, 13)
+        print 5

@@ -5,10 +5,30 @@ import socket
 import os
 import os.path
 
-class ClientWindow(gtk.Window):
-    def __init__(self, protocol, id, x, y, w, h, metadata):
-        gtk.Window.__init__(self)
+from xscreen.address import client_sock
+from xscreen.protocol import Protocol, CAPABILITIES
+
+class ClientSource(object):
+    def __init__(self, protocol):
+        self._ordinary_packets = []
         self._protocol = protocol
+        self._protocol.source = self
+
+    def queue_packet(self, packet):
+        self._ordinary_packets.append(packet)
+        self._protocol.source_has_more()
+
+    def next_packet(self):
+        if self._ordinary_packets:
+            packet = self._ordinary_packets.pop(0)
+            return packet, bool(self._ordinary_packets)
+        else:
+            return None, False
+
+class ClientWindow(gtk.Window):
+    def __init__(self, client, id, x, y, w, h, metadata):
+        gtk.Window.__init__(self)
+        self._client = client
         self._id = id
         self._pos = (-1, -1)
         self._size = (1, 1)
@@ -39,6 +59,12 @@ class ClientWindow(gtk.Window):
             ]:
             if a in self._metadata:
                 hints[h1], hints[h2] = self._metadata[a]
+        for (a, h) in [
+            ("size-constraint:minimum-aspect", "min_aspect_ratio"),
+            ("size-constraint:maximum-aspect", "max_aspect_ratio"),
+            ]:
+            if a in self._metadata:
+                hints[h] = self._metadata[a][0] * 1.0 / self._metadata[a][1]
         if hints:
             self.set_geometry_hints(None, **hints)
 
@@ -92,7 +118,7 @@ class ClientWindow(gtk.Window):
         print "Got map event"
         gtk.Window.do_map_event(self, event)
         x, y, w, h = self._geometry()
-        self._protocol.queue_packet(["map-window", self._id, x, y, w, h])
+        self._client.send(["map-window", self._id, x, y, w, h])
         self._pos = (x, y)
         self._size = (w, h)
 
@@ -102,17 +128,17 @@ class ClientWindow(gtk.Window):
         x, y, w, h = self._geometry()
         if (x, y) != self._pos:
             self._pos = (x, y)
-            self._protocol.queue_packet(["move-window", self._id, x, y])
+            self._client.send(["move-window", self._id, x, y])
         if (w, h) != self._size:
             self._size = (w, h)
-            self._protocol.queue_packet(["resize-window", self._id, w, h])
+            self._client.send(["resize-window", self._id, w, h])
             self._new_backing(w, h)
 
     def do_unmap_event(self, event):
-        self._protocol.queue_packet(["unmap-window", self._id])
+        self._client.send(["unmap-window", self._id])
 
     def do_delete_event(self, event):
-        self._protocol.queue_packet(["close-window", self._id])
+        self._client.send(["close-window", self._id])
         return True
 
 gobject.type_register(ClientWindow)
@@ -122,13 +148,14 @@ class XScreenClient(object):
         self._window_to_id = {}
         self._id_to_window = {}
 
-        address = os.path.expanduser("~/.xscreen/%s" % (name,))
-        sock = socket.socket(socket.AF_UNIX)
-        sock.connect(address)
+        sock = client_sock(name)
         print "Connected"
         self._protocol = Protocol(sock, self.process_packet)
-        self._protocol.accept_packets()
-        self._protocol.queue_packet(["hello", list(CAPABILITIES)])
+        ClientSource(self._protocol)
+        self.send(["hello", list(CAPABILITIES)])
+
+    def send(self, packet):
+        self._protocol.source.queue_packet(packet)
 
     def _process_hello(self, packet):
         (_, capabilities) = packet
@@ -137,7 +164,7 @@ class XScreenClient(object):
 
     def _process_new_window(self, packet):
         (_, id, x, y, w, h, metadata) = packet
-        window = ClientWindow(self._protocol, id, x, y, w, h, metadata)
+        window = ClientWindow(self, id, x, y, w, h, metadata)
         self._id_to_window[id] = window
         self._window_to_id[window] = id
         window.show_all()
@@ -172,6 +199,6 @@ class XScreenClient(object):
         Protocol.CONNECTION_LOST: _process_connection_lost,
         }
     
-    def process_packet(self, packet):
+    def process_packet(self, proto, packet):
         packet_type = packet[0]
         self._packet_handlers[packet_type](self, packet)

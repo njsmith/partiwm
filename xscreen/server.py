@@ -1,10 +1,11 @@
 # Todo:
-#   write queue management
 #   stacking order
 #   keycode mapping
 #   button press, motion events, mask
 #   override-redirect windows
 #   xsync resize stuff
+#   icons
+#   any other interesting metadata? _NET_WM_TYPE, WM_TRANSIENT_FOR, etc.?
 
 import gtk
 import gobject
@@ -15,9 +16,10 @@ import socket
 from wimpiggy.wm import Wm
 from wimpiggy.world_window import WorldWindow
 from wimpiggy.util import LameStruct
-from wimpiggy.lowlevel import xtest_fake_button, xtest_fake_key
+from wimpiggy.lowlevel import get_rectangle_from_region
 
-from xscreen.protocol import Protocol
+from xscreen.address import server_sock
+from xscreen.protocol import Protocol, CAPABILITIES
 
 class DesktopManager(gtk.Widget):
     def __init__(self):
@@ -27,6 +29,7 @@ class DesktopManager(gtk.Widget):
         self._models = {}
 
     ## For communicating with the main WM:
+
     def add_window(self, model, x, y, w, h):
         assert self.flags() & gtk.REALIZED
         s = LameStruct()
@@ -65,6 +68,7 @@ class DesktopManager(gtk.Widget):
                 win.raise_()
 
     ## For communicating with WindowModels:
+
     def _unmanaged(self, model, wm_exiting):
         del self._models[model]
 
@@ -90,8 +94,82 @@ class DesktopManager(gtk.Widget):
 
 gobject.type_register(DesktopManager)
 
-class XScreenServer(object):
+class ServerSource(object):
+    # Strategy: if we have ordinary packets to send, send those.  When we
+    # don't, then send window updates.
+    def __init__(self, protocol):
+        self._ordinary_packets = []
+        self._protocol = protocol
+        self._damage = {}
+        protocol.source = self
+        if self._have_more():
+            protocol.source_has_more()
 
+    def _have_more(self):
+        return bool(self._ordinary_packets) or bool(self._damage)
+
+    def queue_ordinary_packet(self, packet):
+        assert self._protocol
+        self._ordinary_packets.append(packet)
+        self._protocol.source_has_more()
+
+    def cancel_damage(self, id):
+        if id in self._damage:
+            del self._damage[id]
+        
+    def damage(self, id, window, x, y, w, h):
+        window, region = self._damage.setdefault(id,
+                                                 (window, gtk.gdk.Region()))
+        region.union_with_rect(gtk.gdk.Rectangle(x, y, w, h))
+        self._protocol.source_has_more()
+
+    def next_packet(self):
+        if self._ordinary_packets:
+            packet = self._ordinary_packets.pop(0)
+        elif self._damage:
+            id, (window, damage) = self._damage.items()[0]
+            (x, y, w, h) = get_rectangle_from_region(damage)
+            rect = gtk.gdk.Rectangle(x, y, w, h)
+            damage.subtract(gtk.gdk.region_rectangle(rect))
+            if damage.empty():
+                del self._damage[id]
+            pixmap = window.get_property("client-contents")
+            if pixmap is None:
+                packet = None
+            else:
+                (x2, y2, w2, h2, data) = self._get_rgb_data(pixmap, x, y, w, h)
+                if not w2 or not h2:
+                    packet = None
+                else:
+                    packet = ["draw", id, x2, y2, w2, h2, "rgb24", data]
+        else:
+            packet = None
+        return packet, self._have_more()
+
+    def _get_rgb_data(self, pixmap, x, y, width, height):
+        pixmap_w, pixmap_h = pixmap.get_size()
+        if x + width > pixmap_w:
+            width = pixmap_w - x
+        if y + height > pixmap_h:
+            height = pixmap_h - y
+        if width <= 0 or height <= 0:
+            return (0, 0, 0, 0, "")
+        pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, False, 8, width, height)
+        pixbuf.get_from_drawable(pixmap, pixmap.get_colormap(),
+                                 x, y, 0, 0, width, height)
+        raw_data = pixbuf.get_pixels()
+        rowwidth = width * 3
+        rowstride = pixbuf.get_rowstride()
+        if rowwidth == rowstride:
+            data = raw_data
+        else:
+            rows = []
+            for i in xrange(height):
+                rows.append(raw_data[i*rowstride : i*rowstride+rowwidth])
+            data = "".join(rows)
+        return (x, y, width, height, data)
+
+class XScreenServer(object):
     def __init__(self, replace_other_wm):
         self._wm = Wm("XScreen", replace_other_wm)
         self._wm.connect("focus-got-dropped", self._focus_dropped)
@@ -107,32 +185,19 @@ class XScreenServer(object):
         # Window id 0 is reserved for "not a window"
         self._max_window_id = 1
 
-        self._protocol = DummyProtocol()
+        self._protocol = None
+        self._maybe_protocols = []
 
         for window in self._wm.get_property("windows"):
             self._add_new_window(window)
 
-        name = gtk.gdk.display_get_default().get_name()
-        if name.startswith(":"):
-            name = name[1:]
-        sockdir = os.path.expanduser("~/.xscreen")
-        if not os.path.exists(sockdir):
-            os.mkdir(sockdir, 0700)
-        sockpath = os.path.join(sockdir, name)
-        if os.path.exists(sockpath) and replace_other_wm:
-            os.unlink(sockpath)
-        self._listener = socket.socket(socket.AF_UNIX)
-        self._listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._listener.bind(sockpath)
-        self._listener.listen(5)
+        self._listener = server_sock(replace_other_wm)
         gobject.io_add_watch(self._listener, gobject.IO_IN,
                              self._new_connection)
 
     def _new_connection(self, *args):
-        # Just drop any existing connection
-        self._protocol.close()
         sock, addr = self._listener.accept()
-        self._protocol = Protocol(sock, self.process_packet)
+        self._maybe_protocols.append(Protocol(sock, self.process_packet))
         return True
 
     def _focus_dropped(self, *args):
@@ -170,124 +235,111 @@ class XScreenServer(object):
                 ("min_size", "size-constraint:minimum-size"),
                 ("base_size", "size-constraint:base-size"),
                 ("resize_inc", "size-constraint:increment"),
+                ("min_aspect_ratio", "size-constraint:minimum-aspect"),
+                ("max_aspect_ratio", "size-constraint:maximum-aspect"),
                 ]:
                 if getattr(hints, attr) is not None:
                     metadata[metakey] = getattr(hints, attr)
-            if hints.min_aspect is not None:
-                # Need a way to send doubles, or recover the original integer
-                # fractional form.
-                print "FIXME: ignoring aspect ratio constraint, things will likely break"
             return metadata
         else:
             assert False
 
+    def _send(self, packet):
+        if self._protocol is not None:
+            self._protocol.source.queue_ordinary_packet(packet)
+
+    def _damage(self, window, x, y, width, height):
+        if self._protocol is not None and self._protocol.source is not None:
+            id = self._window_to_id[window]
+            self._protocol.source.damage(id, window, x, y, width, height)
+        
+    def _cancel_damage(self, window):
+        if self._protocol is not None and self._protocol.source is not None:
+            id = self._window_to_id[window]
+            self._protocol.source.cancel_damage(id)
+            
     def _send_new_window_packet(self, window):
         id = self._window_to_id[window]
         (x, y, w, h) = self._desktop_manager.window_geometry(window)
         metadata = {}
         metadata.update(self._make_metadata(window, "title"))
         metadata.update(self._make_metadata(window, "size-hints"))
-        self._protocol.queue_packet(["new-window", id, x, y, w, h, metadata])
+        self._send(["new-window", id, x, y, w, h, metadata])
 
     def _update_metadata(self, window, pspec):
         id = self._window_to_id[window]
         metadata = self._make_metadata(window, pspec.name)
-        self._protocol.queue_packet(["window-metadata", id, metadata])
+        self._send(["window-metadata", id, metadata])
 
     def _lost_window(self, window, wm_exiting):
         id = self._window_to_id[window]
-        self._protocol.queue_packet(["lost-window", id])
+        self._send(["lost-window", id])
+        self._cancel_damage(window)
         del self._window_to_id[window]
         del self._id_to_window[id]
 
     def _redraw_needed(self, window, event):
         if self._desktop_manager.visible(window):
-            self._send_draw_packet(window,
-                                   event.x, event.y, event.width, event.height)
+            self._damage(window, event.x, event.y, event.width, event.height)
 
-    def _send_draw_packet(self, window, x, y, width, height):
-        id = self._window_to_id[window]
-        pixmap = window.get_property("client-contents")
-        # Originally this used Cairo and an ImageSurface, but for some reason
-        # the resulting surface basically always contained nonsense.  This is
-        # actually less code, too:
-        pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, False, 8, width, height)
-        pixbuf.get_from_drawable(pixmap, pixmap.get_colormap(),
-                                 x, y, 0, 0, width, height)
-        raw_data = pixbuf.get_pixels()
-        rowwidth = width * 3
-        rowstride = pixbuf.get_rowstride()
-        if rowwidth == rowstride:
-            data = raw_data
-        else:
-            rows = []
-            for i in xrange(height):
-                rows.append(raw_data[i*rowstride : i*rowstride+rowwidth])
-            data = "".join(rows)
-        packet = ["draw", id, x, y, width, height, "rgb24", data]
-        self._protocol.queue_packet(packet)
-
-    def _process_hello(self, packet):
+    def _process_hello(self, proto, packet):
+        # Drop any existing protocol
+        if self._protocol is not None:
+            self._protocol.close()
+        self._protocol = proto
+        ServerSource(self._protocol)
         client_capabilities = set(packet[1])
         capabilities = CAPABILITIES.intersection(client_capabilities)
-        self._protocol.accept_packets()
-        self._protocol.queue_packet(["hello", list(capabilities)])
+        self._send(["hello", list(capabilities)])
         if "deflate" in capabilities:
             self._protocol.enable_deflate()
         for window in self._window_to_id.keys():
             self._desktop_manager.hide_window(window)
             self._send_new_window_packet(window)
 
-    def _process_map_window(self, packet):
+    def _process_map_window(self, proto, packet):
         (_, id, x, y, width, height) = packet
         window = self._id_to_window[id]
         self._desktop_manager.show_window(window, x, y, width, height)
-        self._send_draw_packet(window, 0, 0, width, height)
+        self._damage(window, 0, 0, width, height)
 
-    def _process_unmap_window(self, packet):
+    def _process_unmap_window(self, proto, packet):
         (_, id) = packet
         window = self._id_to_window[id]
         self._desktop_manager.hide_window(window)
+        self._cancel_damage(window)
 
-    def _process_move_window(self, packet):
+    def _process_move_window(self, proto, packet):
         (_, id, x, y) = packet
         window = self._id_to_window[id]
         (_, _, w, h) = self._desktop_manager.window_geometry(window)
         self._desktop_manager.show_window(window, x, y, w, h)
 
-    def _process_resize_window(self, packet):
+    def _process_resize_window(self, proto, packet):
         (_, id, w, h) = packet
         window = self._id_to_window[id]
+        self._cancel_damage(window)
+        self._damage(window, 0, 0, w, h)
         (x, y, _, _) = self._desktop_manager.window_geometry(window)
         self._desktop_manager.show_window(window, x, y, w, h)
 
-    def _process_window_order(self, packet):
+    def _process_window_order(self, proto, packet):
         (_, ids_bottom_to_top) = packet
         windows_bottom_to_top = [self._id_to_window[id]
                                  for id in ids_bottom_to_top]
         self._desktop_manager.reorder_windows(windows_bottom_to_top)
 
-    def _process_close_window(self, packet):
+    def _process_close_window(self, proto, packet):
         (_, id) = packet
         window = self._id_to_window[id]
         window.request_close()
 
-    def _process_mouse_position(self, packet):
-        (_, x, y) = packet
-        display = gtk.gdk.display_get_default()
-        display.warp_pointer(display.get_default_screen(), x, y)
-
-    def _process_button_event(self, packet):
-        (_, button, pressed) = packet
-        xtest_fake_button(gtk.gdk.display_get_default(), button, pressed)
-
-    def _process_connection_lost(self, packet):
-        (_, protocol) = packet
-        if protocol is self._protocol:
-            self._protocol.close()
-            self._protocol = DummyProtocol()
-        else:
-            print "stale connection lost message"
+    def _process_connection_lost(self, proto, packet):
+        proto.close()
+        if proto in self._maybe_protocols:
+            self._maybe_protocols.remove(proto)
+        if proto is self._protocol:
+            self._protocol = None
 
     _packet_handlers = {
         "hello": _process_hello,
@@ -297,11 +349,9 @@ class XScreenServer(object):
         "resize-window": _process_resize_window,
         "window-order": _process_window_order,
         "close-window": _process_close_window,
-        "mouse-position": _process_mouse_position,
-        "button-event": _process_button_event,
         Protocol.CONNECTION_LOST: _process_connection_lost,
         }
 
-    def process_packet(self, packet):
+    def process_packet(self, proto, packet):
         packet_type = packet[0]
-        self._packet_handlers[packet_type](self, packet)
+        self._packet_handlers[packet_type](self, proto, packet)
