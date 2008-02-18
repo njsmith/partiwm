@@ -150,7 +150,8 @@ class ClientWindow(gtk.Window):
 
     def _key_action(self, event, depressed):
         modifiers = self._client.mask_to_names(event.state)
-        self._client.send(["key-action", self._id, depressed, modifiers])
+        name = gtk.gdk.keyval_name(event.keyval)
+        self._client.send(["key-action", self._id, name, depressed, modifiers])
 
     def do_key_press_event(self, event):
         self._key_action(event, True)

@@ -5,5 +5,6 @@ def mask_to_names(mask, modifier_map):
                      ]:
         modifier_mask = modifier_map[modifier]
         if modifier_mask & mask:
-            modifiers.append(modifier_mask)
+            modifiers.append(modifier)
+            mask &= ~modifier_mask
     return modifiers

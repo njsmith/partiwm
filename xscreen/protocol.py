@@ -43,11 +43,11 @@ class Protocol(object):
         if want_write == write_armed:
             return
         if want_write:
-            #print "Arming writes"
+            print "Arming writes"
             self._write_tag = gobject.io_add_watch(self._sock, gobject.IO_OUT,
                                                    self._socket_writeable)
         else:
-            #print "Disarming writes"
+            print "Disarming writes"
             gobject.source_remove(self._write_tag)
             self._write_tag = None
 
@@ -79,12 +79,16 @@ class Protocol(object):
 
     def _socket_readable(self, *args):
         buf = self._sock.recv(4096)
+        print "read %s bytes" % len(buf)
         if not buf:
             self._accept_packets = False
             self._process_packet_cb(self, [Protocol.CONNECTION_LOST])
             return False
         if self._decompressor is not None:
             buf = self._decompressor.decompress(buf)
+            print "%s bytes decompressed" % len(buf)
+            if len(buf) < 250:
+                print "here they are: %r" % buf
         self._read_buf += buf
         while True:
             had_deflate = (self._decompressor is not None)

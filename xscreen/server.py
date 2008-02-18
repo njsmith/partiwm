@@ -296,7 +296,7 @@ class XScreenServer(object):
         else:
             assert False
 
-    def _keycode(keyname):
+    def _keycode(self, keyname):
         keyval = gtk.gdk.keyval_from_name(keyname)
         return self._keymap.get_entries_for_keyval(keyval)[0][0]
 

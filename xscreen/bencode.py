@@ -64,7 +64,8 @@ from types import (StringType, IntType, LongType, DictType, ListType,
                    TupleType, BooleanType)
 
 def encode_int(x, r):
-    r.extend(('i', str(x), 'e'))
+    # Explicit cast, because bool.__str__ is annoying.
+    r.extend(('i', str(long(x)), 'e'))
 
 def encode_string(x, r):
     r.extend((str(len(x)), ':', x))
