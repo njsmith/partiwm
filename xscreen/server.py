@@ -224,12 +224,12 @@ class XScreenServer(object):
                                keycode any = Alt_L
                                keycode any = Hyper_L
                                keycode any = Super_L
-                               add Shift = Shift_L
-                               add Control = Control_L
-                               add Mod1 = Meta_L
-                               add Mod2 = Alt_L
-                               add Mod3 = Hyper_L
-                               add Mod4 = Super_L
+                               add Shift = Shift_L Shift_R
+                               add Control = Control_L Control_R
+                               add Mod1 = Meta_L Meta_R
+                               add Mod2 = Alt_L Alt_R
+                               add Mod3 = Hyper_L Hyper_R
+                               add Mod4 = Super_L Super_R
                             """)
         self._keyname_for_mod = {
             "shift": "Shift_L",
@@ -279,19 +279,19 @@ class XScreenServer(object):
             else:
                 return {}
         elif propname == "size-hints":
-            metadata = {}
+            hints_metadata = {}
             hints = window.get_property("size-hints")
             for attr, metakey in [
-                ("max_size", "size-constraint:maximum-size"),
-                ("min_size", "size-constraint:minimum-size"),
-                ("base_size", "size-constraint:base-size"),
-                ("resize_inc", "size-constraint:increment"),
-                ("min_aspect_ratio", "size-constraint:minimum-aspect"),
-                ("max_aspect_ratio", "size-constraint:maximum-aspect"),
+                ("max_size", "maximum-size"),
+                ("min_size", "minimum-size"),
+                ("base_size", "base-size"),
+                ("resize_inc", "increment"),
+                ("min_aspect_ratio", "minimum-aspect"),
+                ("max_aspect_ratio", "maximum-aspect"),
                 ]:
                 if getattr(hints, attr) is not None:
-                    metadata[metakey] = getattr(hints, attr)
-            return metadata
+                    hints_metadata[metakey] = getattr(hints, attr)
+            return {"size-constraints": hints_metadata}
         else:
             assert False
 
@@ -305,10 +305,12 @@ class XScreenServer(object):
         wanted = set(modifier_list)
         for modifier in current.difference(wanted):
             xtest_fake_key(gtk.gdk.display_get_default(),
-                           keycode(self._keyname_for_mod[modifier]), False)
+                           self._keycode(self._keyname_for_mod[modifier]),
+                           False)
         for modifier in wanted.difference(current):
             xtest_fake_key(gtk.gdk.display_get_default(),
-                           keycode(self._keyname_for_mod[modifier]), True)
+                           self._keycode(self._keyname_for_mod[modifier]),
+                           True)
 
     def _focus(self, id):
         if self._has_focus != id:

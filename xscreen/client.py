@@ -16,17 +16,31 @@ from xscreen.keys import mask_to_names
 class ClientSource(object):
     def __init__(self, protocol):
         self._ordinary_packets = []
+        self._mouse_position = None
         self._protocol = protocol
         self._protocol.source = self
 
-    def queue_packet(self, packet):
+    def queue_ordinary_packet(self, packet):
         self._ordinary_packets.append(packet)
+        self._protocol.source_has_more()
+
+    def queue_positional_packet(self, packet):
+        self.queue_ordinary_packet(packet)
+        self._mouse_position = None
+
+    def queue_mouse_position_packet(self, packet):
+        self._mouse_position = packet
         self._protocol.source_has_more()
 
     def next_packet(self):
         if self._ordinary_packets:
             packet = self._ordinary_packets.pop(0)
-            return packet, bool(self._ordinary_packets)
+            return packet, (bool(self._ordinary_packets)
+                            or self._mouse_position is not None)
+        elif self._mouse_position is not None:
+            packet = self._mouse_position
+            self._mouse_position = None
+            return packet, False
         else:
             return None, False
 
@@ -62,22 +76,24 @@ class ClientWindow(gtk.Window):
                        % self._metadata.get("title",
                                             "<untitled window>"
                                             ).decode("utf-8"))
-        hints = {}
-        for (a, h1, h2) in [
-            ("size-constraint:maximum-size", "max_width", "max_height"),
-            ("size-constraint:minimum-size", "min_width", "min_height"),
-            ("size-constraint:base-size", "base_width", "base_height"),
-            ("size-constraint:increment", "width_inc", "height_inc"),
-            ]:
-            if a in self._metadata:
-                hints[h1], hints[h2] = self._metadata[a]
-        for (a, h) in [
-            ("size-constraint:minimum-aspect", "min_aspect_ratio"),
-            ("size-constraint:maximum-aspect", "max_aspect_ratio"),
-            ]:
-            if a in self._metadata:
-                hints[h] = self._metadata[a][0] * 1.0 / self._metadata[a][1]
-        if hints:
+
+        if "size-constraints" in self._metadata:
+            size_metadata = self._metadata["size-constraints"]
+            hints = {}
+            for (a, h1, h2) in [
+                ("maximum-size", "max_width", "max_height"),
+                ("minimum-size", "min_width", "min_height"),
+                ("base-size", "base_width", "base_height"),
+                ("increment", "width_inc", "height_inc"),
+                ]:
+                if a in self._metadata["size-constraints"]:
+                    hints[h1], hints[h2] = size_metadata[a]
+            for (a, h) in [
+                ("minimum-aspect", "min_aspect_ratio"),
+                ("maximum-aspect", "max_aspect_ratio"),
+                ]:
+                if a in self._metadata:
+                    hints[h] = size_metadata[a][0] * 1.0 / size_metadata[a][1]
             self.set_geometry_hints(None, **hints)
 
     def _new_backing(self, w, h):
@@ -171,12 +187,13 @@ class ClientWindow(gtk.Window):
 
     def do_motion_notify_event(self, event):
         (pointer, modifiers) = self._pointer_modifiers(event)
-        self._client.send(["pointer-position", pointer, modifiers])
+        self._client.send_mouse_position(["pointer-position", pointer,
+                                          modifiers])
         
     def _button_action(self, event, depressed):
         (pointer, modifiers) = self._pointer_modifiers(event)
-        self._client.send(["button-action", event.button, depressed,
-                           pointer, modifiers])
+        self._client.send_positional(["button-action", event.button,
+                                      depressed, pointer, modifiers])
 
     def do_button_press_event(self, event):
         self._button_action(event, True)
@@ -235,7 +252,13 @@ class XScreenClient(gobject.GObject):
         return mask_to_names(mask, self._modifier_map)
 
     def send(self, packet):
-        self._protocol.source.queue_packet(packet)
+        self._protocol.source.queue_ordinary_packet(packet)
+
+    def send_positional(self, packet):
+        self._protocol.source.queue_positional_packet(packet)
+
+    def send_mouse_position(self, packet):
+        self._protocol.source.queue_mouse_position_packet(packet)
 
     def do_wimpiggy_property_notify_event(self, event):
         root = gtk.gdk.get_default_root_window()
