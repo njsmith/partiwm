@@ -99,9 +99,9 @@ from wimpiggy.composite import CompositeHelper
 # We should also have a block comment describing how to create a
 # view/"controller" for a WindowModel.
 #
-# Viewing a WindowModel is easy.  Connect to the redraw-needed signal.  Every
-# time the window contents is updated, you'll get a message.  This message is
-# passed a single object e, which has useful members:
+# Viewing a (Base)WindowModel is easy.  Connect to the client-contents-changed
+# signal.  Every time the window contents is updated, you'll get a message.
+# This message is passed a single object e, which has useful members:
 #   e.x, e.y, e.width, e.height:
 #      The part of the client window that was modified, and needs to be
 #      redrawn.
@@ -112,6 +112,8 @@ from wimpiggy.composite import CompositeHelper
 #      ...this gtk.gdk.Pixmap object.  This object will be destroyed as soon
 #      as pixmap_handle passes out of scope, so if you want do anything fancy,
 #      hold onto pixmap_handle, not just the pixmap itself.
+# You can also get the handle as the "client-contents-handle" property, and
+# the pixmap itself as the "client-contents" property.
 #
 # But what if you'd like to do more than just look at your pretty composited
 # windows?  Maybe you'd like to, say, *interact* with them?  Then life is a
