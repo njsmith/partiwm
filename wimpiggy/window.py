@@ -223,6 +223,9 @@ class BaseWindowModel(AutoPropGObjectMixin, gobject.GObject):
     def do_get_property_client_contents_handle(self, name):
         return self._composite.get_property("contents-handle")
 
+    def acknowledge_changes(self, x, y, w, h):
+        self._composite.acknowledge_changes(x, y, w, h)
+
     def unmanage(self, exiting=False):
         self.emit("unmanaged", exiting)
 
@@ -1005,6 +1008,9 @@ class WindowView(gtk.Widget):
         #tmpcr.paint()
         #cr.set_source_surface(tmpsrf, 0, 0)
         cr.paint()
+
+        self.model.acknowledge_changes(event.x, event.y,
+                                       event.width, event.height)
 
         icon = self.model.get_property("icon")
         if icon is not None:

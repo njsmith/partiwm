@@ -1117,9 +1117,6 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     pyev.y = damage_e.area.y
                     pyev.width = damage_e.area.width
                     pyev.height = damage_e.area.height
-                    xdamage_acknowledge(d, pyev.damage,
-                                        pyev.x, pyev.y,
-                                        pyev.width, pyev.height)
             except XError, e:
                 print ("Some window in our event disappeared before we could "
                        + "handle the event; so I'm just ignoring it instead.")

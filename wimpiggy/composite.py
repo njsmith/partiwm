@@ -5,6 +5,7 @@ from wimpiggy.lowlevel import (xcomposite_redirect_window,
                                xcomposite_unredirect_window,
                                xcomposite_name_window_pixmap,
                                xdamage_start, xdamage_stop,
+                               xdamage_acknowledge,
                                add_event_receiver, remove_event_receiver)
 
 class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
@@ -38,8 +39,15 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
         if not self._already_composited:
             trap.swallow(xcomposite_unredirect_window, self._window)
         trap.swallow(xdamage_stop, self._window, self._damage_handle)
+        self._damage_handle = None
         self._internal_set_property("contents-handle", None)
         remove_event_receiver(self._window, self)
+        self._window = None
+
+    def acknowledge_changes(self, x, y, w, h):
+        if self._damage_handle is not None:
+            xdamage_acknowledge(self._window, self._damage_handle,
+                                x, y, w, h)
 
     def refresh_pixmap(self):
         def set_pixmap():
