@@ -12,8 +12,8 @@ import xscreen
 def main(cmdline):
     parser = OptionParser(version="xscreen v%s" % xscreen.__version__,
                           usage=("\n"
-                                 + "\t%prog serve DISPLAY\n"
-                                 + "\t%prog connect DISPLAY\n"
+                                 + "\t%prog start DISPLAY\n"
+                                 + "\t%prog attach DISPLAY\n"
                                  + "\t%prog shutdown DISPLAY\n"
                                  + "\t%prog list"))
     parser.add_option("--no-daemon", action="store_false",
@@ -25,9 +25,9 @@ def main(cmdline):
         parser.error("need a mode")
 
     mode = args[0]
-    if mode == "serve":
+    if mode == "start":
         run_server(parser, options, args[1:])
-    elif mode == "connect":
+    elif mode == "attach":
         run_client(parser, options, args[1:])
     elif mode == "shutdown":
         run_shutdown(parser, options, args[1:])
