@@ -1,8 +1,9 @@
 # Todo:
 #   override-redirect windows
-#   cursors
 #   copy/paste (dnd?)
+#   cursors
 #   xsync resize stuff
+#   shape?
 #   icons
 #   any other interesting metadata? _NET_WM_TYPE, WM_TRANSIENT_FOR, etc.?
 
@@ -14,10 +15,14 @@ import socket
 import subprocess
 
 from wimpiggy.wm import Wm
-from wimpiggy.util import LameStruct
+from wimpiggy.util import LameStruct, one_arg_signal
 from wimpiggy.lowlevel import (get_rectangle_from_region,
                                xtest_fake_key,
-                               xtest_fake_button)
+                               xtest_fake_button,
+                               is_override_redirect, is_mapped,
+                               add_event_receiver,
+                               get_children)
+from wimpiggy.window import OverrideRedirectWindowModel
 from wimpiggy.keys import grok_modifier_map
 
 from xscreen.address import server_sock
@@ -172,8 +177,14 @@ class ServerSource(object):
             data = "".join(rows)
         return (x, y, width, height, data)
 
-class XScreenServer(object):
+class XScreenServer(gobject.GObject):
+    __gsignals__ = {
+        "wimpiggy-child-map-event": one_arg_signal,
+        }
+
     def __init__(self, socketpath, clobber):
+        gobject.GObject.__init__(self)
+        
         self._wm = Wm("XScreen", clobber)
         self._wm.connect("new-window", self._new_window_signaled)
 
@@ -187,10 +198,17 @@ class XScreenServer(object):
         self._max_window_id = 1
 
         self._protocol = None
-        self._maybe_protocols = []
+        self._potential_protocols = []
 
         for window in self._wm.get_property("windows"):
             self._add_new_window(window)
+
+        root = gtk.gdk.get_default_root_window()
+        root.set_events(gtk.gdk.SUBSTRUCTURE_MASK)
+        add_event_receiver(root, self)
+        for window in get_children(root):
+            if (is_override_redirect(window) and is_mapped(window)):
+                self._add_new_or_window(window)
 
         self._socketpath = socketpath
         self._listener = socket.socket(socket.AF_UNIX)
@@ -241,7 +259,7 @@ class XScreenServer(object):
     def _new_connection(self, *args):
         print "New connection received"
         sock, addr = self._listener.accept()
-        self._maybe_protocols.append(Protocol(sock, self.process_packet))
+        self._potential_protocols.append(Protocol(sock, self.process_packet))
         return True
 
     def _keys_changed(self, *args):
@@ -250,21 +268,43 @@ class XScreenServer(object):
     def _new_window_signaled(self, wm, window):
         self._add_new_window(window)
 
+    def do_wimpiggy_child_map_event(self, event):
+        raw_window = event.window
+        if event.override_redirect:
+            self._add_new_or_window(raw_window)
+
     _window_export_properties = ("title", "size-hints")
 
-    def _add_new_window(self, window):
+    def _add_new_window_common(self, window):
         id = self._max_window_id
         self._max_window_id += 1
         self._window_to_id[window] = id
         self._id_to_window[id] = window
-        window.connect("redraw-needed", self._redraw_needed)
+        window.connect("contents-changed", self._contents_changed)
         window.connect("unmanaged", self._lost_window)
+
+    def _add_new_window(self, window):
+        self._new_window_bookkeep(window)
         for prop in self._window_export_properties:
             window.connect("notify::%s" % prop, self._update_metadata)
         (x, y, w, h, depth) = window.get_property("client-window").get_geometry()
         self._desktop_manager.add_window(window, x, y, w, h)
         self._send_new_window_packet(window)
-            
+
+    def _add_new_or_window(self, raw_window):
+        try:
+            window = OverrideRedirectWindowModel(raw_window)
+        except Unmanageable, e:
+            return
+        self._add_new_window_common(window)
+        window.connect("notify::geometry", self._or_window_geometry_changed)
+        self._send_new_or_window_packet(window)
+        self._send_or_stacking_packet()
+
+    def _or_window_geometry_changed(self, window, pspec):
+        (x, y, w, h) = window.get_property("geometry")
+        self._send(["configure-override-redirect", x, y, w, h])
+
     def _make_metadata(self, window, propname):
         if propname == "title":
             if window.get_property("title") is not None:
@@ -342,10 +382,30 @@ class XScreenServer(object):
         metadata.update(self._make_metadata(window, "size-hints"))
         self._send(["new-window", id, x, y, w, h, metadata])
 
+    def _send_new_or_window_packet(self, window):
+        id = self._window_to_id[window]
+        (x, y, w, h) = self._desktop_manager.window_geometry(window)
+        self._send(["new-override-redirect", id, x, y, w, h, {}])
+        self._damage(window, 0, 0, w, h)
+
+    def _send_or_stacking_packet(self):
+        raw_or_to_id = {}
+        for window, id in self._window_to_id.iteritems():
+            if isinstance(window, OverrideRedirectWindowModel):
+                raw_or_to_id[window.get_property("client-window")] = id
+        or_stacking = []
+        root = gtk.gdk.get_default_root_window()
+        for raw_window in get_children(root):
+            if raw_window in raw_or_to_id:
+                or_stacking.append(raw_or_to_id[raw_or_to_id])
+        if or_stacking:
+            self._send(["override-redirect-order", or_stacking])
+        
     def _update_metadata(self, window, pspec):
         id = self._window_to_id[window]
         metadata = self._make_metadata(window, pspec.name)
         self._send(["window-metadata", id, metadata])
+
 
     def _lost_window(self, window, wm_exiting):
         id = self._window_to_id[window]
@@ -354,8 +414,9 @@ class XScreenServer(object):
         del self._window_to_id[window]
         del self._id_to_window[id]
 
-    def _redraw_needed(self, window, event):
-        if self._desktop_manager.visible(window):
+    def _contents_changed(self, window, event):
+        if (isinstance(window, OverrideRedirectWindowModel)
+            or self._desktop_manager.visible(window)):
             self._damage(window, event.x, event.y, event.width, event.height)
 
     def _process_hello(self, proto, packet):
@@ -371,30 +432,38 @@ class XScreenServer(object):
         if "deflate" in capabilities:
             self._protocol.enable_deflate()
         for window in self._window_to_id.keys():
-            self._desktop_manager.hide_window(window)
-            self._send_new_window_packet(window)
+            if isinstance(window, OverrideRedirectWindowModel):
+                self._send_new_or_window_packet(window)
+            else:
+                self._desktop_manager.hide_window(window)
+                self._send_new_window_packet(window)
+        self._send_or_stacking_packet()
 
     def _process_map_window(self, proto, packet):
         (_, id, x, y, width, height) = packet
         window = self._id_to_window[id]
+        assert not isinstance(window, OverrideRedirectWindowModel)
         self._desktop_manager.show_window(window, x, y, width, height)
         self._damage(window, 0, 0, width, height)
 
     def _process_unmap_window(self, proto, packet):
         (_, id) = packet
         window = self._id_to_window[id]
+        assert not isinstance(window, OverrideRedirectWindowModel)
         self._desktop_manager.hide_window(window)
         self._cancel_damage(window)
 
     def _process_move_window(self, proto, packet):
         (_, id, x, y) = packet
         window = self._id_to_window[id]
+        assert not isinstance(window, OverrideRedirectWindowModel)
         (_, _, w, h) = self._desktop_manager.window_geometry(window)
         self._desktop_manager.show_window(window, x, y, w, h)
 
     def _process_resize_window(self, proto, packet):
         (_, id, w, h) = packet
         window = self._id_to_window[id]
+        assert not isinstance(window, OverrideRedirectWindowModel)
         self._cancel_damage(window)
         self._damage(window, 0, 0, w, h)
         (x, y, _, _) = self._desktop_manager.window_geometry(window)
@@ -436,8 +505,8 @@ class XScreenServer(object):
     def _process_connection_lost(self, proto, packet):
         print "Connection lost"
         proto.close()
-        if proto in self._maybe_protocols:
-            self._maybe_protocols.remove(proto)
+        if proto in self._potential_protocols:
+            self._potential_protocols.remove(proto)
         if proto is self._protocol:
             self._protocol = None
 
@@ -464,3 +533,5 @@ class XScreenServer(object):
     def process_packet(self, proto, packet):
         packet_type = packet[0]
         self._packet_handlers[packet_type](self, proto, packet)
+
+gobject.type_register(XScreenServer)

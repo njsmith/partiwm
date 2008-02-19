@@ -46,14 +46,19 @@ class ClientSource(object):
             return None, False
 
 class ClientWindow(gtk.Window):
-    def __init__(self, client, id, x, y, w, h, metadata):
-        gtk.Window.__init__(self)
+    def __init__(self, client, id, x, y, w, h, metadata, override_redirect):
+        if override_redirect:
+            type = gtk.WINDOW_POPUP
+        else:
+            type = gtk.WINDOW_TOPLEVEL
+        gtk.Window.__init__(self, type)
         self._client = client
         self._id = id
         self._pos = (-1, -1)
         self._size = (1, 1)
         self._backing = None
         self._metadata = {}
+        self._override_redirect = override_redirect
         self._new_backing(1, 1)
         self.update_metadata(metadata)
         
@@ -64,8 +69,7 @@ class ClientWindow(gtk.Window):
                         | gtk.gdk.BUTTON_PRESS_MASK
                         | gtk.gdk.BUTTON_RELEASE_MASK)
 
-        # FIXME: It's possible in X to request a starting position for a
-        # window, but I don't know how to do it from GTK.
+        self.move(x, y)
         self.set_default_size(w, h)
 
         self.connect("notify::has-toplevel-focus", self._focus_change)
@@ -146,25 +150,33 @@ class ClientWindow(gtk.Window):
     def do_map_event(self, event):
         print "Got map event"
         gtk.Window.do_map_event(self, event)
-        x, y, w, h = self._geometry()
-        self._client.send(["map-window", self._id, x, y, w, h])
-        self._pos = (x, y)
-        self._size = (w, h)
+        if not self._override_redirect:
+            x, y, w, h = self._geometry()
+            self._client.send(["map-window", self._id, x, y, w, h])
+            self._pos = (x, y)
+            self._size = (w, h)
 
     def do_configure_event(self, event):
         print "Got configure event"
         gtk.Window.do_configure_event(self, event)
-        x, y, w, h = self._geometry()
-        if (x, y) != self._pos:
-            self._pos = (x, y)
-            self._client.send(["move-window", self._id, x, y])
-        if (w, h) != self._size:
-            self._size = (w, h)
-            self._client.send(["resize-window", self._id, w, h])
-            self._new_backing(w, h)
+        if not self._override_redirect:
+            x, y, w, h = self._geometry()
+            if (x, y) != self._pos:
+                self._pos = (x, y)
+                self._client.send(["move-window", self._id, x, y])
+            if (w, h) != self._size:
+                self._size = (w, h)
+                self._client.send(["resize-window", self._id, w, h])
+                self._new_backing(w, h)
+
+    def move_resize(self, x, y, w, h):
+        assert self._override_redirect
+        self.window.move_resize(x, y, w, h)
+        self._new_backing(w, h)
 
     def do_unmap_event(self, event):
-        self._client.send(["unmap-window", self._id])
+        if not self._override_redirect:
+            self._client.send(["unmap-window", self._id])
 
     def do_delete_event(self, event):
         self._client.send(["close-window", self._id])
@@ -283,12 +295,19 @@ class XScreenClient(gobject.GObject):
         if "deflate" in capabilities:
             self._protocol.enable_deflate()
 
-    def _process_new_window(self, packet):
+    def _process_new_common(self, packet, override_redirect):
         (_, id, x, y, w, h, metadata) = packet
-        window = ClientWindow(self, id, x, y, w, h, metadata)
+        window = ClientWindow(self, id, x, y, w, h, metadata,
+                              override_redirect)
         self._id_to_window[id] = window
         self._window_to_id[window] = id
         window.show_all()
+
+    def _process_new_window(self, packet):
+        self._process_new_common(packet, False)
+
+    def _process_new_override_redirect(self, packet):
+        self._process_new_common(packet, True)
 
     def _process_draw(self, packet):
         (_, id, x, y, width, height, coding, data) = packet
@@ -300,6 +319,21 @@ class XScreenClient(gobject.GObject):
         (_, id, metadata) = packet
         window = self._id_to_window[id]
         window.update_metadata(metadata)
+
+    def _process_override_redirect_order(self, packet):
+        (_, order) = packet
+        try:
+            gtk.gdk.x11_grab_server()
+            for id in order:
+                window = self._id_to_window[id]
+                window.window.raise_()
+        finally:
+            gtk.gdk.x11_ungrab_server()
+
+    def _process_configure_override_redirect(self, packet):
+        (_, id, x, y, w, h) = packet
+        window = self._id_to_window[id]
+        window.move_resize(x, y, w, h)
 
     def _process_lost_window(self, packet):
         (_, id) = packet
@@ -315,8 +349,11 @@ class XScreenClient(gobject.GObject):
     _packet_handlers = {
         "hello": _process_hello,
         "new-window": _process_new_window,
+        "new-override-redirect": _process_new_override_redirect,
         "draw": _process_draw,
         "window-metadata": _process_window_metadata,
+        "override-redirect-order": _process_override_redirect_order,
+        "configure-override-redirect": _process_configure_override_redirect,
         "lost-window": _process_lost_window,
         Protocol.CONNECTION_LOST: _process_connection_lost,
         }
