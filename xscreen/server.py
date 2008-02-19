@@ -1,5 +1,5 @@
 # Todo:
-#   override-redirect windows
+#   figure out how to not fall behind on processing Damage events
 #   copy/paste (dnd?)
 #   cursors
 #   xsync resize stuff

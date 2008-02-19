@@ -105,9 +105,9 @@ class ClientWindow(gtk.Window):
         old_backing = self._backing
         self._backing = gtk.gdk.Pixmap(gtk.gdk.get_default_root_window(),
                                        w, h)
+        cr = self._backing.cairo_create()
         if old_backing is not None:
             # Really we should respect bit-gravity here but... meh.
-            cr = self._backing.cairo_create()
             cr.set_operator(cairo.OPERATOR_SOURCE)
             cr.set_source_pixmap(old_backing, 0, 0)
             cr.paint()
@@ -119,8 +119,10 @@ class ClientWindow(gtk.Window):
             cr.line_to(0, old_h)
             cr.line_to(old_w, old_h)
             cr.close_path()
-            cr.set_source_rgb(1, 1, 1)
-            cr.fill()
+        else:
+            cr.rectangle(0, 0, w, h)
+        cr.set_source_rgb(1, 1, 1)
+        cr.fill()
 
     def draw(self, x, y, width, height, rgb_data):
         assert len(rgb_data) == width * height * 3
