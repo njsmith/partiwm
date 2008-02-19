@@ -447,6 +447,14 @@ def is_mapped(pywindow):
                          &attrs)
     return attrs.map_state != IsUnmapped
 
+# Override-redirect status
+def is_override_redirect(pywindow):
+    cdef XWindowAttributes attrs
+    XGetWindowAttributes(get_xdisplay_for(pywindow),
+                         get_xwindow(pywindow),
+                         &attrs)
+    return attrs.override_redirect
+
 # Focus management
 def XSetInputFocus(pywindow, time=None):
     # Always does RevertToParent
