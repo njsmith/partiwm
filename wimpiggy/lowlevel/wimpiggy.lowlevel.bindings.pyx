@@ -1139,7 +1139,6 @@ _gdk_event_signals = {
     gtk.gdk.PROPERTY_NOTIFY: ("wimpiggy-property-notify-event", None),
     gtk.gdk.UNMAP: ("wimpiggy-unmap-event", "wimpiggy-child-unmap-event"),
     gtk.gdk.DESTROY: ("wimpiggy-destroy-event", None),
-    gtk.gdk.MAP: ("wimpiggy-map-event", "wimpiggy-child-map-event"),
     gtk.gdk.CONFIGURE: ("wimpiggy-configure-event", None),
     gtk.gdk.KEY_PRESS: ("wimpiggy-key-press-event", None),
     }
