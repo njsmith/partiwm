@@ -41,7 +41,7 @@ class TestSelection(TestWithSession, MockEventReceiver):
         d2 = self.clone_display()
         root2 = d2.get_default_screen().get_root_window()
         root2.set_events(gtk.gdk.STRUCTURE_MASK)
-        root2.set_data("wimpiggy-route-events-to", self)
+        wimpiggy.lowlevel.add_event_receiver(root2, self)
         d2.flush()
         self.event = None
 

@@ -300,7 +300,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         self.parking_window = parking_window
         self.client_window = client_window
         self._internal_set_property("client-window", client_window)
-        self.client_window.set_data("wimpiggy-route-events-to", self)
+        wimpiggy.lowlevel.add_event_receiver(self.client_window, self)
 
         # We count how many times we have asked that the child be unmapped, so
         # that when the server tells us that the child has been unmapped, we
@@ -434,7 +434,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                 self.client_window.show_unraised()
         trap.swallow(unmanageit)
         print "destroying self"
-        self.client_window.set_data("wimpiggy-route-events-to", None)
+        wimpiggy.lowlevel.remove_event_receiver(self.client_window, self)
         self._composite.disconnect(self._damage_forward_handle)
         self._composite.destroy()
 

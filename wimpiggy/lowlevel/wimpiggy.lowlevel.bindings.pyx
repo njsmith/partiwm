@@ -980,14 +980,33 @@ def selectFocusChange(pywindow):
 # client that owns the window they are sent to, otherwise they go to any
 # clients that are selecting for that mask they are sent with.
 
-def _maybe_send_event(handler, signal, event):
-    if signal in gobject.signal_list_names(handler):
-        handler.emit(signal, event)
-    else:
-        print ("Handler %r has no '%s' signal; ignoring event"
-               % (handler, signal))
+_ev_receiver_key = "wimpiggy-route-events-to"
+def add_event_receiver(window, receiver):
+    receivers = window.get_data(_ev_receiver_key)
+    if receivers is None:
+        receivers = set()
+    if receiver not in receivers:
+        receivers.add(receiver)
+    window.set_data(_ev_receiver_key, receivers)
 
-def _route_event(event, key, signal, parent_signal):
+def remove_event_receiver(window, receiver):
+    receivers = window.get_data(_ev_receiver_key)
+    if receivers is None:
+        return
+    receivers.discard(receiver)
+    if not receivers:
+        receivers = None
+    window.set_data(_ev_receiver_key, receivers)
+
+def _maybe_send_event(handlers, signal, event):
+    for handler in handlers:
+        if signal in gobject.signal_list_names(handler):
+            handler.emit(signal, event)
+        else:
+            print ("Handler %r has no '%s' signal; ignoring event"
+                   % (handler, signal))
+
+def _route_event(event, signal, parent_signal):
     # Sometimes we get GDK events with event.window == None, because they are
     # for windows we have never created a GdkWindow object for, and GDK
     # doesn't do so just for this event.  As far as I can tell this only
@@ -996,29 +1015,29 @@ def _route_event(event, key, signal, parent_signal):
     if event.window is None:
         assert event.type in (gtk.gdk.UNMAP, gtk.gdk.DESTROY)
         return
-    handler = event.window.get_data(key)
-    if handler is not None:
-        print "  sending event to event.window's %s handler" % key
-        _maybe_send_event(handler, signal, event)
-    elif parent_signal is not None:
-        handler = event.parent.get_data(key)
-        if handler is not None:
-            print "  sending event to event.parent's %s handler" % key
-            print handler, parent_signal, event
-            _maybe_send_event(handler, parent_signal, event)
+    handlers = event.window.get_data(_ev_receiver_key)
+    if handlers is not None:
+        print "  sending event to event.window's handler(s)"
+        _maybe_send_event(handlers, signal, event)
+    if parent_signal is not None:
+        if hasattr(event, "parent"):
+            parent = event.parent
+        else:
+            parent = event.window.get_parent()
+        handlers = parent.get_data(_ev_receiver_key)
+        if handlers is not None:
+            print "  sending event to event.parent's handler(s)"
+            print handlers, parent_signal, event
+            _maybe_send_event(handlers, parent_signal, event)
 
-_default_ev_key = "wimpiggy-route-events-to"
-_damage_helper_key = "wimpiggy-route-damage-to"
 _x_event_signals = {
-    MapRequest: (_default_ev_key,
-                 "map-request-event", "child-map-request-event"),
-    ConfigureRequest: (_default_ev_key,
-                       "configure-request-event",
+    MapRequest: ("map-request-event", "child-map-request-event"),
+    ConfigureRequest: ("configure-request-event",
                        "child-configure-request-event"),
-    FocusIn: (_default_ev_key, "wimpiggy-focus-in-event", None),
-    FocusOut: (_default_ev_key, "wimpiggy-focus-out-event", None),
-    ClientMessage: (_default_ev_key, "wimpiggy-client-message-event", None),
-    "XDamageNotify": (_damage_helper_key, "wimpiggy-damage-event", None),
+    FocusIn: ("wimpiggy-focus-in-event", None),
+    FocusOut: ("wimpiggy-focus-out-event", None),
+    ClientMessage: ("wimpiggy-client-message-event", None),
+    "XDamageNotify": ("wimpiggy-damage-event", None),
     }
 
 def _gw(display, xwin):
@@ -1120,13 +1139,13 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
 
 _gdk_event_signals = {
     # These other events are on client windows, mostly
-    gtk.gdk.PROPERTY_NOTIFY: (_default_ev_key,
-                              "wimpiggy-property-notify-event", None),
-    gtk.gdk.UNMAP: (_default_ev_key, "wimpiggy-unmap-event", None),
-    gtk.gdk.DESTROY: (_default_ev_key, "wimpiggy-destroy-event", None),
-    gtk.gdk.MAP: (_damage_helper_key, "wimpiggy-map-event", None),
-    gtk.gdk.CONFIGURE: (_damage_helper_key, "wimpiggy-configure-event", None),
-    gtk.gdk.KEY_PRESS: ("wimpiggy-hotkey-manager", "key-press-event", None),
+    gtk.gdk.PROPERTY_NOTIFY: ("wimpiggy-property-notify-event", None),
+    gtk.gdk.UNMAP: ("wimpiggy-unmap-event", "wimpiggy-child-unmap-event"),
+    gtk.gdk.DESTROY: ("wimpiggy-destroy-event", None),
+    gtk.gdk.MAP: ("wimpiggy-map-event", "wimpiggy-child-map-event"),
+    gtk.gdk.CONFIGURE: ("wimpiggy-configure-event",
+                        "wimpiggy-child-configure-event"),
+    gtk.gdk.KEY_PRESS: ("wimpiggy-key-press-event", None),
     }
 
 def _dispatch_gdk_event(event):

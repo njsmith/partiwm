@@ -3,13 +3,15 @@ import gtk
 from wimpiggy.util import one_arg_signal
 from wimpiggy.error import *
 from wimpiggy.lowlevel import (get_display_for,
-                               get_modifier_map, grab_key, ungrab_all_keys)
+                               get_modifier_map, grab_key, ungrab_all_keys,
+                               add_event_receiver, remove_event_receiver)
 
 class HotkeyManager(gobject.GObject):
     __gsignals__ = {
-        "key-press-event": one_arg_signal,
         "hotkey": (gobject.SIGNAL_RUN_LAST | gobject.SIGNAL_DETAILED,
                    gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,)),
+
+        "wimpiggy-key-press-event": one_arg_signal,
         }
 
     def __init__(self, window):
@@ -22,7 +24,8 @@ class HotkeyManager(gobject.GObject):
         self.keymap_id = self.keymap.connect("keys-changed",
                                              self._keys_changed)
         self._keys_changed()
-        self.window.set_data("wimpiggy-hotkey-manager", self)
+
+        add_event_receiver(self.window, self)
 
     def destroy(self):
         self.keymap.disconnect(self.keymap_id)
@@ -30,7 +33,7 @@ class HotkeyManager(gobject.GObject):
         self.keymap_id = None
 
         trap.swallow(self.unbind_all)
-        self.window.set_data("wimpiggy-hotkey-manager", None)
+        remove_event_receiver(self.window, self)
         self.window = None
 
     def _keys_changed(self, *args):

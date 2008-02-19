@@ -161,6 +161,53 @@ class TestLowlevelMisc(TestLowlevel):
         gtk.gdk.flush()
         assert l.is_override_redirect(win)
 
+class _EventRoutingReceiver(MockEventReceiver):
+    def __init__(self, tag, store_in, limit):
+        MockEventReceiver.__init__(self)
+        self.tag = tag
+        self.store_in = store_in
+        self.limit = limit
+    def do_wimpiggy_map_event(self, event):
+        print "map_event in %s" % self.tag
+        self.store_in.add(("map", self.tag))
+        if len(self.store_in) == self.limit:
+            gtk.main_quit()
+    def do_wimpiggy_child_map_event(self, event):
+        print "child_map_event in %s" % self.tag
+        self.store_in.add(("child-map", self.tag))
+        if len(self.store_in) == self.limit:
+            gtk.main_quit()
+
+class TestEventRouting(TestLowlevel):
+    def test_event_routing(self):
+        w1 = self.window()
+        w2 = self.window()
+        w2.reparent(w1, 0, 0)
+        w1.set_events(gtk.gdk.SUBSTRUCTURE_MASK)
+        w2.set_events(gtk.gdk.STRUCTURE_MASK)
+        results = set()
+        r1 = _EventRoutingReceiver(1, results, 4)
+        r2 = _EventRoutingReceiver(2, results, 4)
+        r3 = _EventRoutingReceiver(3, results, 4)
+        r4 = _EventRoutingReceiver(4, results, 4)
+        l.add_event_receiver(w1, r1)
+        l.add_event_receiver(w1, r2)
+        l.add_event_receiver(w2, r3)
+        l.add_event_receiver(w2, r4)
+        w2.show()
+        gtk.main()
+        w2.hide()
+        assert results == set([("child-map", 1), ("child-map", 2),
+                               ("map", 3), ("map", 4)])
+        l.remove_event_receiver(w1, r2)
+        l.remove_event_receiver(w2, r4)
+        r1.limit = 2
+        r3.limit = 2
+        results.clear()
+        w2.show()
+        gtk.main()
+        assert results == set([("child-map", 1), ("map", 3)])
+
 class TestFocusStuff(TestLowlevel, MockEventReceiver):
     def do_wimpiggy_focus_in_event(self, event):
         if event.window is self.w1:
@@ -188,8 +235,8 @@ class TestFocusStuff(TestLowlevel, MockEventReceiver):
         self.w1_lost, self.w2_lost = None, None
         l.selectFocusChange(self.w1)
         l.selectFocusChange(self.w2)
-        self.w1.set_data("wimpiggy-route-events-to", self)
-        self.w2.set_data("wimpiggy-route-events-to", self)
+        l.add_event_receiver(self.w1, self)
+        l.add_event_receiver(self.w2, self)
 
         gtk.gdk.flush()
         l.XSetInputFocus(self.w1)
@@ -244,8 +291,8 @@ class TestClientMessageAndXSelectInputStuff(TestLowlevel, MockEventReceiver):
         self.w = self.window()
         gtk.gdk.flush()
 
-        self.w.set_data("wimpiggy-route-events-to", self)
-        self.root().set_data("wimpiggy-route-events-to", self)
+        l.add_event_receiver(self.w, self)
+        l.add_event_receiver(self.root(), self)
 
         data = (0x01020304, 0x05060708, 0x090a0b0c, 0x0d0e0f10, 0x11121314)
         l.sendClientMessage(self.root(), False, 0, "NOMASK", *data)
@@ -276,7 +323,7 @@ class TestClientMessageAndXSelectInputStuff(TestLowlevel, MockEventReceiver):
     def test_send_wm_take_focus(self):
         self.evs = []
         win = self.window()
-        win.set_data("wimpiggy-route-events-to", self)
+        l.add_event_receiver(win, self)
         gtk.gdk.flush()
 
         l.send_wm_take_focus(win, 1234)
@@ -386,7 +433,7 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
         gtk.gdk.flush()
         w1 = l.get_pywindow(self.display, l.get_xwindow(w2))
 
-        root.set_data("wimpiggy-route-events-to", self)
+        l.add_event_receiver(root, self)
         l.substructureRedirect(root)
         gtk.gdk.flush()
 
@@ -414,7 +461,7 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
         # If we have a handler installed on the child, it takes precedence:
         self.child_map_ev = None
         self.child_conf_ev = None
-        w1.set_data("wimpiggy-route-events-to", self)
+        l.add_event_receiver(w1, self)
         w2.show()
         while None in (self.map_ev, self.conf_ev):
             gtk.main()
@@ -476,7 +523,7 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
         w1_client = self.window(client)
         gtk.gdk.flush()
         w1_wm = l.get_pywindow(self.display, l.get_xwindow(w1_client))
-        w1_wm.set_data("wimpiggy-route-events-to", self)
+        l.add_event_receiver(w1_wm, self)
 
         l.configureAndNotify(w1_client, 11, 12, 13, 14)
         gtk.main()

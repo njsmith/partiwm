@@ -1,9 +1,12 @@
 # Todo:
 #   override-redirect windows
+#   cursors
 #   copy/paste (dnd?)
 #   xsync resize stuff
 #   icons
 #   any other interesting metadata? _NET_WM_TYPE, WM_TRANSIENT_FOR, etc.?
+# kill base()
+# use gtk.gdk.Window.get_pointer()
 
 import gtk
 import gobject

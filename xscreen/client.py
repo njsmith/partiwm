@@ -8,6 +8,7 @@ import os.path
 from wimpiggy.util import one_arg_signal
 from wimpiggy.prop import prop_get
 from wimpiggy.keys import grok_modifier_map
+from wimpiggy.lowlevel import add_event_receiver, remove_event_receiver
 
 from xscreen.address import client_sock
 from xscreen.protocol import Protocol, CAPABILITIES
@@ -223,7 +224,7 @@ class XScreenClient(gobject.GObject):
 
         root = gtk.gdk.get_default_root_window()
         root.set_events(gtk.gdk.PROPERTY_NOTIFY)
-        root.set_data("wimpiggy-route-events-to", self)
+        add_event_receiver(root, self)
 
         sock = client_sock(name)
         print "Connected"

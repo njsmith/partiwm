@@ -2,10 +2,10 @@ import gobject
 from wimpiggy.util import one_arg_signal, AutoPropGObjectMixin
 from wimpiggy.error import *
 from wimpiggy.lowlevel import (xcomposite_redirect_window,
-                            xcomposite_unredirect_window,
-                            xcomposite_name_window_pixmap,
-                            xdamage_start,
-                            xdamage_stop)
+                               xcomposite_unredirect_window,
+                               xcomposite_name_window_pixmap,
+                               xdamage_start, xdamage_stop,
+                               add_event_receiver, remove_event_receiver)
 
 class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
     __gsignals__ = {
@@ -29,14 +29,15 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
             xcomposite_redirect_window(window)
         self.refresh_pixmap()
         self._damage_handle = xdamage_start(window)
-        self._window.set_data("wimpiggy-route-damage-to", self)
+
+        add_event_receiver(self._window, self)
 
     def destroy(self):
         if not self._already_composited:
             trap.swallow(xcomposite_unredirect_window, self._window)
         trap.swallow(xdamage_stop, self._window, self._damage_handle)
         self._internal_set_property("window-contents-handle", None)
-        self._window.set_data("wimpiggy-route-damage-to", None)
+        remove_event_receiver(self._window, self)
 
     def refresh_pixmap(self):
         def set_pixmap():
