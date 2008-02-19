@@ -178,7 +178,6 @@ class ServerSource(object):
 class XScreenServer(object):
     def __init__(self, socketpath, clobber):
         self._wm = Wm("XScreen", clobber)
-        self._wm.connect("focus-got-dropped", self._focus_dropped)
         self._wm.connect("new-window", self._new_window_signaled)
 
         self._desktop_manager = DesktopManager()
