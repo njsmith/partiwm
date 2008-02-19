@@ -5,6 +5,7 @@ from sets import ImmutableSet
 
 from wimpiggy.error import *
 import wimpiggy.selection
+from wimpiggy.world_window import WorldWindow
 import wimpiggy.lowlevel
 from wimpiggy.prop import prop_set
 from wimpiggy.util import base, no_arg_signal, one_arg_signal
@@ -100,14 +101,14 @@ class Wm(gobject.GObject):
         "windows": (gobject.TYPE_PYOBJECT,
                     "Set of managed windows (as WindowModels)", "",
                     gobject.PARAM_READABLE),
+        "toplevel": (gobject.TYPE_PYOBJECT,
+                     "Toplevel container widget for the display", "",
+                     gobject.PARAM_READABLE),
         }
     __gsignals__ = {
         # Public use:
         # A new window has shown up:
         "new-window": one_arg_signal,
-        # "FYI, no client has focus, like the client that had focus died or
-        # something":
-        "focus-got-dropped": no_arg_signal,
         # You can emit this to cause the WM to quit, or the WM may
         # spontaneously raise it if another WM takes over the display:
         "quit": no_arg_signal,
@@ -155,6 +156,11 @@ class Wm(gobject.GObject):
         prop_set(self._root, "_NET_DESKTOP_VIEWPORT",
                  ["u32"], [0, 0])
 
+        # Load up our full-screen widget
+        self._world_window = WorldWindow()
+        self.notify("toplevel")
+        self._world_window.show_all()
+
         # Okay, ready to select for SubstructureRedirect and then load in all
         # the existing clients.
         self._root.set_data("wimpiggy-route-events-to", self)
@@ -165,6 +171,7 @@ class Wm(gobject.GObject):
             # created ourselves (like, say, the world window), and checking
             # for mapped filters out any withdrawn windows.
             if (w.get_window_type() == gtk.gdk.WINDOW_FOREIGN
+                and not wimpiggy.lowlevel.is_override_redirect(w)
                 and wimpiggy.lowlevel.is_mapped(w)):
                 self._manage_client(w)
 
@@ -177,8 +184,12 @@ class Wm(gobject.GObject):
         # (and notifications for both)
 
     def do_get_property(self, pspec):
-        assert pspec.name == "windows"
-        return ImmutableSet(self._windows.itervalues())
+        if pspec.name == "windows":
+            return ImmutableSet(self._windows.itervalues())
+        elif pspec.name == "toplevel":
+            return self._world_window
+        else:
+            assert False
 
     # This is in some sense the key entry point to the entire WM program.  We
     # have detected a new client window, and start managing it:
@@ -262,15 +273,11 @@ class Wm(gobject.GObject):
         # gone to PointerRoot or None, so that it can be given back to
         # something real.  This is easy to detect -- a FocusIn event with
         # detail PointerRoot or None is generated on the root window.
-        print "FocusIn on root"
-        print event
         if event.detail in (wimpiggy.lowlevel.const["NotifyPointerRoot"],
                             wimpiggy.lowlevel.const["NotifyDetailNone"]):
-            print "PointerRoot or None?  This won't do... someone should get focus!"
-            self.emit("focus-got-dropped")
+            self._world_window.reset_x_focus()
 
     def do_wimpiggy_focus_out_event(self, event):
-        print "Focus left root, FYI"
         wimpiggy.lowlevel.printFocus(self._display)
 
     def do_desktop_list_changed(self, desktops):

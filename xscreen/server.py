@@ -13,7 +13,6 @@ import socket
 import subprocess
 
 from wimpiggy.wm import Wm
-from wimpiggy.world_window import WorldWindow
 from wimpiggy.util import LameStruct
 from wimpiggy.lowlevel import (get_rectangle_from_region,
                                get_current_keyboard_mask,
@@ -179,10 +178,9 @@ class XScreenServer(object):
         self._wm.connect("focus-got-dropped", self._focus_dropped)
         self._wm.connect("new-window", self._new_window_signaled)
 
-        self._world_window = WorldWindow()
         self._desktop_manager = DesktopManager()
-        self._world_window.add(self._desktop_manager)
-        self._world_window.show_all()
+        self._wm.get_property("toplevel").add(self._desktop_manager)
+        self._desktop_manager.show_all()
 
         self._window_to_id = {}
         self._id_to_window = {}
@@ -246,9 +244,6 @@ class XScreenServer(object):
         sock, addr = self._listener.accept()
         self._maybe_protocols.append(Protocol(sock, self.process_packet))
         return True
-
-    def _focus_dropped(self, *args):
-        self._world_window.reset_x_focus()
 
     def _keys_changed(self, *args):
         self._modifier_map = grok_modifier_map(gtk.gdk.display_get_default())
@@ -314,7 +309,8 @@ class XScreenServer(object):
     def _focus(self, id):
         if self._has_focus != id:
             if id == 0:
-                self._world_window.reset_x_focus()
+                # FIXME: kind of a hack:
+                self._wm.get_property("toplevel").reset_x_focus()
             else:
                 window = self._id_to_window[id]
                 window.give_client_focus()

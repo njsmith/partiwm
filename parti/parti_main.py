@@ -3,8 +3,8 @@ import gtk
 import wimpiggy.lowlevel
 
 from wimpiggy.wm import Wm
+from wimpiggy.keys import HotkeyManager
 
-from wimpiggy.world_window import WorldWindow
 from parti.world_organizer import WorldOrganizer
 
 from parti.windowset import WindowSet
@@ -14,8 +14,6 @@ from parti.trays.simpletab import SimpleTabTray
 from parti.addons.ipython_embed import spawn_repl_window
 
 from parti.bus import PartiDBusService
-
-from wimpiggy.keys import HotkeyManager
 
 class Parti(object):
     def __init__(self, replace_other_wm):
@@ -27,11 +25,10 @@ class Parti(object):
         self._trays = TraySet()
         self._trays.connect("changed", self._desktop_list_changed)
         
-        # Create our giant window
-        self._world_window = WorldWindow()
+        # Create our display stage
         self._world_organizer = WorldOrganizer(self._trays)
-        self._world_window.add(self._world_organizer)
-        self._world_window.show_all()
+        self._wm.get_property("toplevel").add(self._world_organizer)
+        self._world_organizer.show_all()
 
         # FIXME: be less stupid
         #self._trays.new(u"default", SimpleTabTray)
@@ -61,9 +58,6 @@ class Parti(object):
     def _add_new_window(self, window):
         # FIXME: be less stupid
         self._trays.trays[0].add(window)
-
-    def _focus_dropped(self, *args):
-        self._world_window.reset_x_focus()
 
     def _desktop_list_changed(self, *args):
         self._wm.emit("desktop-list-changed", self._trays.tags())
