@@ -30,8 +30,8 @@ def pkgconfig(*packages, **kw):
 
 import wimpiggy
 import parti
-import xscreen
-assert wimpiggy.__version__ == parti.__version__ == xscreen.__version__
+import xpra
+assert wimpiggy.__version__ == parti.__version__ == xpra.__version__
 
 setup(
     name="wimpiggy",
@@ -70,15 +70,15 @@ setup(
 )
 
 setup(
-  name = "xscreen",
+  name = "xpra",
   author="Nathaniel Smith",
   author_email="parti-discuss@partiwm.org",
-  version=xscreen.__version__,
+  version=xpra.__version__,
   url="http://partiwm.org",
   description="'screen for X' -- a tool to detach/reattach running X programs",
   download_url="http://partiwm.org/static/downloads/",
   
-  scripts=["scripts/xscreen"],
-  packages=["xscreen", "xscreen.scripts",
+  scripts=["scripts/xpra"],
+  packages=["xpra", "xpra.scripts",
             ],
 )

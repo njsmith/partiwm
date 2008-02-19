@@ -10,9 +10,9 @@ from wimpiggy.prop import prop_get
 from wimpiggy.keys import grok_modifier_map
 from wimpiggy.lowlevel import add_event_receiver, remove_event_receiver
 
-from xscreen.address import client_sock
-from xscreen.protocol import Protocol, CAPABILITIES
-from xscreen.keys import mask_to_names
+from xpra.address import client_sock
+from xpra.protocol import Protocol, CAPABILITIES
+from xpra.keys import mask_to_names
 
 class ClientSource(object):
     def __init__(self, protocol):
@@ -77,7 +77,7 @@ class ClientWindow(gtk.Window):
     def update_metadata(self, metadata):
         self._metadata.update(metadata)
         
-        self.set_title(u"%s (via XScreen)"
+        self.set_title(u"%s (via xpra)"
                        % self._metadata.get("title",
                                             "<untitled window>"
                                             ).decode("utf-8"))
@@ -222,7 +222,7 @@ class ClientWindow(gtk.Window):
 
 gobject.type_register(ClientWindow)
 
-class XScreenClient(gobject.GObject):
+class XpraClient(gobject.GObject):
     __gsignals__ = {
         "wimpiggy-property-notify-event": one_arg_signal,
         }
@@ -364,4 +364,4 @@ class XScreenClient(gobject.GObject):
         packet_type = packet[0]
         self._packet_handlers[packet_type](self, packet)
 
-gobject.type_register(XScreenClient)
+gobject.type_register(XpraClient)

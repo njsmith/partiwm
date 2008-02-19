@@ -24,9 +24,9 @@ from wimpiggy.lowlevel import (get_rectangle_from_region,
 from wimpiggy.window import OverrideRedirectWindowModel, Unmanageable
 from wimpiggy.keys import grok_modifier_map
 
-from xscreen.address import server_sock
-from xscreen.protocol import Protocol, CAPABILITIES
-from xscreen.keys import mask_to_names
+from xpra.address import server_sock
+from xpra.protocol import Protocol, CAPABILITIES
+from xpra.keys import mask_to_names
 
 class DesktopManager(gtk.Widget):
     def __init__(self):
@@ -180,7 +180,7 @@ class ServerSource(object):
             data = "".join(rows)
         return (x, y, width, height, data)
 
-class XScreenServer(gobject.GObject):
+class XpraServer(gobject.GObject):
     __gsignals__ = {
         "wimpiggy-child-map-event": one_arg_signal,
         }
@@ -194,7 +194,7 @@ class XScreenServer(gobject.GObject):
         root.set_events(root.get_events() | gtk.gdk.SUBSTRUCTURE_MASK)
         add_event_receiver(root, self)
 
-        self._wm = Wm("XScreen", clobber)
+        self._wm = Wm("Xpra", clobber)
         self._wm.connect("new-window", self._new_window_signaled)
 
         self._desktop_manager = DesktopManager()
@@ -541,4 +541,4 @@ class XScreenServer(gobject.GObject):
         packet_type = packet[0]
         self._packet_handlers[packet_type](self, proto, packet)
 
-gobject.type_register(XScreenServer)
+gobject.type_register(XpraServer)

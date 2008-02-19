@@ -2,7 +2,7 @@ import gobject
 import zlib
 
 from wimpiggy.util import dump_exc
-from xscreen.bencode import bencode, bdecode
+from xpra.bencode import bencode, bdecode
 
 CAPABILITIES = set(["deflate"])
 

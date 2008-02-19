@@ -1,7 +1,7 @@
 import gobject
 import os
 import socket
-from xscreen.address import client_sock
+from xpra.address import client_sock
 
 # Basic strategy:
 #   There are two pairs of (read -> write) sockets that we shuffle data
@@ -70,7 +70,7 @@ class ChannelProxy(object):
             self._definitely_readable = False
         return True
 
-class XScreenProxy(object):
+class XpraProxy(object):
     def __init__(self, readfd, writefd, name):
         server_conn = client_sock(name)
         serverfd1 = server_conn.fileno()

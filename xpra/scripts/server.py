@@ -6,8 +6,8 @@ import os.path
 import atexit
 import signal
 
-from xscreen.server import XScreenServer
-from xscreen.address import server_sock
+from xpra.server import XpraServer
+from xpra.address import server_sock
 
 _cleanups = []
 def run_cleanups():
@@ -83,7 +83,7 @@ def run_server(parser, opts, extra_args):
 
     xauthority = os.environ.get("XAUTHORITY",
                                 os.path.expanduser("~/.Xauthority"))
-    xvfb = subprocess.Popen(["Xvfb-for-XScreen", display_name,
+    xvfb = subprocess.Popen(["Xvfb-for-Xpra", display_name,
                              "-auth", xauthority,
                              "+extension", "Composite",
                              "-screen", "0", "2048x2048x24+32"],
@@ -109,7 +109,7 @@ def run_server(parser, opts, extra_args):
         default_display.close()
     manager.set_default_display(display)
 
-    app = XScreenServer(sockpath, False)
+    app = XpraServer(sockpath, False)
     def cleanup_socket(self):
         print "removing socket"
         try:

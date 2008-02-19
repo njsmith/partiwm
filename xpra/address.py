@@ -5,7 +5,7 @@ import socket
 import errno
 
 def sockdir():
-    dir = os.path.expanduser("~/.xscreen")
+    dir = os.path.expanduser("~/.xpra")
     if not os.path.exists(dir):
         os.mkdir(dir, 0700)
     return dir
