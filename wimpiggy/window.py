@@ -174,7 +174,82 @@ from wimpiggy.composite import CompositeHelper
 class Unmanageable(Exception):
     pass
 
-class WindowModel(AutoPropGObjectMixin, gobject.GObject):
+class BaseWindowModel(AutoPropGObjectMixin, gobject.GObject):
+    __gproperties__ = {
+        "client-window": (gobject.TYPE_PYOBJECT,
+                          "gtk.gdk.Window representing the client toplevel", "",
+                          gobject.PARAM_READABLE),
+        # NB "notify" signal never fires for the client-contents properties:
+        "client-contents": (gobject.TYPE_PYOBJECT,
+                            "gtk.gdk.Pixmap containing the window contents", "",
+                            gobject.PARAM_READABLE),
+        "client-contents-handle": (gobject.TYPE_PYOBJECT,
+                                   "", "",
+                                   gobject.PARAM_READABLE),
+        }
+    __gsignals__ = {
+        "client-contents-changed": one_arg_signal,
+        "unmanaged": one_arg_signal,
+        }
+    
+    def __init__(self, client_window):
+        super(BaseWindowModel, self).__init__()
+
+        self.client_window = window
+        self._internal_set_property("client-window", window)
+        wimpiggy.lowlevel.add_event_receiver(window, self)
+
+        def setup():
+            # Keith Packard says that composite state is undefined following a
+            # reparent, so I'm not sure doing this here in the superclass,
+            # before we reparent, actually works... let's wait and see.
+            self._composite = CompositeHelper(window, False)
+            h = self._composite.connect("contents-changed",
+                                        self._forward_contents_changed)
+            self._damage_forward_handle = h
+        try:
+            trap.call(setup)
+        except XError, e:
+            raise Unmanageable, e
+
+    def _forward_contents_changed(self, obj, event):
+        self.emit("client-contents-changed", event)
+
+    def do_get_property_client_contents(self, name):
+        self._composite.get_property("contents")
+
+    def do_get_property_client_contents_handle(self, name):
+        return self._composite.get_property("window-contents-handle")
+
+    def unmanage(self, exiting=False):
+        self.emit("unmanaged", exiting)
+
+    def do_unmanaged(self, wm_exiting):
+        wimpiggy.lowlevel.remove_event_receiver(self.client_window, self)
+        self._composite.disconnect(self._damage_forward_handle)
+        self._composite.destroy()
+
+gobject.type_register(BaseWindowModel)
+
+
+# FIXME: EWMH says that O-R windows should set various properties just like
+# ordinary managed windows; so some of that code should get pushed up into the
+# superclass sooner or later.  When someone cares, presumably.
+class OverrideRedirectWindowModel(BaseWindowModel):
+    __gsignals__ = {
+        "wimpiggy-unmap-event": one_arg_signal,
+        }
+
+    def __init__(self, window):
+        BaseWindowModel.__init__(self, window)
+
+    def do_wimpiggy_unmap_event(self, event):
+        self.emit("unmanaged", False)
+
+gobject.type_register(OverrideRedirectWindowModel)
+
+
+class WindowModel(BaseWindowModel):
     """This represents a managed client window.  It allows one to produce
     widgets that view that client window in various ways."""
 
@@ -194,16 +269,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                        False,
                        gobject.PARAM_READWRITE),
 
-        "client-window": (gobject.TYPE_PYOBJECT,
-                          "gtk.gdk.Window representing the client toplevel", "",
-                          gobject.PARAM_READABLE),
-        # NB "notify" signal never fires for the client-contents properties:
-        "contents": (gobject.TYPE_PYOBJECT,
-                     "gtk.gdk.Pixmap containing the window contents", "",
-                     gobject.PARAM_READABLE),
-        "contents-handle": (gobject.TYPE_PYOBJECT,
-                            "", "",
-                            gobject.PARAM_READABLE),
         "actual-size": (gobject.TYPE_PYOBJECT,
                         "Size of client window (actual (width,height))", "",
                         gobject.PARAM_READABLE),
@@ -276,11 +341,9 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                   gobject.PARAM_READABLE),
         }
     __gsignals__ = {
-        "redraw-needed": one_arg_signal,
         "ownership-election": (gobject.SIGNAL_RUN_LAST,
                                gobject.TYPE_PYOBJECT, (),
                                non_none_list_accumulator),
-        "unmanaged": one_arg_signal,
 
         "map-request-event": one_arg_signal,
         "configure-request-event": one_arg_signal,
@@ -296,13 +359,8 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         managed, for whatever reason.  ATM, this mostly means that the window
         died somehow before we could do anything with it."""
 
-        wimpiggy.lowlevel.printFocus(client_window)
-
-        super(WindowModel, self).__init__()
+        BaseWindowModel.__init__(self, client_window)
         self.parking_window = parking_window
-        self.client_window = client_window
-        self._internal_set_property("client-window", client_window)
-        wimpiggy.lowlevel.add_event_receiver(self.client_window, self)
 
         # We count how many times we have asked that the child be unmapped, so
         # that when the server tells us that the child has been unmapped, we
@@ -356,26 +414,10 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             client_size = self.client_window.get_geometry()[2:4]
             self.corral_window.resize(*client_size)
             self.client_window.show_unraised()
-
-            # Keith Packard says that composite state is undefined following a
-            # reparent, so let's be cautious and wait to turn on compositing
-            # until here:
-            self._composite = CompositeHelper(self.client_window, False)
-            h = self._composite.connect("redraw-needed", self._damage_forward)
-            self._damage_forward_handle = h
         try:
             trap.call(setup_client)
         except XError, e:
             raise Unmanageable, e
-
-    def _damage_forward(self, obj, event):
-        self.emit("redraw-needed", event)
-
-    def do_get_property_contents(self, name):
-        self._composite.get_property("contents")
-
-    def do_get_property_contents_handle(self, name):
-        return self._composite.get_property("window-contents-handle")
 
     def do_map_request_event(self, event):
         # If we get a MapRequest then it might mean that someone tried to map
@@ -417,9 +459,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
         # simple code:
         self.unmanage()
 
-    def unmanage(self, exiting=False):
-        self.emit("unmanaged", exiting)
-
     def do_unmanaged(self, exiting):
         print "unmanaging window"
         self._internal_set_property("owner", None)
@@ -431,10 +470,7 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
             if exiting:
                 self.client_window.show_unraised()
         trap.swallow(unmanageit)
-        print "destroying self"
-        wimpiggy.lowlevel.remove_event_receiver(self.client_window, self)
-        self._composite.disconnect(self._damage_forward_handle)
-        self._composite.destroy()
+        BaseWindowModel.do_unmanaged(self, exiting)
 
     def ownership_election(self):
         candidates = self.emit("ownership-election")
@@ -775,8 +811,6 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                 wimpiggy.lowlevel.XDeleteProperty(self.client_window, prop)
         trap.swallow(doit)
 
-    
-
     ################################
     # Focus handling:
     ################################
@@ -832,8 +866,8 @@ class WindowView(gtk.Widget):
         
         self._image_window = None
         self.model = model
-        self._redraw_handle = self.model.connect("redraw-needed",
-                                                  self._redraw_needed)
+        self._redraw_handle = self.model.connect("client-contents-changed",
+                                                  self._client_contents_changed)
         self._election_handle = self.model.connect("ownership-election",
                                                     self._vote_for_pedro)
 
@@ -878,7 +912,7 @@ class WindowView(gtk.Widget):
         else:
             return (-1, self)
 
-    def _redraw_needed(self, model, event):
+    def _client_contents_changed(self, model, event):
         if not self.flags() & gtk.MAPPED:
             return
         m = self._get_transform_matrix()
@@ -938,7 +972,7 @@ class WindowView(gtk.Widget):
         cr.save()
         cr.set_matrix(self._get_transform_matrix())
 
-        cr.set_source_pixmap(self.model.get_property("contents"),
+        cr.set_source_pixmap(self.model.get_property("client-contents"),
                              0, 0)
         # Super slow (copies everything out of the server and then back
         # again), but an option for working around Cairo/X bugs:

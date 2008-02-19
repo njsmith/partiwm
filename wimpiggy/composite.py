@@ -9,7 +9,7 @@ from wimpiggy.lowlevel import (xcomposite_redirect_window,
 
 class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
     __gsignals__ = {
-        "redraw-needed": one_arg_signal,
+        "contents-changed": one_arg_signal,
 
         "wimpiggy-damage-event": one_arg_signal,
         "wimpiggy-map-event": one_arg_signal,
@@ -62,6 +62,6 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
 
     def do_wimpiggy_damage_event(self, event):
         event.pixmap_handle = self.get_property("contents-handle")
-        self.emit("redraw-needed", event)
+        self.emit("contents-changed", event)
 
 gobject.type_register(CompositeHelper)
