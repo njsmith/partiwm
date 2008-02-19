@@ -51,8 +51,3 @@ def server_sock(display_name, clobber):
         os.unlink(path)
     return path
 
-def client_sock(display_name):
-    path = sockpath(display_name)
-    sock = socket.socket(socket.AF_UNIX)
-    sock.connect(path)
-    return sock

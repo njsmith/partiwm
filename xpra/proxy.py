@@ -1,17 +1,13 @@
 import gobject
 import os
 import socket
-from xpra.address import client_sock
-
-# Basic strategy:
-#   There are two pairs of (read -> write) sockets that we shuffle data
-#   between.
 
 class ChannelProxy(object):
     """Copies bytes from 'readfd' to 'writefd'.
 
     This is performed efficiently (i.e., with no busy-waiting) and with
-    minimal buffering (i.e., we transfer backpressure from writefd to readfd.)
+    minimal buffering (i.e., we transfer backpressure from writefd to
+    readfd).
 
     Closes both fds when done."""
 
@@ -71,8 +67,7 @@ class ChannelProxy(object):
         return True
 
 class XpraProxy(object):
-    def __init__(self, readfd, writefd, name):
-        server_conn = client_sock(name)
+    def __init__(self, readfd, writefd, server_conn):
         serverfd1 = server_conn.fileno()
         serverfd2 = os.dup(serverfd1)
 

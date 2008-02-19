@@ -2,9 +2,14 @@ import gtk
 import sys
 import os
 import stat
+import socket
+import subprocess
 from optparse import OptionParser
 
 import xpra
+from xpra.bencode import bencode
+from xpra.address import (sockdir, sockpath,
+                          server_state, LIVE, DEAD, UNKNOWN)
 
 # FIXME: make this UI more screen-like?
 # FIXME: add ssh support
@@ -19,6 +24,9 @@ def main(cmdline):
     parser.add_option("--no-daemon", action="store_false",
                       dest="daemon", default=True,
                       help="Don't daemonize when running as a server")
+    parser.add_option("--remote-xpra", action="store",
+                      dest="remote_xpra", default="xpra",
+                      help="How to run 'xpra' on the remote host")
     (options, args) = parser.parse_args(cmdline[1:])
 
     if not args:
@@ -40,36 +48,49 @@ def main(cmdline):
 
 from xpra.scripts.server import run_server
 
+def client_sock(parser, opts, extra_args):
+    if len(extra_args) != 1:
+        parser.error("connect to what?")
+    display_name = extra_args[0]
+    if display_name.startswith("ssh:"):
+        (_, host, display) = display_name.split(":", 2)
+        display = ":" + display
+        (a, b) = socket.socketpair()
+        remote_xpra = opts.remote_xpra.split()
+        p = subprocess.Popen(["ssh", host, "-e", "none"]
+                             + remote_xpra + ["_proxy", display],
+                             stdin=b.fileno(), stdout=b.fileno(),
+                             bufsize=0)
+        return a
+    else:
+        path = sockpath(display_name)
+        sock = socket.socket(socket.AF_UNIX)
+        sock.connect(path)
+        return sock
+
 from xpra.client import XpraClient
 def run_client(parser, opts, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
-    app = XpraClient(extra_args[0])
+    sock = client_sock(parser, opts, extra_args)
+    app = XpraClient(sock)
+    sys.stdout.write("Attached\n")
     gtk.main()
 
 from xpra.proxy import XpraProxy
 def run_proxy(parser, opts, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
-    app = XpraProxy(0, 1, extra_args[0])
+    app = XpraProxy(0, 1, client_sock(parser, opts, extra_args))
     gtk.main()
 
-from xpra.bencode import bencode
-from xpra.address import (client_sock,
-                             sockdir, sockpath,
-                             server_state, LIVE, DEAD, UNKNOWN)
 def run_shutdown(parser, opts, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     display_name = extra_args[0]
     magic_string = bencode(["hello", []]) + bencode(["shutdown-server"])
 
-    initial_state = server_state(sockpath(display_name))
-    if initial_state is DEAD:
-        print "No xpra running at %s; doing nothing" % display_name
-        sys.exit(0)
-
-    sock = client_sock(display_name)
+    sock = client_sock(parser, opts, extra_args)
     sock.sendall(magic_string)
     while sock.recv(4096):
         pass

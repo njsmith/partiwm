@@ -1,7 +1,6 @@
 import gtk
 import gobject
 import cairo
-import socket
 import os
 import os.path
 
@@ -10,7 +9,6 @@ from wimpiggy.prop import prop_get
 from wimpiggy.keys import grok_modifier_map
 from wimpiggy.lowlevel import add_event_receiver, remove_event_receiver
 
-from xpra.address import client_sock
 from xpra.protocol import Protocol, CAPABILITIES
 from xpra.keys import mask_to_names
 
@@ -227,7 +225,7 @@ class XpraClient(gobject.GObject):
         "wimpiggy-property-notify-event": one_arg_signal,
         }
 
-    def __init__(self, name):
+    def __init__(self, sock):
         gobject.GObject.__init__(self)
         self._window_to_id = {}
         self._id_to_window = {}
@@ -240,8 +238,6 @@ class XpraClient(gobject.GObject):
         root.set_events(root.get_events() | gtk.gdk.PROPERTY_NOTIFY)
         add_event_receiver(root, self)
 
-        sock = client_sock(name)
-        print "Connected"
         self._protocol = Protocol(sock, self.process_packet)
         ClientSource(self._protocol)
         self.send(["hello", list(CAPABILITIES)])
