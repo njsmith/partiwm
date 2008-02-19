@@ -22,7 +22,7 @@ from wimpiggy.lowlevel import (get_rectangle_from_region,
                                is_override_redirect, is_mapped,
                                add_event_receiver,
                                get_children)
-from wimpiggy.window import OverrideRedirectWindowModel
+from wimpiggy.window import OverrideRedirectWindowModel, Unmanageable
 from wimpiggy.keys import grok_modifier_map
 
 from xscreen.address import server_sock
@@ -52,13 +52,15 @@ class DesktopManager(gtk.Widget):
     def window_geometry(self, model):
         return self._models[model].geom
 
-    def show_window(self, model, x, y, w, h):
+    def show_window(self, model):
         self._models[model].shown = True
-        self._models[model].geom = (x, y, w, h)
         model.ownership_election()
-        model.maybe_recalculate_geometry_for(self)
         if model.get_property("iconic"):
             model.set_property("iconic", False)
+
+    def configure_window(self, model, x, y, w, h):
+        self._models[model].geom = (x, y, w, h)
+        model.maybe_recalculate_geometry_for(self)
 
     def hide_window(self, model):
         if not model.get_property("iconic"):
@@ -143,6 +145,7 @@ class ServerSource(object):
                 del self._damage[id]
             pixmap = window.get_property("client-contents")
             if pixmap is None:
+                print "wtf, pixmap is None?"
                 packet = None
             else:
                 (x2, y2, w2, h2, data) = self._get_rgb_data(pixmap, x, y, w, h)
@@ -185,6 +188,12 @@ class XScreenServer(gobject.GObject):
     def __init__(self, socketpath, clobber):
         gobject.GObject.__init__(self)
         
+        # Do this before creating the Wm object, to avoid clobbering its
+        # selecting SubstructureRedirect.
+        root = gtk.gdk.get_default_root_window()
+        root.set_events(root.get_events() | gtk.gdk.SUBSTRUCTURE_MASK)
+        add_event_receiver(root, self)
+
         self._wm = Wm("XScreen", clobber)
         self._wm.connect("new-window", self._new_window_signaled)
 
@@ -203,9 +212,6 @@ class XScreenServer(gobject.GObject):
         for window in self._wm.get_property("windows"):
             self._add_new_window(window)
 
-        root = gtk.gdk.get_default_root_window()
-        root.set_events(gtk.gdk.SUBSTRUCTURE_MASK)
-        add_event_receiver(root, self)
         for window in get_children(root):
             if (is_override_redirect(window) and is_mapped(window)):
                 self._add_new_or_window(window)
@@ -213,7 +219,6 @@ class XScreenServer(gobject.GObject):
         self._socketpath = socketpath
         self._listener = socket.socket(socket.AF_UNIX)
         self._listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        print self._socketpath
         self._listener.bind(self._socketpath)
         self._listener.listen(5)
         gobject.io_add_watch(self._listener, gobject.IO_IN,
@@ -280,11 +285,11 @@ class XScreenServer(gobject.GObject):
         self._max_window_id += 1
         self._window_to_id[window] = id
         self._id_to_window[id] = window
-        window.connect("contents-changed", self._contents_changed)
+        window.connect("client-contents-changed", self._contents_changed)
         window.connect("unmanaged", self._lost_window)
 
     def _add_new_window(self, window):
-        self._new_window_bookkeep(window)
+        self._add_new_window_common(window)
         for prop in self._window_export_properties:
             window.connect("notify::%s" % prop, self._update_metadata)
         (x, y, w, h, depth) = window.get_property("client-window").get_geometry()
@@ -384,7 +389,7 @@ class XScreenServer(gobject.GObject):
 
     def _send_new_or_window_packet(self, window):
         id = self._window_to_id[window]
-        (x, y, w, h) = self._desktop_manager.window_geometry(window)
+        (x, y, w, h) = window.get_property("geometry")
         self._send(["new-override-redirect", id, x, y, w, h, {}])
         self._damage(window, 0, 0, w, h)
 
@@ -397,7 +402,7 @@ class XScreenServer(gobject.GObject):
         root = gtk.gdk.get_default_root_window()
         for raw_window in get_children(root):
             if raw_window in raw_or_to_id:
-                or_stacking.append(raw_or_to_id[raw_or_to_id])
+                or_stacking.append(raw_or_to_id[raw_window])
         if or_stacking:
             self._send(["override-redirect-order", or_stacking])
         
@@ -443,7 +448,8 @@ class XScreenServer(gobject.GObject):
         (_, id, x, y, width, height) = packet
         window = self._id_to_window[id]
         assert not isinstance(window, OverrideRedirectWindowModel)
-        self._desktop_manager.show_window(window, x, y, width, height)
+        self._desktop_manager.configure_window(window, x, y, width, height)
+        self._desktop_manager.show_window(window)
         self._damage(window, 0, 0, width, height)
 
     def _process_unmap_window(self, proto, packet):
@@ -458,16 +464,17 @@ class XScreenServer(gobject.GObject):
         window = self._id_to_window[id]
         assert not isinstance(window, OverrideRedirectWindowModel)
         (_, _, w, h) = self._desktop_manager.window_geometry(window)
-        self._desktop_manager.show_window(window, x, y, w, h)
+        self._desktop_manager.configure_window(window, x, y, w, h)
 
     def _process_resize_window(self, proto, packet):
         (_, id, w, h) = packet
         window = self._id_to_window[id]
         assert not isinstance(window, OverrideRedirectWindowModel)
         self._cancel_damage(window)
-        self._damage(window, 0, 0, w, h)
+        if self._desktop_manager.visible(window):
+            self._damage(window, 0, 0, w, h)
         (x, y, _, _) = self._desktop_manager.window_geometry(window)
-        self._desktop_manager.show_window(window, x, y, w, h)
+        self._desktop_manager.configure_window(window, x, y, w, h)
 
     def _process_window_order(self, proto, packet):
         (_, ids_bottom_to_top) = packet

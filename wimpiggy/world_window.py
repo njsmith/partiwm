@@ -151,7 +151,7 @@ class WorldWindow(gtk.Window):
 
     def reset_x_focus(self):
         focus = self.get_focus()
-        print focus
+        print "widget with focus: focus"
         if isinstance(focus, wimpiggy.window.WindowView):
             # FIXME: ugly:
             focus.model.give_client_focus()

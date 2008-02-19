@@ -38,16 +38,14 @@ class Protocol(object):
         self._update_write_watch()
 
     def _update_write_watch(self):
-        want_write = (self._write_buf or self._source_has_more)
-        write_armed = (self._write_tag is not None)
+        want_write = bool(self._write_buf or self._source_has_more)
+        write_armed = bool(self._write_tag is not None)
         if want_write == write_armed:
             return
         if want_write:
-            #print "Arming writes"
             self._write_tag = gobject.io_add_watch(self._sock, gobject.IO_OUT,
                                                    self._socket_writeable)
         else:
-            #print "Disarming writes"
             gobject.source_remove(self._write_tag)
             self._write_tag = None
 
@@ -119,6 +117,7 @@ class Protocol(object):
         # Flush everything out of the source
         while self._source_has_more:
             self._flush_one_packet_into_buffer()
+        self._update_write_watch()
         # Now enable compression
         self._compressor = zlib.compressobj()
         self._decompressor = zlib.decompressobj()

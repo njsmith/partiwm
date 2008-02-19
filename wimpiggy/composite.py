@@ -38,7 +38,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
         if not self._already_composited:
             trap.swallow(xcomposite_unredirect_window, self._window)
         trap.swallow(xdamage_stop, self._window, self._damage_handle)
-        self._internal_set_property("window-contents-handle", None)
+        self._internal_set_property("contents-handle", None)
         remove_event_receiver(self._window, self)
 
     def refresh_pixmap(self):

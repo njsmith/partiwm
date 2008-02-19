@@ -197,15 +197,15 @@ class BaseWindowModel(AutoPropGObjectMixin, gobject.GObject):
     def __init__(self, client_window):
         super(BaseWindowModel, self).__init__()
 
-        self.client_window = window
-        self._internal_set_property("client-window", window)
-        wimpiggy.lowlevel.add_event_receiver(window, self)
+        self.client_window = client_window
+        self._internal_set_property("client-window", client_window)
+        wimpiggy.lowlevel.add_event_receiver(client_window, self)
 
         def setup():
             # Keith Packard says that composite state is undefined following a
             # reparent, so I'm not sure doing this here in the superclass,
             # before we reparent, actually works... let's wait and see.
-            self._composite = CompositeHelper(window, False)
+            self._composite = CompositeHelper(self.client_window, False)
             h = self._composite.connect("contents-changed",
                                         self._forward_contents_changed)
             self._damage_forward_handle = h
@@ -218,10 +218,10 @@ class BaseWindowModel(AutoPropGObjectMixin, gobject.GObject):
         self.emit("client-contents-changed", event)
 
     def do_get_property_client_contents(self, name):
-        self._composite.get_property("contents")
+        return self._composite.get_property("contents")
 
     def do_get_property_client_contents_handle(self, name):
-        return self._composite.get_property("window-contents-handle")
+        return self._composite.get_property("contents-handle")
 
     def unmanage(self, exiting=False):
         self.emit("unmanaged", exiting)
@@ -248,8 +248,8 @@ class OverrideRedirectWindowModel(BaseWindowModel):
         "wimpiggy-configure-event": one_arg_signal,
         }
 
-    def __init__(self, window):
-        BaseWindowModel.__init__(self, window)
+    def __init__(self, client_window):
+        BaseWindowModel.__init__(self, client_window)
         def setup():
             self.client_window.set_events(self.client_window.get_events()
                                           | gtk.gdk.STRUCTURE_MASK)

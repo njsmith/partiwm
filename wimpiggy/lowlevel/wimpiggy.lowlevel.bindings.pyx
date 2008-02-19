@@ -989,12 +989,12 @@ def remove_event_receiver(window, receiver):
     window.set_data(_ev_receiver_key, receivers)
 
 def _maybe_send_event(handlers, signal, event):
-    for handler in handlers:
+    # Copy the 'handlers' list, because signal handlers might cause items to
+    # be added or removed from it while we are iterating:
+    for handler in list(handlers):
         if signal in gobject.signal_list_names(handler):
+            #print "  forwarding event to a %s handler" % type(handler).__name__
             handler.emit(signal, event)
-        else:
-            print ("Handler %r has no '%s' signal; ignoring event"
-                   % (handler, signal))
 
 def _route_event(event, signal, parent_signal):
     # Sometimes we get GDK events with event.window == None, because they are
@@ -1007,7 +1007,6 @@ def _route_event(event, signal, parent_signal):
         return
     handlers = event.window.get_data(_ev_receiver_key)
     if handlers is not None:
-        print "  sending event to event.window's handler(s)"
         _maybe_send_event(handlers, signal, event)
     if parent_signal is not None:
         if hasattr(event, "parent"):
@@ -1016,8 +1015,6 @@ def _route_event(event, signal, parent_signal):
             parent = event.window.get_parent()
         handlers = parent.get_data(_ev_receiver_key)
         if handlers is not None:
-            print "  sending event to event.parent's handler(s)"
-            print handlers, parent_signal, event
             _maybe_send_event(handlers, parent_signal, event)
 
 _x_event_signals = {
@@ -1112,7 +1109,7 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     pyev.window = _gw(d, e.xmap.window)
                     pyev.override_redirect = e.xmap.override_redirect
                 elif e.type == damage_type:
-                    print "DamageNotify received"
+                    #print "DamageNotify received"
                     damage_e = <XDamageNotifyEvent*>e
                     pyev.window = _gw(d, e.xany.window)
                     pyev.damage = damage_e.damage

@@ -59,7 +59,7 @@ class ClientWindow(gtk.Window):
         self._backing = None
         self._metadata = {}
         self._override_redirect = override_redirect
-        self._new_backing(1, 1)
+        self._new_backing(w, h)
         self.update_metadata(metadata)
         
         self.set_app_paintable(True)
@@ -235,7 +235,7 @@ class XScreenClient(gobject.GObject):
             assert False, "this program requires an EWMH-compliant window manager"
 
         root = gtk.gdk.get_default_root_window()
-        root.set_events(gtk.gdk.PROPERTY_NOTIFY)
+        root.set_events(root.get_events() | gtk.gdk.PROPERTY_NOTIFY)
         add_event_receiver(root, self)
 
         sock = client_sock(name)
