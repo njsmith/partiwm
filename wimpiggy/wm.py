@@ -8,7 +8,7 @@ import wimpiggy.selection
 from wimpiggy.world_window import WorldWindow
 import wimpiggy.lowlevel
 from wimpiggy.prop import prop_set
-from wimpiggy.util import base, no_arg_signal, one_arg_signal
+from wimpiggy.util import no_arg_signal, one_arg_signal
 
 from wimpiggy.window import WindowModel, Unmanageable
 
@@ -124,7 +124,7 @@ class Wm(gobject.GObject):
         }
 
     def __init__(self, name, replace_other_wm, display=None):
-        base(self).__init__(self)
+        gobject.GObject.__init__(self)
 
         self._name = name
         if display is None:

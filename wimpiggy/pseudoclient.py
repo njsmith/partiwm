@@ -1,7 +1,6 @@
 import gtk
 import gtk.gdk
 import wimpiggy.lowlevel
-from wimpiggy.util import base
 
 class PseudoclientWindow(gtk.Window):
     """A gtk.Window that acts like an ordinary client.
@@ -16,5 +15,5 @@ class PseudoclientWindow(gtk.Window):
     factory method on wm, is that this way allows for subclassing."""
     
     def __init__(self, wm, **kwargs):
-        base(self).__init__(self, **kwargs)
+        gtk.Window.__init__(self, **kwargs)
         wm._make_window_pseudoclient(self)

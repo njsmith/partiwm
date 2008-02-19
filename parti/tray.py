@@ -1,8 +1,6 @@
 import gobject
 import gtk
 
-from wimpiggy.util import base
-
 # FIXME: The current design here is lame... these should probably be models of
 # some sort, or possibly hold many models, so that one can cycle through
 # multiple layout implementations losslessly.  But just making them widgets is
@@ -51,7 +49,7 @@ class TraySet(gobject.GObject):
         }
 
     def __init__(self):
-        base(self).__init__(self)
+        gobject.GObject.__init__(self)
         self.trays = []
 
     def tags(self):

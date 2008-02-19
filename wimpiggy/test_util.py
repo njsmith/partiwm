@@ -2,23 +2,31 @@ from wimpiggy.test import *
 import gobject
 import wimpiggy.util
 
-class TestUtil(object):
-    def test_base(self):
-        class OldStyle:
-            pass
-        assert_raises(AssertionError, wimpiggy.util.base, OldStyle)
-        assert_raises(AssertionError, wimpiggy.util.base, OldStyle())
-        class NewStyleBase(object):
-            pass
-        class NewStyle(NewStyleBase):
-            pass
-        class NewStyleMixin(object):
-            pass
-        class NewStyleMixed(NewStyleBase, NewStyleMixin):
-            pass
-        assert_raises(AssertionError, wimpiggy.util.base, NewStyle)
-        assert wimpiggy.util.base(NewStyle()) is NewStyleBase
-        assert_raises(AssertionError, wimpiggy.util.base, NewStyleMixed())
+class NonNoneListAccumulatorTestClass(gobject.GObject):
+    __gsignals__ = {
+        "foo": (gobject.SIGNAL_RUN_LAST,
+                gobject.TYPE_PYOBJECT, (),
+                wimpiggy.util.non_none_list_accumulator),
+        }
+gobject.type_register(NonNoneListAccumulatorTestClass)
+
+class TestNonNoneListAccumulator(object):
+    def test_list_accumulator(self):
+        obj = NonNoneListAccumulatorTestClass()
+        def f(o):
+            return "f"
+        def g(o):
+            return "g"
+        def h(o):
+            return "h"
+        def n(o):
+            return None
+        obj.connect("foo", f)
+        obj.connect("foo", g)
+        obj.connect("foo", h)
+        obj.connect("foo", n)
+        result = obj.emit("foo")
+        assert sorted(result) == ["f", "g", "h"]
 
 class APTestClass(wimpiggy.util.AutoPropGObjectMixin, gobject.GObject):
     __gproperties__ = {
@@ -72,3 +80,5 @@ class TestAutoPropMixin(object):
         assert c.get_property("readwrite") == 12
         c.custom = 15
         assert c.get_property("readwrite") == 15
+
+

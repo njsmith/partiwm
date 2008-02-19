@@ -13,7 +13,8 @@ import os
 from socket import gethostname
 import wimpiggy.lowlevel
 from wimpiggy.util import (AutoPropGObjectMixin,
-                        one_arg_signal, n_arg_signal, list_accumulator)
+                           one_arg_signal, n_arg_signal,
+                           non_none_list_accumulator)
 from wimpiggy.error import *
 from wimpiggy.prop import prop_get, prop_set
 from wimpiggy.composite import CompositeHelper
@@ -277,7 +278,8 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     __gsignals__ = {
         "redraw-needed": one_arg_signal,
         "ownership-election": (gobject.SIGNAL_RUN_LAST,
-                               gobject.TYPE_PYOBJECT, (), list_accumulator),
+                               gobject.TYPE_PYOBJECT, (),
+                               non_none_list_accumulator),
         "unmanaged": one_arg_signal,
 
         "map-request-event": one_arg_signal,

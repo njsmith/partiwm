@@ -3,7 +3,6 @@ import gobject
 import wimpiggy.lowlevel
 import wimpiggy.window
 import wimpiggy.prop
-from wimpiggy.util import base
 from wimpiggy.error import trap
 
 # This file defines Wimpiggy's top-level widget.  It is a magic window that
@@ -112,7 +111,7 @@ class WorldWindow(gtk.Window):
     #         this time, though, so then give it to whoever should
     #   -- and finally ignore all subsequent focus-in-events
     def do_map(self, *args):
-        base(self).do_map(self, *args)
+        gtk.Window.do_map(self, *args)
 
         # We are being mapped, so we can focus ourselves.
         # Check for the property, just in case this is the second time we are

@@ -41,28 +41,6 @@ def dump_exc():
     print "".join(traceback.format_exception(*sys.exc_info()))
 
 
-# A little utility to make it slightly terser to call base class methods
-# without always running into bugs after tweaking the base class.
-# Usage:
-#   class Foo(Bar):
-#     def foo(self, arg):
-#       # Equivalent to: Bar.foo(self, arg)
-#       base(self).foo(self, arg)
-# This is like a simple version of super, without all the weird magic
-# (http://fuhm.net/super-harmful/), the PyGtk bugs (#315079, #351566), etc.
-def base(obj):
-    # For now disallow base(Foo).<whatever>
-    assert not isinstance(obj, type)
-    # New-style classes only
-    assert not isinstance(obj, types.ClassType)
-    assert not isinstance(obj.__class__, types.ClassType)
-    # base() has no magic to support multiple inheritance, so blow up instead
-    # of silently doing the wrong thing.  (Sorry, using MI means you have to
-    # think, not just use utilities.)
-    assert len(obj.__class__.__bases__) == 1
-    return obj.__class__.__base__
-
-
 # A simple little class whose instances we can stick random bags of attributes
 # on.
 class LameStruct(object):
@@ -77,7 +55,15 @@ no_arg_signal = n_arg_signal(0)
 one_arg_signal = n_arg_signal(1)
 
 
-def list_accumulator(ihint, return_accu, handler_return):
+# Collects the results from signal handlers for a given signal into a list,
+# ignoring all handlers that return None.  (This filtering is useful because
+# the intended use of this method is to "poll" all connected objects, so it's
+# pretty useless to call a default do_* method... but even if such a method is
+# not defined, a default implementation will still be called automatically,
+# and that implementation simply returns None.)
+def non_none_list_accumulator(ihint, return_accu, handler_return):
     if return_accu is None:
         return_accu = []
-    return True, return_accu + [handler_return]
+    if handler_return is not None:
+        return_accu += [handler_return]
+    return True, return_accu

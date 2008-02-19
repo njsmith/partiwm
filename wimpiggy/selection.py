@@ -16,7 +16,6 @@ import gtk.gdk
 from struct import pack, unpack
 import time
 
-from wimpiggy.util import base
 from wimpiggy.lowlevel import (get_xatom, sendClientMessage,
                                myGetSelectionOwner, const)
 
@@ -30,7 +29,7 @@ class ManagerSelection(gobject.GObject):
         }
 
     def __init__(self, display, selection):
-        base(self).__init__(self)
+        gobject.GObject.__init__(self)
         self.atom = selection
         self.clipboard = gtk.Clipboard(display, selection)
 

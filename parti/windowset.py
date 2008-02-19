@@ -1,7 +1,6 @@
 import gtk
 import gobject
 
-from wimpiggy.util import base
 from wimpiggy.window import WindowModel, Unmanageable
 
 class WindowSet(gobject.GObject):
@@ -11,7 +10,7 @@ class WindowSet(gobject.GObject):
         }
 
     def __init__(self):
-        base(self).__init__(self)
+        gobject.GObject(self).__init__(self)
         self.l = []
         self.d = {}
 
