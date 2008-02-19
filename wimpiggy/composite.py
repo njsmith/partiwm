@@ -17,8 +17,10 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
         }
 
     __gproperties__ = {
-        "window-contents-handle": (gobject.TYPE_PYOBJECT,
-                                   "", "", gobject.PARAM_READABLE),
+        "contents": (gobject.TYPE_PYOBJECT,
+                     "", "", gobject.PARAM_READABLE),
+        "contents-handle": (gobject.TYPE_PYOBJECT,
+                            "", "", gobject.PARAM_READABLE),
         }        
 
     def __init__(self, window, already_composited):
@@ -42,8 +44,15 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
     def refresh_pixmap(self):
         def set_pixmap():
             handle = xcomposite_name_window_pixmap(self._window)
-            self._internal_set_property("window-contents-handle", handle)
+            self._internal_set_property("contents-handle", handle)
         trap.swallow(set_pixmap)
+
+    def do_get_property_contents(self, name):
+        handle = self.get_property("contents-handle")
+        if handle is None:
+            return None
+        else:
+            return handle.pixmap
 
     def do_wimpiggy_map_event(self, *args):
         self.refresh_pixmap()
@@ -52,7 +61,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
         self.refresh_pixmap()
 
     def do_wimpiggy_damage_event(self, event):
-        event.pixmap_handle = self.get_property("window-contents-handle")
+        event.pixmap_handle = self.get_property("contents-handle")
         self.emit("redraw-needed", event)
 
 gobject.type_register(CompositeHelper)

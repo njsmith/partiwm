@@ -163,7 +163,7 @@ class Wm(gobject.GObject):
 
         # Okay, ready to select for SubstructureRedirect and then load in all
         # the existing clients.
-        self._root.set_data("wimpiggy-route-events-to", self)
+        wimpiggy.lowlevel.add_event_receiver(self._root, self)
         wimpiggy.lowlevel.substructureRedirect(self._root)
 
         for w in wimpiggy.lowlevel.get_children(self._root):

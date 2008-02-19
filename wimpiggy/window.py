@@ -198,12 +198,12 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
                           "gtk.gdk.Window representing the client toplevel", "",
                           gobject.PARAM_READABLE),
         # NB "notify" signal never fires for the client-contents properties:
-        "client-contents": (gobject.TYPE_PYOBJECT,
-                            "gtk.gdk.Pixmap containing the window contents", "",
+        "contents": (gobject.TYPE_PYOBJECT,
+                     "gtk.gdk.Pixmap containing the window contents", "",
+                     gobject.PARAM_READABLE),
+        "contents-handle": (gobject.TYPE_PYOBJECT,
+                            "", "",
                             gobject.PARAM_READABLE),
-        "client-contents-handle": (gobject.TYPE_PYOBJECT,
-                                   "", "",
-                                   gobject.PARAM_READABLE),
         "actual-size": (gobject.TYPE_PYOBJECT,
                         "Size of client window (actual (width,height))", "",
                         gobject.PARAM_READABLE),
@@ -371,14 +371,10 @@ class WindowModel(AutoPropGObjectMixin, gobject.GObject):
     def _damage_forward(self, obj, event):
         self.emit("redraw-needed", event)
 
-    def do_get_property_client_contents(self, name):
-        handle = self.get_property("client-contents-handle")
-        if handle is not None:
-            return handle.pixmap
-        else:
-            return None
+    def do_get_property_contents(self, name):
+        self._composite.get_property("contents")
 
-    def do_get_property_client_contents_handle(self, name):
+    def do_get_property_contents_handle(self, name):
         return self._composite.get_property("window-contents-handle")
 
     def do_map_request_event(self, event):
@@ -942,7 +938,7 @@ class WindowView(gtk.Widget):
         cr.save()
         cr.set_matrix(self._get_transform_matrix())
 
-        cr.set_source_pixmap(self.model.get_property("client-contents"),
+        cr.set_source_pixmap(self.model.get_property("contents"),
                              0, 0)
         # Super slow (copies everything out of the server and then back
         # again), but an option for working around Cairo/X bugs:
