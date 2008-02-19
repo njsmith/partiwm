@@ -577,23 +577,6 @@ def ungrab_all_keys(pywindow):
     XUngrabKey(get_xdisplay_for(pywindow), AnyKey, AnyModifier,
                get_xwindow(pywindow))
 
-cdef extern from *:
-    Bool XQueryPointer(Display *, Window w, Window *, Window *,
-                       int *, int *, int *, int *,
-                       unsigned int * mask)
-def get_current_keyboard_mask(display_source):
-    cdef Window ignored_w
-    cdef int ignored_i
-    cdef unsigned int mask
-    display = get_display_for(display_source)
-    screen = display.get_default_screen()
-    root = screen.get_root_window()
-    XQueryPointer(get_xdisplay_for(display), get_xwindow(root),
-                  &ignored_w, &ignored_w,
-                  &ignored_i, &ignored_i, &ignored_i, &ignored_i,
-                  &mask)
-    return mask
-
 ###################################
 # XKillClient
 ###################################

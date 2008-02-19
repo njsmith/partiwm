@@ -5,8 +5,6 @@
 #   xsync resize stuff
 #   icons
 #   any other interesting metadata? _NET_WM_TYPE, WM_TRANSIENT_FOR, etc.?
-# kill base()
-# use gtk.gdk.Window.get_pointer()
 
 import gtk
 import gobject
@@ -18,7 +16,6 @@ import subprocess
 from wimpiggy.wm import Wm
 from wimpiggy.util import LameStruct
 from wimpiggy.lowlevel import (get_rectangle_from_region,
-                               get_current_keyboard_mask,
                                xtest_fake_key,
                                xtest_fake_button)
 from wimpiggy.keys import grok_modifier_map
@@ -296,7 +293,7 @@ class XScreenServer(object):
         return self._keymap.get_entries_for_keyval(keyval)[0][0]
 
     def _make_keymask_match(self, modifier_list):
-        current_mask = get_current_keyboard_mask(gtk.gdk.display_get_default())
+        (_, _, current_mask) = gtk.gdk.get_default_root_window().get_pointer()
         current = set(mask_to_names(current_mask, self._modifier_map))
         wanted = set(modifier_list)
         for modifier in current.difference(wanted):
