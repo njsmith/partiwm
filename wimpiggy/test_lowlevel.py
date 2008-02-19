@@ -153,6 +153,13 @@ class TestLowlevelMisc(TestLowlevel):
         gtk.gdk.flush()
         assert l.is_mapped(win)
 
+    def test_is_override_redirect(self):
+        win = self.window()
+        gtk.gdk.flush()
+        assert not l.is_override_redirect(win)
+        win.set_override_redirect(True)
+        gtk.gdk.flush()
+        assert l.is_override_redirect(win)
 
 class TestFocusStuff(TestLowlevel, MockEventReceiver):
     def do_wimpiggy_focus_in_event(self, event):
