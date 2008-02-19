@@ -112,8 +112,8 @@ from wimpiggy.composite import CompositeHelper
 #      ...this gtk.gdk.Pixmap object.  This object will be destroyed as soon
 #      as pixmap_handle passes out of scope, so if you want do anything fancy,
 #      hold onto pixmap_handle, not just the pixmap itself.
-# You can also get the handle as the "client-contents-handle" property, and
-# the pixmap itself as the "client-contents" property.
+# You can also get the handle as the "client-contents-handle" property on the
+# (Base)WindowModel, and the pixmap itself as the "client-contents" property.
 #
 # But what if you'd like to do more than just look at your pretty composited
 # windows?  Maybe you'd like to, say, *interact* with them?  Then life is a
@@ -238,15 +238,34 @@ gobject.type_register(BaseWindowModel)
 # ordinary managed windows; so some of that code should get pushed up into the
 # superclass sooner or later.  When someone cares, presumably.
 class OverrideRedirectWindowModel(BaseWindowModel):
+    __gproperties__ = {
+        "geometry": (gobject.TYPE_PYOBJECT,
+                     "current (x, y, w, h) for the window", "",
+                     gobject.PARAM_READABLE),
+        }
     __gsignals__ = {
         "wimpiggy-unmap-event": one_arg_signal,
+        "wimpiggy-configure-event": one_arg_signal,
         }
 
     def __init__(self, window):
         BaseWindowModel.__init__(self, window)
+        def setup():
+            self.client_window.set_events(self.client_window.get_events()
+                                          | gtk.gdk.STRUCTURE_MASK)
+            (x, y, w, h, d) = self.client_window.get_geometry()
+            self._internal_set_property("geometry", (x, y, w, h))
+        try:
+            trap.call(setup)
+        except XError, e:
+            raise Unmanageable, e
 
     def do_wimpiggy_unmap_event(self, event):
         self.emit("unmanaged", False)
+
+    def do_wimpiggy_configure_event(self, event):
+        self._internal_set_property("geometry", (event.x, event.y,
+                                                 event.width, event.height))
 
 gobject.type_register(OverrideRedirectWindowModel)
 

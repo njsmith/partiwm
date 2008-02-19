@@ -159,6 +159,12 @@ cdef extern from *:
         int x, y, width, height, border_width
         Window above
         Bool override_redirect
+    # The only way we can learn about override redirects is through MapNotify,
+    # which means we need to be able to get MapNotify for windows we have
+    # never seen before, which means we can't rely on GDK:
+    ctypedef struct XMapEvent:
+        Window window
+        Bool override_redirect
     ctypedef union XEvent:
         int type
         XAnyEvent xany
@@ -168,6 +174,7 @@ cdef extern from *:
         XConfigureEvent xconfigure
         XFocusChangeEvent xfocus
         XClientMessageEvent xclient
+        XMapEvent xmap
         
     Status XSendEvent(Display *, Window target, Bool propagate,
                       long event_mask, XEvent * event)
@@ -1020,6 +1027,7 @@ _x_event_signals = {
     FocusIn: ("wimpiggy-focus-in-event", None),
     FocusOut: ("wimpiggy-focus-out-event", None),
     ClientMessage: ("wimpiggy-client-message-event", None),
+    MapNotify: ("wimpiggy-map-event", "wimpiggy-child-map-event"),
     "XDamageNotify": ("wimpiggy-damage-event", None),
     }
 
@@ -1032,6 +1040,8 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
     cdef XEvent * e
     cdef XDamageNotifyEvent * damage_e
     e = <XEvent*>e_gdk
+    if e.xany.send_event and e.type != ClientMessage:
+        return GDK_FILTER_CONTINUE
     try:
         d = wrap(<cGObject*>gdk_x11_lookup_xdisplay(e.xany.display))
         my_events = dict(_x_event_signals)
@@ -1097,6 +1107,10 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     for i in xrange(5):
                         pieces.append(int(e.xclient.data.l[i]))
                     pyev.data = tuple(pieces)
+                elif e.type == MapNotify:
+                    print "MapNotify event received"
+                    pyev.window = _gw(d, e.xmap.window)
+                    pyev.override_redirect = e.xmap.override_redirect
                 elif e.type == damage_type:
                     print "DamageNotify received"
                     damage_e = <XDamageNotifyEvent*>e
@@ -1116,7 +1130,7 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                 # Dispatch:
                 _route_event(pyev, *my_events[e.type])
     except:
-        print "Unhandled exception in pyrex callback:"
+        print "Unhandled exception in x_event_filter:"
         dump_exc()
     return GDK_FILTER_CONTINUE
 
@@ -1126,8 +1140,7 @@ _gdk_event_signals = {
     gtk.gdk.UNMAP: ("wimpiggy-unmap-event", "wimpiggy-child-unmap-event"),
     gtk.gdk.DESTROY: ("wimpiggy-destroy-event", None),
     gtk.gdk.MAP: ("wimpiggy-map-event", "wimpiggy-child-map-event"),
-    gtk.gdk.CONFIGURE: ("wimpiggy-configure-event",
-                        "wimpiggy-child-configure-event"),
+    gtk.gdk.CONFIGURE: ("wimpiggy-configure-event", None),
     gtk.gdk.KEY_PRESS: ("wimpiggy-key-press-event", None),
     }
 
@@ -1135,8 +1148,12 @@ def _dispatch_gdk_event(event):
     # This function is called for every event GDK sees.  Most of them we
     # want to just pass on to GTK, but some we are especially interested
     # in...
-    if event.type in _gdk_event_signals:
-        _route_event(event, *_gdk_event_signals[event.type])
+    try:
+        if event.type in _gdk_event_signals:
+            _route_event(event, *_gdk_event_signals[event.type])
+    except:
+        print "Unhandled exception in _dispatch_gdk_event:"
+        dump_exc()
     gtk.main_do_event(event)
 
 def _install_global_event_filters():
