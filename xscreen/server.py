@@ -1,7 +1,6 @@
 # Todo:
-#   figure out how to not fall behind on processing Damage events
-#   copy/paste (dnd?)
 #   cursors
+#   copy/paste (dnd?)
 #   xsync resize stuff
 #   shape?
 #   icons
