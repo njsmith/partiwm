@@ -56,7 +56,7 @@ class SimpleTabTray(parti.tray.Tray, gtk.HPaned):
             notebook = self.left_notebook
         elif window in right_children:
             notebook = self.right_notebook
-        notebook.remove_page(notebook.get_children().index(window))
+        notebook.remove_page(notebook.page_num(window))
         
     def windows(self):
         return set(self.windows)

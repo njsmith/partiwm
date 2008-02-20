@@ -998,8 +998,8 @@ class WindowView(gtk.Widget):
 
         # It's important to acknowledge changes *before* we redraw them, to
         # avoid a race condition.
-        self.model.acknowledge_changes(event.x, event.y,
-                                       event.width, event.height)
+        self.model.acknowledge_changes(event.area.x, event.area.y,
+                                       event.area.width, event.area.height)
 
         cr.set_source_pixmap(self.model.get_property("client-contents"),
                              0, 0)

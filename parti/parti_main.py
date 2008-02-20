@@ -20,7 +20,6 @@ class Parti(object):
         self._wm = Wm("Parti", replace_other_wm)
         self._wm.connect("new-window", self._new_window_signaled)
         self._wm.connect("quit", self._wm_quit)
-        self._wm.connect("focus-got-dropped", self._focus_dropped)
 
         self._trays = TraySet()
         self._trays.connect("changed", self._desktop_list_changed)
