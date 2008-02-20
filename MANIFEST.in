@@ -1,6 +1,8 @@
-include COPYING NEWS try 
+include COPYING NEWS try-parti
+include do-*
 include run-*
-recursive-include doc *
+include wimpiggy/lowlevel/constants.pxi
+recursive-include working-notes *
 global-include *.py *.txt
 global-exclude *~ #*
 prune build
