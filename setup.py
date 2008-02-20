@@ -33,17 +33,33 @@ import parti
 import xpra
 assert wimpiggy.__version__ == parti.__version__ == xpra.__version__
 
+wimpiggy_desc = "A library for writing window managers, using GTK+"
+parti_desc = "A tabbing/tiling window manager using GTK+"
+xpra_desc = "'screen for X' -- a tool to detach/reattach running X programs"
+
+full_desc = """This package contains several sub-projects:
+  wimpiggy:
+    %s
+  parti:
+    %s
+  xpra:
+    %s""" % (wimpiggy_desc, parti_desc, xpra_desc)
+
 setup(
-    name="wimpiggy",
+    name="parti-all",
     author="Nathaniel Smith",
     author_email="parti-discuss@partiwm.org",
-    version=wimpiggy.__version__,
+    version=parti.__version__,
     url="http://partiwm.org",
-    description="A library for writing window managers, using GTK+",
+    description=full_desc,
     download_url="http://partiwm.org/static/downloads/",
-
     packages=["wimpiggy", "wimpiggy.lowlevel",
+              "parti", "parti.trays", "parti.addons", "parti.scripts",
+              "xpra", "xpra.scripts",
               ],
+    scripts=["scripts/parti", "scripts/parti-repl",
+             "scripts/xpra",
+             ],
     ext_modules=[ 
       Extension("wimpiggy.lowlevel.bindings",
                 ["wimpiggy/lowlevel/wimpiggy.lowlevel.bindings.pyx"],
@@ -54,31 +70,3 @@ setup(
     # Turn on Pyrex-sensitivity:
     cmdclass = {'build_ext': build_ext}
     )
-
-setup(
-  name = "parti",
-  author="Nathaniel Smith",
-  author_email="parti-discuss@partiwm.org",
-  version=parti.__version__,
-  url="http://partiwm.org",
-  description="A tabbing/tiling window manager using GTK+",
-  download_url="http://partiwm.org/static/downloads/",
-  
-  scripts=["scripts/parti", "scripts/parti-repl"],
-  packages=["parti", "parti.trays", "parti.addons", "parti.scripts",
-            ],
-)
-
-setup(
-  name = "xpra",
-  author="Nathaniel Smith",
-  author_email="parti-discuss@partiwm.org",
-  version=xpra.__version__,
-  url="http://partiwm.org",
-  description="'screen for X' -- a tool to detach/reattach running X programs",
-  download_url="http://partiwm.org/static/downloads/",
-  
-  scripts=["scripts/xpra"],
-  packages=["xpra", "xpra.scripts",
-            ],
-)
