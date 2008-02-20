@@ -1,18 +1,34 @@
 Parti 0.0.3 (2008-?????)
 ========================
 
-refactoring
-hotkeys
-model/view separation for client windows
-  compositing
-window icon support
-better geometry constraint interpretation
-redo event plumbing to avoid cross-language reference loops (-> memory
-  leaks)
-support for STRUT hints (i.e. we can tell how panels work)
-added --replace switch
-use one X/D-Bus session for running multiple tests -- speeds up test
-suite by ~3x, though may be buggy and fragile
+Massive refactoring occurred for this release.
+
+wimpiggy: The WM backend parts of Parti have been split off into a
+separate package known as wimpiggy.  As compared to the corresponding
+code in 0.0.2, wimpiggy 0.0.3 adds:
+  -- Compositing support
+  -- Model/view separation for client windows (based on compositing
+     support)
+  -- Improved client hint support, including icon handling, strut
+     handling, and more correct geometry handling.
+  -- Keybinding support
+  -- Event dispatching that doesn't leak memory
+  -- Better interaction with already running window managers (i.e., a
+     --replace switch as seen in metacity etc.)
+
+parti: This package will eventually become the real window manager,
+but for now is essentially a testbed for wimpiggy.
+
+xpra: This is a new, independent program dependent on wimpiggy (which
+is why wimpiggy had to be split out).  It implements 'screen for X' --
+letting one run applications remotely that can be detached and then
+re-attached without losing state.  This is the first release, but
+while not perfect, it is substantially usable.
+
+general: The test runner was hacked to share a single X/D-Bus session
+across multiple tests.  This speeds up the test suite by a factor of
+~3, but seems to be buggy and fragile and may be reverted in the
+future.
 
 Parti 0.0.2 (2007-10-26)
 ========================
