@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 # NOTE (FIXME): This setup.py file will not work on its own; you have to run
-#   $ python make-constants-pxi.py wimpiggy/wimpiggy._lowlevel.const.txt wimpiggy/wimpiggy._lowlevel.const.pxi
+#   $ python make-constants-pxi.py wimpiggy/lowlevel/constants.txt wimpiggy/lowlevel/constants.pxi
 # before using this setup.py, and again if you change
-# wimpiggy/wimpiggy._lowlevel.const.txt.
+# wimpiggy/lowlevel/constants.txt.
 
 # FIXME: Pyrex.Distutils.build_ext leaves crud in the source directory.  (So
 # does the make-constants-pxi.py hack.)
