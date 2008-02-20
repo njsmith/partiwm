@@ -78,6 +78,7 @@ class ChannelProxy(object):
 
     def _uhoh(self, *args):
         self._set_state(self.DONE)
+        return False
 
 class XpraProxy(object):
     def __init__(self, readfd, writefd, server_conn):
