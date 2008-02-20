@@ -996,6 +996,11 @@ class WindowView(gtk.Widget):
         cr.save()
         cr.set_matrix(self._get_transform_matrix())
 
+        # It's important to acknowledge changes *before* we redraw them, to
+        # avoid a race condition.
+        self.model.acknowledge_changes(event.x, event.y,
+                                       event.width, event.height)
+
         cr.set_source_pixmap(self.model.get_property("client-contents"),
                              0, 0)
         # Super slow (copies everything out of the server and then back
@@ -1008,9 +1013,6 @@ class WindowView(gtk.Widget):
         #tmpcr.paint()
         #cr.set_source_surface(tmpsrf, 0, 0)
         cr.paint()
-
-        self.model.acknowledge_changes(event.x, event.y,
-                                       event.width, event.height)
 
         icon = self.model.get_property("icon")
         if icon is not None:
