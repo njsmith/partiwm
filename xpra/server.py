@@ -140,9 +140,11 @@ class ServerSource(object):
             (x, y, w, h) = get_rectangle_from_region(damage)
             rect = gtk.gdk.Rectangle(x, y, w, h)
             damage.subtract(gtk.gdk.region_rectangle(rect))
-            window.acknowledge_changes(x, y, w, h)
             if damage.empty():
                 del self._damage[id]
+            # It's important to acknowledge changes *before* we extract them,
+            # to avoid a race condition.
+            window.acknowledge_changes(x, y, w, h)
             pixmap = window.get_property("client-contents")
             if pixmap is None:
                 print "wtf, pixmap is None?"

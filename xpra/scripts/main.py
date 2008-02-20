@@ -1,4 +1,4 @@
-import gtk
+import gobject
 import sys
 import os
 import stat
@@ -75,14 +75,16 @@ def run_client(parser, opts, extra_args):
     sock = client_sock(parser, opts, extra_args)
     app = XpraClient(sock)
     sys.stdout.write("Attached\n")
-    gtk.main()
+    gobject.MainLoop().run()
 
 from xpra.proxy import XpraProxy
 def run_proxy(parser, opts, extra_args):
+    if "DISPLAY" in os.environ:
+        del os.environ["DISPLAY"]
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     app = XpraProxy(0, 1, client_sock(parser, opts, extra_args))
-    gtk.main()
+    gobject.MainLoop().run()
 
 def run_shutdown(parser, opts, extra_args):
     if len(extra_args) != 1:
