@@ -65,7 +65,7 @@ setup(
       Extension("wimpiggy.lowlevel.bindings",
                 ["wimpiggy/lowlevel/wimpiggy.lowlevel.bindings.pyx"],
                 **pkgconfig("pygobject-2.0", "gdk-x11-2.0", "gtk+-x11-2.0",
-                            "xtst")
+                            "xtst", "xfixes", "xcomposite", "xdamage")
                 ),
       ],
     # Turn on Pyrex-sensitivity:
