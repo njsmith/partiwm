@@ -10,40 +10,116 @@ disconnect from these programs and reconnect from the same or another
 machine, without losing any state.
 
 
-Wait, isn't that what VNC does?  How does this compare to other remote
-desktop systems?
-----------------------------------------------------------------------
+Wait, isn't that what VNC does?
+-------------------------------
 
-The main difference is that xpra is "rootless" -- i.e., programs you
+VNC is another system for using apps remotely.  The main difference
+between xpra and VNC is that xpra is "rootless" -- i.e., programs you
 run under it show up on your desktop as regular programs, managed by
 your regular window manager, instead of being trapped inside a box.
 It gives you "remote applications", not a "remote desktop".  (Hence
 the name -- "X Persistent Remote Applications".)
 
-VNC versus xpra: VNC is far more portable -- you can get both
-'servers' and 'viewers' for essentially any operating system.  For
-xpra, you can only run X programs against the 'server', and the
+Another difference is that VNC is far more portable -- you can get
+both 'servers' and 'viewers' for essentially any operating system.
+For xpra, you can only run X programs against the 'server', and the
 current codebase also assumes some Unix-isms (e.g., unix domain
 sockets).  The xpra viewer is more portable (in principle) -- the
 existing one should be able to work anywhere that GTK+ does, and it's
 only a few hundred lines of code in any case, so is easy to replace.
+
 Basically, if you want a remote desktop, use VNC; if you just want to
 run a few programs remotely, use xpra.
 
-NX versus xpra: NX is the name for a protocol, rootless X server, mass
-of management scripts, etc., produced by NoMachine Inc.  There's some
-very nice tech in NX, and in principle it can do everything that xpra
-does and more.  In practice, they offer either a super-slick, complete
-thin client solution with some questionable (IMO) engineering
-decisions and a proprietary license, or, a minimally-documented code
-dump of GPLed software with a build system straight from the 1980s, an
-included fork of the old X.org monolithic (!) tree, and if you somehow
-get it built then it has all sorts of weird quirks to work around.
-Xpra, by comparison, is <1000 source lines of code for the core, was
-written in a weekend, and just works.  NX seems aimed at large
-enterprise thin client deployments, and I just want a way to run data
-visualization jobs that won't die when my wireless does -- xpra is
-great for the latter.
+
+What about NX?
+--------------
+
+NX is the name for a protocol, rootless X server, mass of management
+scripts, etc., produced by NoMachine Inc.  There's some very nice tech
+in NX, and in principle it can do everything that xpra does and more.
+In practice, they offer either a super-slick, complete thin client
+solution with some questionable (IMO) engineering decisions and a
+proprietary license, or, a minimally-documented code dump of GPLed
+software with a build system straight from the 1980s, an included fork
+of the old X.org monolithic (!) tree, and if you somehow get it built
+then it has all sorts of weird quirks to work around.  Xpra, by
+comparison, is <1000 source lines of code for the core, was written in
+a weekend, and just works.
+
+NX seems aimed at large enterprise thin client deployments, and I just
+want a way to run data visualization jobs that won't die when my
+wireless does -- xpra is great for the latter.
+
+
+And what about xmove?
+---------------------
+
+xmove is a tool designed to do exactly the same thing as xpra.  The
+main differences are that xmove uses a very different implementation
+strategy (it implements a "pseudo" X server, while xpra takes
+advantage of the standard X.org server), and that xmove has been
+unmaintained since ~1997.
+
+I have not personally used xmove, and X clients tend to be very
+conservative -- it's entirely possible that all modern X apps will
+still work just fine against a 10+ year old server like xmove.
+However, X *has* changed since then; for example, xmove does not
+support the Render extension, which is essentially required if you
+want anti-aliased fonts.  Between the somewhat cumbersome design and
+the lack of existing maintainers, this will almost certainly never get
+fixed; nor will any other flaws that xmove may have.  (For instance,
+xpra looks easier to set up without writing custom shell scripts.)
+
+The other major issue with xmove's design is its sensitivity to
+latency.  Usually, if you're using a tool like xmove or xpra, it's
+because you want to run an app on a remote computer.  Usually you
+don't have a local ethernet connection to that remote computer, but
+rather something with a much higher ping time.  Standard X forwarding
+becomes notoriously slow and unusable in such situations -- and xmove
+uses the same mechanisms as standard X.  Xpra, on the other hand, uses
+a protocol with no round trips, and applications forwarded by xpra
+should remain snappy and responsive over connections that make X or
+xmove crawl away to die.
+
+Still, like I said, I haven't actually used xmove, and would be
+interested to hear from those who do.
+
+
+Okay, so how do I try xpra?
+---------------------------
+
+Download the latest version from
+  http://partiwm.org/static/downloads/
+
+Make sure you have the dependencies, at least:
+  development packages for python-gtk, and all dependencies
+  Xvfb
+  pyrex
+On Debian-based OSes, I think it's:
+  # aptitude install libx11-dev libxtst-dev libxcomposite-dev \
+    libxdamage-dev python-gobject-dev python-gtk2-dev xvfb python-pyrex
+
+Build it:
+  tar xvzf parti-all-<whatever>.tar.gz
+  cd parti-all-<whatever>
+  ./do-build
+  export PYTHONPATH=$PWD/install/lib/python:$PYTHONPATH
+(If running and displaying apps on two different machines, then you'll
+need to do this on both of them, obviously.)
+
+On the machine where you will run the apps:
+  install/bin/xpra start :13
+
+On the machine where you want the apps to display:
+  install/bin/xpra attach ssh:<remote box>:13
+or if displaying on the same machine for testing, just:
+  install/bin/xpra attach :13
+
+Start some apps:
+  export DISPLAY=:13
+  emacs
+
 
 So how does it work?
 --------------------
@@ -146,41 +222,6 @@ accented character that does not exist in that keymap, then it won't
 work.  This is a hard problem, in general, but improvements should be
 possible.  If you run into this, again, send an email -- extra points
 if it contains a patch :-).
-
-
-Okay, so how do I try it?
--------------------------
-
-Download the latest version from
-  http://partiwm.org/static/downloads/
-
-Make sure you have the dependencies, at least:
-  development packages for python-gtk, and all dependencies
-  Xvfb
-  pyrex
-On Debian-based OSes, I think it's:
-  # aptitude install libx11-dev libxtst-dev libxcomposite-dev \
-    libxdamage-dev python-gobject-dev python-gtk2-dev xvfb python-pyrex
-
-Build it:
-  tar xvzf parti-all-<whatever>.tar.gz
-  cd parti-all-<whatever>
-  ./do-build
-  export PYTHONPATH=$PWD/install/lib/python:$PYTHONPATH
-(If running and displaying apps on two different machines, then you'll
-need to do this on both of them, obviously.)
-
-On the machine where you will run the apps:
-  install/bin/xpra start :13
-
-On the machine where you want the apps to display:
-  install/bin/xpra attach ssh:<remote box>:13
-or if displaying on the same machine for testing, just:
-  install/bin/xpra attach :13
-
-Start some apps:
-  export DISPLAY=:13
-  emacs
 
 
 What's this 'parti' thing, and what does it have to do with xpra?
