@@ -159,8 +159,8 @@ Make sure you have the dependencies, at least:
   Xvfb
   pyrex
 On Debian-based OSes, I think it's:
-  # aptitude install libx11-dev libxtst-dev python-gobject-dev \
-    python-gtk2-dev xvfb python-pyrex
+  # aptitude install libx11-dev libxtst-dev libxcomposite-dev \
+    libxdamage-dev python-gobject-dev python-gtk2-dev xvfb python-pyrex
 
 Build it:
   tar xvzf parti-all-<whatever>.tar.gz
