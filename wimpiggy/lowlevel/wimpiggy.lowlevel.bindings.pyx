@@ -721,7 +721,8 @@ cdef extern from "X11/extensions/Xfixes.h":
 
 cdef extern from "X11/extensions/Xdamage.h":
     ctypedef XID Damage
-    unsigned int XDamageReportDeltaRectangles
+    #unsigned int XDamageReportDeltaRectangles
+    unsigned int XDamageReportRawRectangles
     unsigned int XDamageNotify
     ctypedef struct XDamageNotifyEvent:
         Damage damage
@@ -758,8 +759,14 @@ def _ensure_XDamage_support(display_source):
 
 def xdamage_start(window):
     _ensure_XDamage_support(window)
+    # Our design all assumes we are using DeltaRectangles, rather than
+    # RawRectangles -- if we settle on using RawRectangles permanently, then
+    # we should rip out all the xdamage_acknowledge stuff.  But the only
+    # reason we're using RawRectangles is that DeltaRectangles mode is broken,
+    # and hopefully it will be fixed in X.org 7.4 (see freedesktop.org bug
+    # #14648 for details):
     return XDamageCreate(get_xdisplay_for(window), get_xwindow(window),
-                         XDamageReportDeltaRectangles)
+                         XDamageReportRawRectangles)
 
 def xdamage_stop(display_source, handle):
     _ensure_XDamage_support(display_source)
