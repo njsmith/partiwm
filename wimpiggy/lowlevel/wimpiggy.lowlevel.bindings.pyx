@@ -668,7 +668,7 @@ def _ensure_XComposite_support(display_source):
                 if (major, 0) <= required_version <= (major, minor):
                     display.set_data("XComposite-support", True)
     if not display.get_data("XComposite-support"):
-        raise ValueError, "Composite v%s.%s not supported" % required_version
+        raise ValueError, "Composite v%s.%s not supported" % (major, minor)
 
 def xcomposite_redirect_window(window):
     _ensure_XComposite_support(window)
@@ -767,7 +767,7 @@ def _ensure_XDamage_support(display_source):
                 if (major, 0) <= required_version <= (major, minor):
                     display.set_data("XDamage-support", True)
     if not display.get_data("XDamage-support"):
-        raise ValueError, "Xdamage v%s.%s not supported" % required_version
+        raise ValueError, "Xdamage v%s.%s not supported" % (major, minor)
 
 def xdamage_start(window):
     _ensure_XDamage_support(window)
