@@ -284,7 +284,7 @@ class XpraClient(gobject.GObject):
             our_stacking = [our_windows[win]
                             for win in stacking
                             if win in our_windows]
-            if self._stacking != our_stacking and our_stacking:
+            if self._stacking != our_stacking and len(our_stacking) > 1:
                 self.send(["window-order", our_stacking])
             self._stacking = our_stacking
 
