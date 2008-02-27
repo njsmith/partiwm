@@ -458,15 +458,15 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
             print field
             assert hasattr(self.child_conf_ev, field)
 
-        # If we have a handler installed on the child, it takes precedence:
+        # If we have a handler installed on the child, both handlers get it:
         self.child_map_ev = None
         self.child_conf_ev = None
         l.add_event_receiver(w1, self)
         w2.show()
         while None in (self.map_ev, self.conf_ev):
             gtk.main()
-        assert self.child_map_ev is None
-        assert self.child_conf_ev is None
+        assert self.child_map_ev is self.map_ev
+        assert self.child_conf_ev is self.conf_ev
 
         assert self.map_ev.parent is root
         assert self.map_ev.window is w1
@@ -478,6 +478,8 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
             print field
             assert hasattr(self.conf_ev, field)
 
+        self.child_map_ev = None
+        self.child_conf_ev = None
         self.map_ev = None
         self.conf_ev = None
 
