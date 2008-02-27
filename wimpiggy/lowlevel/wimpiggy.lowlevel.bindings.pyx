@@ -1177,29 +1177,4 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
         dump_exc()
     return GDK_FILTER_CONTINUE
 
-_gdk_event_signals = {
-    # These other events are on client windows, mostly
-    gtk.gdk.PROPERTY_NOTIFY: ("wimpiggy-property-notify-event", None),
-    gtk.gdk.UNMAP: ("wimpiggy-unmap-event", "wimpiggy-child-unmap-event"),
-    gtk.gdk.DESTROY: ("wimpiggy-destroy-event", None),
-    gtk.gdk.CONFIGURE: ("wimpiggy-configure-event", None),
-    gtk.gdk.KEY_PRESS: ("wimpiggy-key-press-event", None),
-    }
-
-def _dispatch_gdk_event(event):
-    # This function is called for every event GDK sees.  Most of them we
-    # want to just pass on to GTK, but some we are especially interested
-    # in...
-    try:
-        if event.type in _gdk_event_signals:
-            _route_event(event, *_gdk_event_signals[event.type])
-    except:
-        print "Unhandled exception in _dispatch_gdk_event:"
-        dump_exc()
-    gtk.main_do_event(event)
-
-def _install_global_event_filters():
-    gdk_window_add_filter(<cGdkWindow*>0, x_event_filter, <void*>0)
-#    gtk.gdk.event_handler_set(_dispatch_gdk_event)
-
-_install_global_event_filters()
+gdk_window_add_filter(<cGdkWindow*>0, x_event_filter, <void*>0)
