@@ -11,8 +11,11 @@ from xpra.bencode import bencode
 from xpra.address import (sockdir, sockpath,
                           server_state, LIVE, DEAD, UNKNOWN)
 
-# FIXME: make this UI more screen-like?
-# FIXME: add ssh support
+def nox():
+    if "DISPLAY" in os.environ:
+        del os.environ["DISPLAY"]
+    import warnings
+    warnings.filterwarnings("ignore", "could not open display")
 
 def main(cmdline):
     parser = OptionParser(version="xpra v%s" % xpra.__version__,
@@ -34,19 +37,21 @@ def main(cmdline):
 
     mode = args[0]
     if mode == "start":
+        nox()
+        from xpra.scripts.server import run_server
         run_server(parser, options, args[1:])
     elif mode == "attach":
         run_client(parser, options, args[1:])
     elif mode == "shutdown":
+        nox()
         run_shutdown(parser, options, args[1:])
     elif mode == "list":
         run_list(parser, options, args[1:])
     elif mode == "_proxy":
+        nox()
         run_proxy(parser, options, args[1:])
     else:
         parser.error("invalid mode '%s'" % mode)
-
-from xpra.scripts.server import run_server
 
 def client_sock(parser, opts, extra_args):
     if len(extra_args) != 1:
@@ -68,8 +73,8 @@ def client_sock(parser, opts, extra_args):
         sock.connect(path)
         return sock
 
-from xpra.client import XpraClient
 def run_client(parser, opts, extra_args):
+    from xpra.client import XpraClient
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     sock = client_sock(parser, opts, extra_args)
@@ -77,10 +82,8 @@ def run_client(parser, opts, extra_args):
     sys.stdout.write("Attached\n")
     gobject.MainLoop().run()
 
-from xpra.proxy import XpraProxy
 def run_proxy(parser, opts, extra_args):
-    if "DISPLAY" in os.environ:
-        del os.environ["DISPLAY"]
+    from xpra.proxy import XpraProxy
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     app = XpraProxy(0, 1, client_sock(parser, opts, extra_args))
