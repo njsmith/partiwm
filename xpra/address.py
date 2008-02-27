@@ -1,4 +1,3 @@
-import gtk
 import os
 import os.path
 import socket
