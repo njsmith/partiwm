@@ -264,7 +264,7 @@ class OverrideRedirectWindowModel(BaseWindowModel):
             raise Unmanageable, e
 
     def do_wimpiggy_unmap_event(self, event):
-        self.emit("unmanaged", False)
+        self.unmanage()
 
     def do_wimpiggy_configure_event(self, event):
         self._internal_set_property("geometry", (event.x, event.y,
@@ -887,6 +887,9 @@ gobject.type_register(WindowModel)
 class WindowView(gtk.Widget):
     def __init__(self, model):
         gtk.Widget.__init__(self)
+
+        # Workaround for pygobject bug, see comment in do_destroy():
+        self._got_inited = True
         
         self._image_window = None
         self.model = model
@@ -894,6 +897,8 @@ class WindowView(gtk.Widget):
                                                   self._client_contents_changed)
         self._election_handle = self.model.connect("ownership-election",
                                                     self._vote_for_pedro)
+        self._unmanaged_handle = self.model.connect("unmanaged",
+                                                    self._unmanaged)
 
         # Standard GTK double-buffering is useless for us, because it's on our
         # "official" window, and we don't draw to that.
@@ -902,9 +907,33 @@ class WindowView(gtk.Widget):
         self.set_property("can-focus", True)
 
 
+    def _unmanaged(self, model, wm_is_exiting):
+        self.destroy()
+
     def do_destroy(self):
+        # Somehow, it is possible for this method to be called without
+        # __init__ having been called!  What seems to be happening is some
+        # skew between the Python object and the GObject that it is wrapping.
+        # The pygobject library stashes a pointer to the Python object inside
+        # the GObject; normally, when we try to wrap a GObject that already
+        # has a wrapper, it notices that this stashed pointer is already
+        # there, and just returns the existing Python object rather than
+        # creating a new Python wrapper.  Somehow, this stashed pointer is
+        # getting lost -- perhaps because calling destroy() clears out the
+        # place where it is stashed? -- and then later on the last reference
+        # to our Python object drops, this causes signal emission on the
+        # GObject, it tries to reflect back into Python, but the stashed
+        # pointer is gone, so it ends up creating a new Python wrapper and
+        # calling methods on it, and things blow up.  So let's skip the
+        # blow-up.
+        # FIXME: figure out what's going on here in enough detail to file a
+        # proper bug.
+        if not hasattr(self, "_got_inited"):
+            print "FIXME: nasty gobject bug triggered, working around"
+            return
         self.model.disconnect(self._redraw_handle)
         self.model.disconnect(self._election_handle)
+        self.model.disconnect(self._unmanaged_handle)
         self.model = None
         gtk.Widget.do_destroy(self)
 

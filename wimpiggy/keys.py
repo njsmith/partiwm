@@ -72,8 +72,10 @@ class HotkeyManager(gobject.GObject):
                 self.normalized_hotkeys[unparsed] = target
 
     def do_key_press_event(self, event):
+        print "got hotkey event, maybe"
         unparsed = unparse_key(event.state, event.hardware_keycode,
                                self.keymap, self.modifier_map)
+        print "unparsed = %s" % unparsed
         if unparsed in self.normalized_hotkeys:
             target = self.normalized_hotkeys[unparsed]
             self.emit("hotkey::%s" % (target,), target)

@@ -165,6 +165,14 @@ cdef extern from *:
     ctypedef struct XMapEvent:
         Window window
         Bool override_redirect
+    ctypedef struct XUnmapEvent:
+        Window window
+    ctypedef struct XDestroyWindowEvent:
+        Window window
+    ctypedef struct XPropertyEvent:
+        Atom atom
+    ctypedef struct XKeyEvent:
+        unsigned int keycode, state
     ctypedef union XEvent:
         int type
         XAnyEvent xany
@@ -175,6 +183,10 @@ cdef extern from *:
         XFocusChangeEvent xfocus
         XClientMessageEvent xclient
         XMapEvent xmap
+        XUnmapEvent xunmap
+        XDestroyWindowEvent xdestroywindow
+        XPropertyEvent xproperty
+        XKeyEvent xkey
         
     Status XSendEvent(Display *, Window target, Bool propagate,
                       long event_mask, XEvent * event)
@@ -1000,8 +1012,9 @@ def _maybe_send_event(handlers, signal, event):
     # be added or removed from it while we are iterating:
     for handler in list(handlers):
         if signal in gobject.signal_list_names(handler):
-            #print "  forwarding event to a %s handler" % type(handler).__name__
+            print "  forwarding event to a %s handler" % type(handler).__name__
             handler.emit(signal, event)
+            print "  forwarded"
 
 def _route_event(event, signal, parent_signal):
     # Sometimes we get GDK events with event.window == None, because they are
@@ -1032,6 +1045,11 @@ _x_event_signals = {
     FocusOut: ("wimpiggy-focus-out-event", None),
     ClientMessage: ("wimpiggy-client-message-event", None),
     MapNotify: ("wimpiggy-map-event", "wimpiggy-child-map-event"),
+    UnmapNotify: ("wimpiggy-unmap-event", "wimpiggy-child-unmap-event"),
+    DestroyNotify: ("wimpiggy-destroy-event", None),
+    PropertyNotify: ("wimpiggy-property-notify-event", None),
+    ConfigureNotify: ("wimpiggy-configure-event", None),
+    KeyPress: ("wimpiggy-key-press-event", None),
     "XDamageNotify": ("wimpiggy-damage-event", None),
     }
 
@@ -1044,7 +1062,7 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
     cdef XEvent * e
     cdef XDamageNotifyEvent * damage_e
     e = <XEvent*>e_gdk
-    if e.xany.send_event and e.type != ClientMessage:
+    if e.xany.send_event and e.type not in (ClientMessage, UnmapNotify):
         return GDK_FILTER_CONTINUE
     try:
         d = wrap(<cGObject*>gdk_x11_lookup_xdisplay(e.xany.display))
@@ -1057,6 +1075,7 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
         if e.type in my_events:
             pyev = LameStruct()
             pyev.type = e.type
+            pyev.send_event = e.xany.send_event
             pyev.display = d
             # Unmarshal:
             try:
@@ -1115,6 +1134,29 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     print "MapNotify event received"
                     pyev.window = _gw(d, e.xmap.window)
                     pyev.override_redirect = e.xmap.override_redirect
+                elif e.type == UnmapNotify:
+                    print "UnmapNotify event received"
+                    pyev.window = _gw(d, e.xunmap.window)
+                elif e.type == DestroyNotify:
+                    print "DestroyNotify event received"
+                    pyev.window = _gw(d, e.xdestroywindow.window)
+                elif e.type == PropertyNotify:
+                    print "PropertyNotify event received"
+                    pyev.window = _gw(d, e.xany.window)
+                    pyev.atom = trap.call_synced(get_pyatom, d,
+                                                 e.xproperty.atom)
+                elif e.type == ConfigureNotify:
+                    print "ConfigureNotify event received"
+                    pyev.window = _gw(d, e.xconfigure.window)
+                    pyev.x = e.xconfigure.x
+                    pyev.y = e.xconfigure.y
+                    pyev.width = e.xconfigure.width
+                    pyev.height = e.xconfigure.height
+                elif e.type == KeyPress:
+                    print "KeyPress event received"
+                    pyev.window = _gw(d, e.xany.window)
+                    pyev.hardware_keycode = e.xkey.keycode
+                    pyev.state = e.xkey.state
                 elif e.type == damage_type:
                     #print "DamageNotify received"
                     damage_e = <XDamageNotifyEvent*>e
@@ -1158,6 +1200,6 @@ def _dispatch_gdk_event(event):
 
 def _install_global_event_filters():
     gdk_window_add_filter(<cGdkWindow*>0, x_event_filter, <void*>0)
-    gtk.gdk.event_handler_set(_dispatch_gdk_event)
+#    gtk.gdk.event_handler_set(_dispatch_gdk_event)
 
 _install_global_event_filters()
