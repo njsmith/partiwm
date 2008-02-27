@@ -660,7 +660,9 @@ def _ensure_XComposite_support(display_source):
         display.set_data("XComposite-support", False)
         if XCompositeQueryExtension(get_xdisplay_for(display),
                                     &ignored, &ignored):
-            required_version = (0, 4)
+            # We need NameWindowPixmap, but we don't need the overlay window
+            # (v0.3) or the special manual-redirect clipping semantics (v0.4):
+            required_version = (0, 2)
             (major, minor) = required_version
             if XCompositeQueryVersion(get_xdisplay_for(display),
                                       &major, &minor):
