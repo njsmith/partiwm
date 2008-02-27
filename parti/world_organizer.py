@@ -4,8 +4,6 @@ their display."""
 import gtk
 import gobject
 
-from wimpiggy.util import base
-
 # FIXME: xinerama support (GdkScreen.get_n_monitors, get_monitor_geometry).
 # There should be multiple logical viewports, one for each xinerama screen,
 # somehow... not clear what the best way to get that is, since GTK has a
