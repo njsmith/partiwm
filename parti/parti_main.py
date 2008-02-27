@@ -7,7 +7,6 @@ from wimpiggy.keys import HotkeyManager
 
 from parti.world_organizer import WorldOrganizer
 
-from parti.windowset import WindowSet
 from parti.tray import TraySet
 from parti.trays.simpletab import SimpleTabTray
 
