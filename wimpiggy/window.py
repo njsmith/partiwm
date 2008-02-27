@@ -926,10 +926,9 @@ class WindowView(gtk.Widget):
         # pointer is gone, so it ends up creating a new Python wrapper and
         # calling methods on it, and things blow up.  So let's skip the
         # blow-up.
-        # FIXME: figure out what's going on here in enough detail to file a
-        # proper bug.
+        # This is gnome bug #518999.
         if not hasattr(self, "_got_inited"):
-            print "FIXME: nasty gobject bug triggered, working around"
+            print "nasty gobject bug #518999 triggered, working around"
             return
         self.model.disconnect(self._redraw_handle)
         self.model.disconnect(self._election_handle)
