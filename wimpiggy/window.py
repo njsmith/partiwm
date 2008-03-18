@@ -527,8 +527,8 @@ class WindowModel(BaseWindowModel):
             (allocated_w, allocated_h) = owner.window_size(self)
             hints = self.get_property("size-hints")
             size = wimpiggy.lowlevel.calc_constrained_size(allocated_w,
-                                                        allocated_h,
-                                                        hints)
+                                                           allocated_h,
+                                                           hints)
             (w, h, wvis, hvis) = size
             (x, y) = owner.window_position(self, w, h)
             self.corral_window.move_resize(x, y, w, h)
