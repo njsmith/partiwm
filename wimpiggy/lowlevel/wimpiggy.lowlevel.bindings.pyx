@@ -322,7 +322,7 @@ def get_xatom(display_source, str_or_xatom):
         )
 
 def get_pyatom(display_source, xatom):
-    if xatom > 2 ** 32:
+    if long(xatom) > long(2) ** 32:
         raise Exception, "weirdly huge purported xatom: %s" % xatom
     cdef cGdkDisplay * disp
     disp = get_raw_display_for(display_source)
@@ -1113,7 +1113,7 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                 elif e.type == ClientMessage:
                     print "ClientMessage received"
                     pyev.window = _gw(d, e.xany.window)
-                    if e.xclient.message_type > (2 ** 32):
+                    if long(e.xclient.message_type) > (long(2) ** 32):
                         print ("Xlib claims that this ClientEvent's 32-bit "
                                + "message_type is %s.  "
                                + "Note that this is >2^32.  "
