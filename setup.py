@@ -11,15 +11,18 @@
 from distutils.core import setup
 from distutils.extension import Extension
 from Pyrex.Distutils import build_ext
-import commands
+import commands, os
 
 # Tweaked from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/502261
 def pkgconfig(*packages, **kw):
     flag_map = {'-I': 'include_dirs',
                 '-L': 'library_dirs',
                 '-l': 'libraries'}
-    for token in commands.getoutput("pkg-config --libs --cflags %s"
-                                    % ' '.join(packages)).split():
+    cmd = "pkg-config --libs --cflags %s" % (" ".join(packages),)
+    (status, output) = commands.getstatusoutput(cmd)
+    if not (os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0):
+        raise Exception, ("call to pkg-config ('%s') failed" % (cmd,))
+    for token in output.split():
         if flag_map.has_key(token[:2]):
             kw.setdefault(flag_map.get(token[:2]), []).append(token[2:])
         else: # throw others to extra_link_args
