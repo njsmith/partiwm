@@ -24,7 +24,7 @@ class TestSelection(TestWithSession, MockEventReceiver):
         assert m1.owned()
         assert m2.owned()
 
-        assert_raises(AlreadyOwned, m2.acquire)
+        assert_raises(AlreadyOwned, m2.acquire, m2.IF_UNOWNED)
 
         assert not selection_lost_fired[m1]
         assert not selection_lost_fired[m2]
