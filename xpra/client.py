@@ -248,6 +248,9 @@ class XpraClient(gobject.GObject):
 
         self._focused = None
 
+    def run(self):
+        gtk.main()
+
     def _keys_changed(self):
         self._modifier_map = grok_modifier_map(gtk.gdk.display_get_default())
 

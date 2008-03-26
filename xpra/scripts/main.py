@@ -80,7 +80,7 @@ def run_client(parser, opts, extra_args):
     sock = client_sock(parser, opts, extra_args)
     app = XpraClient(sock)
     sys.stdout.write("Attached\n")
-    gobject.MainLoop().run()
+    app.run()
 
 def run_proxy(parser, opts, extra_args):
     from xpra.proxy import XpraProxy
