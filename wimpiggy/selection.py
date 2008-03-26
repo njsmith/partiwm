@@ -13,6 +13,7 @@ from wimpiggy.util import no_arg_signal, one_arg_signal
 from wimpiggy.lowlevel import (get_xatom, get_pywindow, sendClientMessage,
                                myGetSelectionOwner, const,
                                add_event_receiver)
+from wimpiggy.error import *
 
 class AlreadyOwned(Exception):
     pass
@@ -48,8 +49,9 @@ class ManagerSelection(gobject.GObject):
     FORCE_AND_RETURN = "force_and_return"
     def acquire(self, when):
         old_owner = self._owner()
-        if when is IF_UNOWNED and old_owner != const["XNone"]:
+        if when is self.IF_UNOWNED and old_owner != const["XNone"]:
             raise AlreadyOwned
+
         self.clipboard.set_with_data([("VERSION", 0, 0)],
                                      self._get,
                                      self._clear,
@@ -82,13 +84,23 @@ class ManagerSelection(gobject.GObject):
                           "MANAGER",
                           ts_num, selection_xatom, owner_window, 0, 0)
 
-        if old_owner != const["XNone"] and when is FORCE:
+        if old_owner != const["XNone"] and when is self.FORCE:
             # Block in a recursive mainloop until the previous owner has
             # cleared out.
-            window = get_pywindow(old_owner)
-            add_event_receiver(window, self)
-            self.rloop.run()
-            remove_event_receiver(window, self)
+            def getwin():
+                window = get_pywindow(self.clipboard, old_owner)
+                window.set_events(window.get_events() | gtk.gdk.STRUCTURE_MASK)
+                return window
+            try:
+                window = trap.call(getwin)
+                print "got window"
+            except XError, e:
+                print "Previous owner is already gone, not blocking"
+            else:
+                print "Waiting for previous owner to exit..."
+                add_event_receiver(window, self)
+                self.rloop.run()
+                print "...they did."
 
     def do_wimpiggy_destroy_event(self, *args):
         if self.rloop.is_running():

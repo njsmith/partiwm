@@ -20,7 +20,7 @@ class TestSelection(TestWithSession, MockEventReceiver):
 
         assert not m1.owned()
         assert not m2.owned()
-        m1.acquire()
+        m1.acquire(m1.IF_UNOWNED)
         assert m1.owned()
         assert m2.owned()
 
@@ -28,7 +28,7 @@ class TestSelection(TestWithSession, MockEventReceiver):
 
         assert not selection_lost_fired[m1]
         assert not selection_lost_fired[m2]
-        m2.acquire(force=True)
+        m2.acquire(m2.FORCE_AND_RETURN)
         assert selection_lost_fired[m1]
         assert not selection_lost_fired[m2]
 
@@ -47,7 +47,7 @@ class TestSelection(TestWithSession, MockEventReceiver):
 
         assert not m.owned()
         assert self.event is None
-        m.acquire()
+        m.acquire(m.IF_UNOWNED)
         gtk.main()
         assert self.event is not None
         assert self.event.window is root2
@@ -69,7 +69,7 @@ class TestSelection(TestWithSession, MockEventReceiver):
 
     def test_conversion(self):
         m = ManagerSelection(self.display, "WM_S0")
-        m.acquire()
+        m.acquire(m.IF_UNOWNED)
 
         d2 = self.clone_display()
         clipboard = gtk.Clipboard(d2, "WM_S0")

@@ -143,7 +143,11 @@ class Wm(gobject.GObject):
         self._wm_selection = wimpiggy.selection.ManagerSelection(self._display, "WM_S0")
         self._wm_selection.connect("selection-lost", self._lost_wm_selection)
         # May throw AlreadyOwned:
-        self._wm_selection.acquire(force=replace_other_wm)
+        if replace_other_wm:
+            mode = self._wm_selection.FORCE
+        else:
+            mode = self._wm_selection.IF_UNOWNED
+        self._wm_selection.acquire(mode)
         # (If we become a compositing manager, then we will want to do the
         # same thing with the _NET_WM_CM_S0 selection (says EWMH).  AFAICT
         # this basically will just be used by clients to know that they can
@@ -246,7 +250,7 @@ class Wm(gobject.GObject):
         self.emit("quit")
 
     def do_quit(self):
-        for win in self._windows.itervalues():
+        for win in list(self._windows.itervalues()):
             win.unmanage(True)
 
     def do_child_map_request_event(self, event):
