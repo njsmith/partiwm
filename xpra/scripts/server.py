@@ -38,18 +38,14 @@ def get_pid():
     return prop_get(gtk.gdk.get_default_root_window(),
                     "_XPRA_SERVER_PID", "u32")
 
-def run_server(parser, opts, extra_args):
+def run_server(parser, opts, mode, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     display_name = extra_args[0]
 
-    # FIXME: Should daemonize, then spawn Xvfb etc. in our process group, then
-    # add an atexit() to clean off everything in our process group.
-
     atexit.register(run_cleanups)
     signal.signal(signal.SIGINT, deadly_signal)
     signal.signal(signal.SIGTERM, deadly_signal)
-
 
     sockpath = server_sock(display_name, False)
     logpath = sockpath + ".log"
@@ -91,27 +87,24 @@ def run_server(parser, opts, extra_args):
         sys.stdout = os.fdopen(1, "w", 1)
         sys.stderr = os.fdopen(2, "w", 1)
 
-    xauthority = os.environ.get("XAUTHORITY",
-                                os.path.expanduser("~/.Xauthority"))
-    xvfb = subprocess.Popen(["Xvfb-for-Xpra", display_name,
-                             "-auth", xauthority,
-                             "+extension", "Composite",
-                             "-screen", "0", "2048x2048x24+32",
-                             "-once"],
-                            executable="Xvfb")
-    def kill_xvfb():
-        # Close our display(s) first, so the server dying won't kill us.
-        for display in gtk.gdk.display_manager_get().list_displays():
-            display.close()
-        if xvfb.poll() is None:
-            os.kill(xvfb.pid, signal.SIGTERM)
-    _cleanups.append(kill_xvfb)
+    if mode == "start":
+        # We need to set up a new server environment
+        xauthority = os.environ.get("XAUTHORITY",
+                                    os.path.expanduser("~/.Xauthority"))
+        xvfb = subprocess.Popen(["Xvfb-for-Xpra", display_name,
+                                 "-auth", xauthority,
+                                 "+extension", "Composite",
+                                 "-screen", "0", "2048x2048x24+32",
+                                 "-once"],
+                                executable="Xvfb")
 
-    raw_cookie = os.urandom(16)
-    baked_cookie = raw_cookie.encode("hex")
-    assert not subprocess.call(["xauth", "add", display_name,
-                                "MIT-MAGIC-COOKIE-1", baked_cookie])
+        raw_cookie = os.urandom(16)
+        baked_cookie = raw_cookie.encode("hex")
+        assert not subprocess.call(["xauth", "add", display_name,
+                                    "MIT-MAGIC-COOKIE-1", baked_cookie])
 
+    # Whether we spawned our server or not, it is now running, and we can
+    # connect to it.
     os.environ["DISPLAY"] = display_name
     display = gtk.gdk.Display(display_name)
     manager = gtk.gdk.display_manager_get()
@@ -120,7 +113,20 @@ def run_server(parser, opts, extra_args):
         default_display.close()
     manager.set_default_display(display)
 
-    save_pid(xvfb.pid)
+    if mode == "start":
+        xvfb_pid = xvfb.pid
+    else:
+        assert mode == "upgrade"
+        xvfb_pid = get_pid()
+
+    def kill_xvfb():
+        # Close our display(s) first, so the server dying won't kill us.
+        for display in gtk.gdk.display_manager_get().list_displays():
+            display.close()
+        os.kill(xvfb_pid, signal.SIGTERM)
+    _cleanups.append(kill_xvfb)
+
+    save_pid(xvfb_pid)
 
     app = XpraServer(sockpath, False)
     def cleanup_socket(self):

@@ -23,7 +23,8 @@ def main(cmdline):
                                  + "\t%prog start DISPLAY\n"
                                  + "\t%prog attach DISPLAY\n"
                                  + "\t%prog stop DISPLAY\n"
-                                 + "\t%prog list"))
+                                 + "\t%prog list\n"
+                                 + "\t%prog upgrade DISPLAY"))
     parser.add_option("--no-daemon", action="store_false",
                       dest="daemon", default=True,
                       help="Don't daemonize when running as a server")
@@ -36,10 +37,10 @@ def main(cmdline):
         parser.error("need a mode")
 
     mode = args[0]
-    if mode == "start":
+    if mode in "start", "upgrade":
         nox()
         from xpra.scripts.server import run_server
-        run_server(parser, options, args[1:])
+        run_server(parser, options, mode, args[1:])
     elif mode == "attach":
         run_client(parser, options, args[1:])
     elif mode == "stop":
