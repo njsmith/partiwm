@@ -6,6 +6,8 @@ import os.path
 import atexit
 import signal
 
+from wimpiggy.prop import prop_set, prop_get
+
 from xpra.server import XpraServer
 from xpra.address import server_sock
 
@@ -27,6 +29,14 @@ def deadly_signal(signum, frame):
     #signal.signal(signum, signal.SIG_DFL)
     #kill(os.getpid(), signum)
     os._exit(128 + signum)
+
+def save_pid(pid):
+    prop_set(gtk.gdk.get_default_root_window(),
+             "_XPRA_SERVER_PID", "u32", pid)
+             
+def get_pid():
+    return prop_get(gtk.gdk.get_default_root_window(),
+                    "_XPRA_SERVER_PID", "u32")
 
 def run_server(parser, opts, extra_args):
     if len(extra_args) != 1:
@@ -109,6 +119,8 @@ def run_server(parser, opts, extra_args):
     if default_display is not None:
         default_display.close()
     manager.set_default_display(display)
+
+    save_pid(xvfb.pid)
 
     app = XpraServer(sockpath, False)
     def cleanup_socket(self):
