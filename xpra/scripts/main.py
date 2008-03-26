@@ -87,7 +87,7 @@ def run_proxy(parser, opts, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     app = XpraProxy(0, 1, client_sock(parser, opts, extra_args))
-    gobject.MainLoop().run()
+    app.run()
 
 def run_shutdown(parser, opts, extra_args):
     if len(extra_args) != 1:

@@ -4,7 +4,7 @@ import socket
 
 import sys
 
-class ChannelProxy(object):
+class ChannelProxy(gobject.GObject):
     """Copies bytes from 'readfd' to 'writefd'.
 
     This is performed efficiently (i.e., with no busy-waiting) and with
@@ -16,6 +16,10 @@ class ChannelProxy(object):
     READ = "READ"
     WRITE = "WRITE"
     DONE = "DONE"
+
+    __gsignals__ = {
+        "done": (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ())
+        }
 
     def __init__(self, readfd, writefd):
         self._readfd = readfd
@@ -48,6 +52,7 @@ class ChannelProxy(object):
         elif state is self.DONE:
             os.close(self._readfd)
             os.close(self._writefd)
+            self.emit("done")
         else:
             assert False
         self._state = state
@@ -80,10 +85,22 @@ class ChannelProxy(object):
         self._set_state(self.DONE)
         return False
 
+gobject.type_register(ChannelProxy)
+
 class XpraProxy(object):
     def __init__(self, readfd, writefd, server_conn):
         serverfd1 = os.dup(server_conn.fileno())
         serverfd2 = os.dup(server_conn.fileno())
 
         self._toserver = ChannelProxy(readfd, serverfd1)
+        self._toserver.connect("done", self._quit)
         self._fromserver = ChannelProxy(serverfd2, writefd)
+        self._fromserver.connect("done", self._quit)
+
+        self._mainloop = gobject.MainLoop()
+
+    def run(self):
+        self._mainloop.run()
+
+    def _quit(self, *args):
+        gobject.MainLoop().quit()
