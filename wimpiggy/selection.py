@@ -3,43 +3,52 @@
 # selection, we can either abort or steal it.  Once we have it, if someone
 # else steals it, then we should exit.
 
-# Standards BUG: ICCCM 2.8 specifies exactly how we are supposed to do the
-# detection/stealing stuff, and we totally ignore it, because G[TD]K don't
-# make it convenient to 1) ask directly whether a selection is owned, 2) wait
-# for a window to be destroyed.  So instead, we detect if the selection is
-# owned by trying to convert it, and if it is we either abort or simply steal
-# the selection and assume things will work out.
-
 import gobject
 import gtk
 import gtk.gdk
 from struct import pack, unpack
 import time
 
-from wimpiggy.lowlevel import (get_xatom, sendClientMessage,
-                               myGetSelectionOwner, const)
+from wimpiggy.util import no_arg_signal, one_arg_signal
+from wimpiggy.lowlevel import (get_xatom, get_pywindow, sendClientMessage,
+                               myGetSelectionOwner, const,
+                               add_event_receiver)
 
 class AlreadyOwned(Exception):
     pass
 
 class ManagerSelection(gobject.GObject):
     __gsignals__ = {
-        'selection-lost': (gobject.SIGNAL_RUN_LAST,
-                           gobject.TYPE_NONE, ()),
+        "selection-lost": no_arg_signal,
+
+        "wimpiggy-destroy-event": one_arg_signal,
         }
 
     def __init__(self, display, selection):
         gobject.GObject.__init__(self)
         self.atom = selection
         self.clipboard = gtk.Clipboard(display, selection)
+        self.rloop = gobject.MainLoop()
+
+    def _owner(self):
+        return myGetSelectionOwner(self.clipboard,self.atom)
 
     def owned(self):
         "Returns True if someone owns the given selection."
-        return self.clipboard.wait_for_targets() is not None
+        return self._owner() != const["XNone"]
 
-    def acquire(self, force=False):
-        was_owned = self.owned()
-        if not force and was_owned:
+    # If the selection is already owned, then raise AlreadyOwned rather
+    # than stealing it.
+    IF_UNOWNED = "if_unowned"
+    # If the selection is already owned, then steal it, and then block until
+    # the previous owner has signaled that they are done cleaning up.
+    FORCE = "force"
+    # If the selection is already owned, then steal it and return immediately.
+    # Created for the use of tests.
+    FORCE_AND_RETURN = "force_and_return"
+    def acquire(self, when):
+        old_owner = self._owner()
+        if when is IF_UNOWNED and old_owner != const["XNone"]:
             raise AlreadyOwned
         self.clipboard.set_with_data([("VERSION", 0, 0)],
                                      self._get,
@@ -73,10 +82,17 @@ class ManagerSelection(gobject.GObject):
                           "MANAGER",
                           ts_num, selection_xatom, owner_window, 0, 0)
 
-        if was_owned:
-            # Give the previous wm a little time to clear out (really we
-            # should wait for their window to disappear, blah blah).
-            time.sleep(2)
+        if old_owner != const["XNone"] and when is FORCE:
+            # Block in a recursive mainloop until the previous owner has
+            # cleared out.
+            window = get_pywindow(old_owner)
+            add_event_receiver(window, self)
+            self.rloop.run()
+            remove_event_receiver(window, self)
+
+    def do_wimpiggy_destroy_event(self, *args):
+        if self.rloop.is_running():
+            self.rloop.quit()
 
     def _get(self, clipboard, outdata, which, userdata):
         # We are compliant with ICCCM version 2.0 (see section 4.3)
