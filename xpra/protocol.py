@@ -4,8 +4,6 @@ import zlib
 from wimpiggy.util import dump_exc
 from xpra.bencode import bencode, bdecode
 
-CAPABILITIES = set(["deflate"])
-
 def repr_ellipsized(obj, limit):
     if isinstance(obj, str) and len(obj) > limit:
         return repr(obj[:limit]) + "..."
@@ -112,14 +110,14 @@ class Protocol(object):
             # Ignore and continue, maybe things will work out anyway
         return consumed
 
-    def enable_deflate(self):
+    def enable_deflate(self, level):
         assert self._compressor is None and self._decompressor is None
         # Flush everything out of the source
         while self._source_has_more:
             self._flush_one_packet_into_buffer()
         self._update_write_watch()
         # Now enable compression
-        self._compressor = zlib.compressobj()
+        self._compressor = zlib.compressobj(level)
         self._decompressor = zlib.decompressobj()
 
     def close(self):

@@ -9,8 +9,12 @@ from wimpiggy.prop import prop_get
 from wimpiggy.keys import grok_modifier_map
 from wimpiggy.lowlevel import add_event_receiver, remove_event_receiver
 
-from xpra.protocol import Protocol, CAPABILITIES
+from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
+
+import xpra
+default_capabilities = {"deflate": 3,
+                        "__prerelease_version": xpra.__version__}
 
 class ClientSource(object):
     def __init__(self, protocol):
@@ -240,7 +244,7 @@ class XpraClient(gobject.GObject):
 
         self._protocol = Protocol(sock, self.process_packet)
         ClientSource(self._protocol)
-        self.send(["hello", list(CAPABILITIES)])
+        self.send(["hello", default_capabilities])
 
         self._keymap = gtk.gdk.keymap_get_default()
         self._keymap.connect("keys-changed", self._keys_changed)
@@ -294,7 +298,10 @@ class XpraClient(gobject.GObject):
     def _process_hello(self, packet):
         (_, capabilities) = packet
         if "deflate" in capabilities:
-            self._protocol.enable_deflate()
+            self._protocol.enable_deflate(capabilities["deflate"])
+        if capabilities.get("__prerelease_version") != xpra.__version__:
+            print ("sorry, I only know how to talk to v%s servers"
+                   % xpra.__version__)
 
     def _process_new_common(self, packet, override_redirect):
         (_, id, x, y, w, h, metadata) = packet

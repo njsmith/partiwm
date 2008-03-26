@@ -24,8 +24,9 @@ from wimpiggy.lowlevel import (get_rectangle_from_region,
 from wimpiggy.window import OverrideRedirectWindowModel, Unmanageable
 from wimpiggy.keys import grok_modifier_map
 
+import xpra
 from xpra.address import server_sock
-from xpra.protocol import Protocol, CAPABILITIES
+from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
 
 class DesktopManager(gtk.Widget):
@@ -426,18 +427,31 @@ class XpraServer(gobject.GObject):
             or self._desktop_manager.visible(window)):
             self._damage(window, event.x, event.y, event.width, event.height)
 
+    def _calculate_capabilities(self, client_capabilities):
+        capabilities = {}
+        for cap in ("deflate", "__prerelease_version"):
+            if cap in client_capabilities:
+                capabilities[cap] = client_capabilities[cap]
+        return capabilities
+
     def _process_hello(self, proto, packet):
+        (_, client_capabilities) = packet
         print "Handshake complete; enabling connection"
-        # Drop any existing protocol
+        capabilities = self._calculate_capabilities(client_capabilities)
+        if capabilities.get("__prerelease_version") != xpra.__version__:
+            print ("Sorry, this pre-release server only works with clients "
+                   + "of exactly the same version (v%s)" % xpra.__version__)
+            proto.close()
+            return
+        # Okay, things are okay, so let's boot out any existing connection and
+        # set this as our new one:
         if self._protocol is not None:
             self._protocol.close()
         self._protocol = proto
         ServerSource(self._protocol)
-        client_capabilities = set(packet[1])
-        capabilities = CAPABILITIES.intersection(client_capabilities)
-        self._send(["hello", list(capabilities)])
+        self._send(["hello", capabilities])
         if "deflate" in capabilities:
-            self._protocol.enable_deflate()
+            self._protocol.enable_deflate(capabilities["deflate"])
         for window in self._window_to_id.keys():
             if isinstance(window, OverrideRedirectWindowModel):
                 self._send_new_or_window_packet(window)
