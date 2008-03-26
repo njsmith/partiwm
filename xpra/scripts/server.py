@@ -47,7 +47,9 @@ def run_server(parser, opts, mode, extra_args):
     signal.signal(signal.SIGINT, deadly_signal)
     signal.signal(signal.SIGTERM, deadly_signal)
 
-    sockpath = server_sock(display_name, False)
+    assert mode in ("start", "upgrade")
+    upgrading = (mode == "upgrade")
+    sockpath = server_sock(display_name, upgrading)
     logpath = sockpath + ".log"
 
     # Daemonize:
@@ -87,7 +89,7 @@ def run_server(parser, opts, mode, extra_args):
         sys.stdout = os.fdopen(1, "w", 1)
         sys.stderr = os.fdopen(2, "w", 1)
 
-    if mode == "start":
+    if not upgrading:
         # We need to set up a new server environment
         xauthority = os.environ.get("XAUTHORITY",
                                     os.path.expanduser("~/.Xauthority"))
@@ -113,22 +115,23 @@ def run_server(parser, opts, mode, extra_args):
         default_display.close()
     manager.set_default_display(display)
 
-    if mode == "start":
-        xvfb_pid = xvfb.pid
-    else:
-        assert mode == "upgrade"
+    if upgrading:
         xvfb_pid = get_pid()
+    else:
+        xvfb_pid = xvfb.pid
 
     def kill_xvfb():
         # Close our display(s) first, so the server dying won't kill us.
         for display in gtk.gdk.display_manager_get().list_displays():
             display.close()
-        os.kill(xvfb_pid, signal.SIGTERM)
+        if xvfb_pid is not None:
+            os.kill(xvfb_pid, signal.SIGTERM)
     _cleanups.append(kill_xvfb)
 
-    save_pid(xvfb_pid)
+    if xvfb_pid is not None:
+        save_pid(xvfb_pid)
 
-    app = XpraServer(sockpath, False)
+    app = XpraServer(sockpath, upgrading)
     def cleanup_socket(self):
         print "removing socket"
         try:

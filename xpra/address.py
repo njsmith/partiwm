@@ -43,9 +43,10 @@ def server_state(path):
 
 def server_sock(display_name, clobber):
     path = sockpath(display_name)
-    state = server_state(path)
-    if state is not DEAD and not clobber:
-        raise ServerSockInUse, (state, path)
+    if not clobber:
+        state = server_state(path)
+        if state is not DEAD:
+            raise ServerSockInUse, (state, path)
     if os.path.exists(path):
         os.unlink(path)
     return path

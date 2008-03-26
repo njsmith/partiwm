@@ -199,7 +199,7 @@ class XpraServer(gobject.GObject):
 
         self._wm = Wm("Xpra", clobber)
         self._wm.connect("new-window", self._new_window_signaled)
-        self._wm.connect("quit", lambda: self.quit(True))
+        self._wm.connect("quit", lambda _: self.quit(True))
 
         self._desktop_manager = DesktopManager()
         self._wm.get_property("toplevel").add(self._desktop_manager)
