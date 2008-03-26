@@ -22,7 +22,7 @@ def main(cmdline):
                           usage=("\n"
                                  + "\t%prog start DISPLAY\n"
                                  + "\t%prog attach DISPLAY\n"
-                                 + "\t%prog shutdown DISPLAY\n"
+                                 + "\t%prog stop DISPLAY\n"
                                  + "\t%prog list"))
     parser.add_option("--no-daemon", action="store_false",
                       dest="daemon", default=True,
@@ -42,9 +42,9 @@ def main(cmdline):
         run_server(parser, options, args[1:])
     elif mode == "attach":
         run_client(parser, options, args[1:])
-    elif mode == "shutdown":
+    elif mode == "stop":
         nox()
-        run_shutdown(parser, options, args[1:])
+        run_stop(parser, options, args[1:])
     elif mode == "list":
         run_list(parser, options, args[1:])
     elif mode == "_proxy":
@@ -89,7 +89,7 @@ def run_proxy(parser, opts, extra_args):
     app = XpraProxy(0, 1, client_sock(parser, opts, extra_args))
     app.run()
 
-def run_shutdown(parser, opts, extra_args):
+def run_stop(parser, opts, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     display_name = extra_args[0]
