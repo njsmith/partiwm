@@ -86,7 +86,8 @@ def run_server(parser, opts, extra_args):
     xvfb = subprocess.Popen(["Xvfb-for-Xpra", display_name,
                              "-auth", xauthority,
                              "+extension", "Composite",
-                             "-screen", "0", "2048x2048x24+32"],
+                             "-screen", "0", "2048x2048x24+32",
+                             "-once"],
                             executable="Xvfb")
     def kill_xvfb():
         # Close our display(s) first, so the server dying won't kill us.
