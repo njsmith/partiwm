@@ -37,7 +37,7 @@ def main(cmdline):
         parser.error("need a mode")
 
     mode = args[0]
-    if mode in "start", "upgrade":
+    if mode in ("start", "upgrade"):
         nox()
         from xpra.scripts.server import run_server
         run_server(parser, options, mode, args[1:])
