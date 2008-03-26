@@ -22,6 +22,7 @@ class ChannelProxy(gobject.GObject):
         }
 
     def __init__(self, readfd, writefd):
+        gobject.GObject.__init__(self)
         self._readfd = readfd
         self._writefd = writefd
         self._tag = None
