@@ -117,5 +117,6 @@ def run_server(parser, opts, extra_args):
         except:
             pass
     _cleanups.append(cleanup_socket)
-
-    gtk.main()
+    if app.run():
+        # Upgrading, so leave X server running
+        _cleanups.remove(kill_xvfb)

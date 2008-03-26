@@ -199,6 +199,7 @@ class XpraServer(gobject.GObject):
 
         self._wm = Wm("Xpra", clobber)
         self._wm.connect("new-window", self._new_window_signaled)
+        self._wm.connect("quit", lambda: self.quit(True))
 
         self._desktop_manager = DesktopManager()
         self._wm.get_property("toplevel").add(self._desktop_manager)
@@ -263,6 +264,15 @@ class XpraServer(gobject.GObject):
             }
 
         self._has_focus = 0
+        self._upgrading = False
+
+    def quit(self, upgrading):
+        self._upgrading = upgrading
+        gtk.main_quit()
+
+    def run(self):
+        gtk.main()
+        return self._upgrading
 
     def _new_connection(self, *args):
         print "New connection received"
@@ -535,7 +545,7 @@ class XpraServer(gobject.GObject):
 
     def _process_shutdown_server(self, proto, packet):
         print "Shutting down in response to request"
-        gtk.main_quit()
+        self.quit(False)
 
     _packet_handlers = {
         "hello": _process_hello,
