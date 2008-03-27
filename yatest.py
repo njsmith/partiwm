@@ -192,6 +192,7 @@ class Runner(object):
             output = tempfile.TemporaryFile()
         else:
             output = None
+            print "----- Starting test %s" % (".".join([class_name, name]),)
         pid = os.fork()
         if pid:
             writeable.close()
