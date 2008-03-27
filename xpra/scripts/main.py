@@ -5,6 +5,7 @@ import stat
 import socket
 import subprocess
 from optparse import OptionParser
+import logging
 
 import xpra
 from xpra.bencode import bencode
@@ -85,6 +86,7 @@ def run_client(parser, opts, extra_args):
 
 def run_proxy(parser, opts, extra_args):
     from xpra.proxy import XpraProxy
+    logging.getLogger("").addHandler(logging.StreamHandler(sys.stderr))
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     app = XpraProxy(0, 1, client_sock(parser, opts, extra_args))

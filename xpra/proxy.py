@@ -4,6 +4,9 @@ import socket
 
 import sys
 
+import logging
+log = logging.getLogger("xpra.proxy")
+
 class ChannelProxy(gobject.GObject):
     """Copies bytes from 'readfd' to 'writefd'.
 
@@ -36,14 +39,13 @@ class ChannelProxy(gobject.GObject):
                              self._uhoh)
 
     def _set_state(self, state):
+        # Set up new state
+        log.debug("%s: state: %s -> %s" % (id(self), self._state, state))
         if self._state is state:
             return
         # Clear old state
         if self._tag is not None:
             gobject.source_remove(self._tag)
-        # Set up new state
-        #sys.stderr.write("%s: state %s -> %s\n"
-        #                 % (id(self), self._state, state))
         if state is self.READ:
             self._tag = gobject.io_add_watch(self._readfd, gobject.IO_IN,
                                              self._readable)
@@ -104,4 +106,5 @@ class XpraProxy(object):
         self._mainloop.run()
 
     def _quit(self, *args):
-        gobject.MainLoop().quit()
+        log.debug("exiting main loop")
+        self._mainloop.quit()
