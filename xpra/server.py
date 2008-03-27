@@ -253,7 +253,11 @@ class XpraServer(gobject.GObject):
                                add Mod2 = Alt_L Alt_R
                                add Mod3 = Hyper_L Hyper_R
                                add Mod4 = Super_L Super_R
-                            """)
+                            """
+                            # Really stupid hack to force backspace to work.
+                            # Remove this once we have real keymap support.
+                            + "keycode any = BackSpace")
+                            )
         self._keyname_for_mod = {
             "shift": "Shift_L",
             "control": "Control_L",
