@@ -1030,18 +1030,16 @@ def _route_event(event, signal, parent_signal):
     if event.window is None:
         assert event.type in (gtk.gdk.UNMAP, gtk.gdk.DESTROY)
         return
-    _maybe_send_event(event.window, signal, event)
-    if parent_signal is not None:
-        if hasattr(event, "parent"):
-            parent = event.parent
-        else:
-            parent = event.window.get_parent()
-        _maybe_send_event(parent, parent_signal, event)
+    if event.window is event.delivered_to:
+        if signal is not None:
+            _maybe_send_event(event.window, signal, event)
+    else:
+        if parent_signal is not None:
+            _maybe_send_event(event.delivered_to, parent_signal, event)
 
 _x_event_signals = {
-    MapRequest: ("map-request-event", "child-map-request-event"),
-    ConfigureRequest: ("configure-request-event",
-                       "child-configure-request-event"),
+    MapRequest: (None, "child-map-request-event"),
+    ConfigureRequest: (None, "child-configure-request-event"),
     FocusIn: ("wimpiggy-focus-in-event", None),
     FocusOut: ("wimpiggy-focus-out-event", None),
     ClientMessage: ("wimpiggy-client-message-event", None),
@@ -1080,13 +1078,12 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
             pyev.display = d
             # Unmarshal:
             try:
+                pyev.delivered_to = _gw(d, e.xany.window)
                 if e.type == MapRequest:
                     print "MapRequest received"
-                    pyev.parent = _gw(d, e.xmaprequest.parent)
                     pyev.window = _gw(d, e.xmaprequest.window)
                 elif e.type == ConfigureRequest:
                     print "ConfigureRequest received"
-                    pyev.parent = _gw(d, e.xconfigurerequest.parent)
                     pyev.window = _gw(d, e.xconfigurerequest.window)
                     pyev.x = e.xconfigurerequest.x
                     pyev.y = e.xconfigurerequest.y
@@ -1135,18 +1132,12 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     print "MapNotify event received"
                     pyev.window = _gw(d, e.xmap.window)
                     pyev.override_redirect = e.xmap.override_redirect
-                    if e.xmap.window != e.xany.window:
-                        pyev.parent = _gw(d, e.xany.window)
                 elif e.type == UnmapNotify:
                     print "UnmapNotify event received"
                     pyev.window = _gw(d, e.xunmap.window)
-                    if e.xunmap.window != e.xany.window:
-                        pyev.parent = _gw(d, e.xany.window)
                 elif e.type == DestroyNotify:
                     print "DestroyNotify event received"
                     pyev.window = _gw(d, e.xdestroywindow.window)
-                    if e.xdestroywindow.window != e.xany.window:
-                        pyev.parent = _gw(d, e.xany.window)
                 elif e.type == PropertyNotify:
                     print "PropertyNotify event received"
                     pyev.window = _gw(d, e.xany.window)
@@ -1159,8 +1150,6 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     pyev.y = e.xconfigure.y
                     pyev.width = e.xconfigure.width
                     pyev.height = e.xconfigure.height
-                    if e.xconfigure.window != e.xany.window:
-                        pyev.parent = _gw(d, e.xany.window)
                 elif e.type == KeyPress:
                     print "KeyPress event received"
                     pyev.window = _gw(d, e.xany.window)

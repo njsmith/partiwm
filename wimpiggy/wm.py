@@ -177,6 +177,7 @@ class Wm(gobject.GObject):
             if (w.get_window_type() == gtk.gdk.WINDOW_FOREIGN
                 and not wimpiggy.lowlevel.is_override_redirect(w)
                 and wimpiggy.lowlevel.is_mapped(w)):
+                print "Wm managing pre-existing child"
                 self._manage_client(w)
 
         # Also watch for focus change events on the root window

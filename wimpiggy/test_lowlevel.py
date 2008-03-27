@@ -405,28 +405,18 @@ class TestSendConfigureNotify(TestLowlevel):
         assert self.ev.height == 16
 
 class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
-    def do_map_request_event(self, event):
-        print "do_map_request_event"
-        self.map_ev = event
-        gtk.main_quit()
     def do_child_map_request_event(self, event):
         print "do_child_map_request_event"
-        self.child_map_ev = event
-        gtk.main_quit()
-    def do_configure_request_event(self, event):
-        print "do_configure_request_event"
-        self.conf_ev = event
+        self.map_ev = event
         gtk.main_quit()
     def do_child_configure_request_event(self, event):
         print "do_child_configure_request_event"
-        self.child_conf_ev = event
+        self.conf_ev = event
         gtk.main_quit()
 
     def test_substructure_redirect(self):
         self.map_ev = None
-        self.child_map_ev = None
         self.conf_ev = None
-        self.child_conf_ev = None
         root = self.root()
         d2 = self.clone_display()
         w2 = self.window(d2)
@@ -443,52 +433,26 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
         w2.show()
         # Can't just call gtk.main() twice, the two events may be delivered
         # together and processed in a single mainloop iteration.
-        while None in (self.child_map_ev, self.child_conf_ev):
-            gtk.main()
-        assert self.map_ev is None
-        assert self.conf_ev is None
-
-        assert self.child_map_ev.parent is root
-        assert self.child_map_ev.window is w1
-
-        assert self.child_conf_ev.parent is root
-        assert self.child_conf_ev.window is w1
-        for field in ("x", "y", "width", "height",
-                      "border_width", "above", "detail", "value_mask"):
-            print field
-            assert hasattr(self.child_conf_ev, field)
-
-        # If we have a handler installed on the child, both handlers get it:
-        self.child_map_ev = None
-        self.child_conf_ev = None
-        l.add_event_receiver(w1, self)
-        w2.show()
         while None in (self.map_ev, self.conf_ev):
             gtk.main()
-        assert self.child_map_ev is self.map_ev
-        assert self.child_conf_ev is self.conf_ev
-
-        assert self.map_ev.parent is root
+        assert self.map_ev.delivered_to is root
         assert self.map_ev.window is w1
 
-        assert self.conf_ev.parent is root
+        assert self.conf_ev.delivered_to is root
         assert self.conf_ev.window is w1
         for field in ("x", "y", "width", "height",
                       "border_width", "above", "detail", "value_mask"):
             print field
             assert hasattr(self.conf_ev, field)
 
-        self.child_map_ev = None
-        self.child_conf_ev = None
         self.map_ev = None
         self.conf_ev = None
 
-        # Now we'll just use that child handler going forward (less typing):
         w2.move_resize(1, 2, 3, 4)
         gtk.main()
         assert self.map_ev is None
         assert self.conf_ev is not None
-        assert self.conf_ev.parent is root
+        assert self.conf_ev.delivered_to is root
         assert self.conf_ev.window is w1
         assert self.conf_ev.x == 1
         assert self.conf_ev.y == 2
@@ -531,7 +495,7 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
         gtk.main()
 
         assert self.conf_ev is not None
-        assert self.conf_ev.parent is self.root()
+        assert self.conf_ev.delivered_to is self.root()
         assert self.conf_ev.window is w1_wm
         assert self.conf_ev.x == 11
         assert self.conf_ev.y == 12
@@ -549,7 +513,7 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
         gtk.main()
         
         assert self.conf_ev is not None
-        assert self.conf_ev.parent is self.root()
+        assert self.conf_ev.delivered_to is self.root()
         assert self.conf_ev.window is w1_wm
         assert self.conf_ev.width == 13
         assert self.conf_ev.border_width == 0

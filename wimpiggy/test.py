@@ -192,9 +192,7 @@ class TestWithSession(object):
 
 class MockEventReceiver(gobject.GObject):
     __gsignals__ = {
-        "map-request-event": one_arg_signal,
         "child-map-request-event": one_arg_signal,
-        "configure-request-event": one_arg_signal,
         "child-configure-request-event": one_arg_signal,
         "wimpiggy-focus-in-event": one_arg_signal,
         "wimpiggy-focus-out-event": one_arg_signal,
@@ -202,14 +200,8 @@ class MockEventReceiver(gobject.GObject):
         "wimpiggy-map-event": one_arg_signal,
         "wimpiggy-child-map-event": one_arg_signal,
         }
-    def do_map_request_event(self, event):
-        print "do_map_request_event"
-        assert False
     def do_child_map_request_event(self, event):
         print "do_child_map_request_event"
-        assert False
-    def do_configure_request_event(self, event):
-        print "do_configure_request_event"
         assert False
     def do_child_configure_request_event(self, event):
         print "do_child_configure_request_event"

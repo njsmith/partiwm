@@ -369,8 +369,8 @@ class WindowModel(BaseWindowModel):
                                gobject.TYPE_PYOBJECT, (),
                                non_none_list_accumulator),
 
-        "map-request-event": one_arg_signal,
-        "configure-request-event": one_arg_signal,
+        "child-map-request-event": one_arg_signal,
+        "child-configure-request-event": one_arg_signal,
         "wimpiggy-property-notify-event": one_arg_signal,
         "wimpiggy-unmap-event": one_arg_signal,
         "wimpiggy-destroy-event": one_arg_signal,
@@ -411,21 +411,29 @@ class WindowModel(BaseWindowModel):
                                             wclass=gtk.gdk.INPUT_OUTPUT,
                                             event_mask=gtk.gdk.PROPERTY_CHANGE_MASK)
         wimpiggy.lowlevel.substructureRedirect(self.corral_window)
+        add_event_receiver(self.corral_window, self)
+        print "created corral window 0x%x" % (self.corral_window.xid,)
 
         def setup_client():
-            # Start listening for important events
-            self.client_window.set_events(self.client_window.get_events()
-                                          | gtk.gdk.STRUCTURE_MASK
-                                          | gtk.gdk.PROPERTY_CHANGE_MASK)
-
             # The child might already be mapped, in case we inherited it from
             # a previous window manager.  If so, we unmap it now, for
             # consistency (otherwise we'd get an unmap event later when we
             # reparent and confuse ourselves).
             if self.client_window.is_visible():
+                print "hiding inherited window"
                 self.client_window.hide()
-                self.pending_unmaps += 1
             
+            # Start listening for important events.  Note: we *must* do this
+            # *after* the previous lines where we unmap the client window,
+            # because the unmap will generate an UnmapNotify, and when we get
+            # that we won't realize that we were the ones that unmapped the
+            # window; we'll think that the *client* just decided to withdraw
+            # its window, so we'll unmanage it, and that's dumb.
+            self.client_window.set_events(self.client_window.get_events()
+                                          | gtk.gdk.STRUCTURE_MASK
+                                          | gtk.gdk.PROPERTY_CHANGE_MASK)
+            add_event_receiver(self.client_window, self)
+
             # Process properties
             self._read_initial_properties()
             self._write_initial_properties_and_setup()
@@ -434,16 +442,18 @@ class WindowModel(BaseWindowModel):
             self._internal_set_property("iconic", False)
 
             wimpiggy.lowlevel.XAddToSaveSet(self.client_window)
+            print "reparenting 0x%x" % (self.client_window.xid,)
             self.client_window.reparent(self.corral_window, 0, 0)
             client_size = self.client_window.get_geometry()[2:4]
             self.corral_window.resize(*client_size)
             self.client_window.show_unraised()
+            print hex(self.client_window.get_parent().xid)
         try:
             trap.call(setup_client)
         except XError, e:
             raise Unmanageable, e
 
-    def do_map_request_event(self, event):
+    def do_child_map_request_event(self, event):
         # If we get a MapRequest then it might mean that someone tried to map
         # this window multiple times in quick succession, before we actually
         # mapped it (so that several MapRequests ended up queued up; FSF Emacs
@@ -537,7 +547,7 @@ class WindowModel(BaseWindowModel):
             self._internal_set_property("actual-size", (w, h))
             self._internal_set_property("user-friendly-size", (wvis, hvis))
 
-    def do_configure_request_event(self, event):
+    def do_child_configure_request_event(self, event):
         # Ignore the request, but as per ICCCM 4.1.5, send back a synthetic
         # ConfigureNotify telling the client that nothing has happened.
         trap.swallow(wimpiggy.lowlevel.sendConfigureNotify,
