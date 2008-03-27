@@ -311,14 +311,9 @@ class WindowModel(BaseWindowModel):
         "strut": (gobject.TYPE_PYOBJECT,
                   "Struts requested by window, or None", "",
                   gobject.PARAM_READABLE),
-        "class": (gobject.TYPE_STRING,
-                  "Classic X 'class'", "",
-                  "",
-                  gobject.PARAM_READABLE),
-        "instance": (gobject.TYPE_STRING,
-                     "Classic X 'instance'", "",
-                     "",
-                     gobject.PARAM_READABLE),
+        "class-instance": (gobject.TYPE_PYOBJECT,
+                           "Classic X 'class' and 'instance'", "",
+                           gobject.PARAM_READABLE),
         "transient-for": (gobject.TYPE_PYOBJECT,
                           "Transient for (or None)", "",
                           gobject.PARAM_READABLE),
@@ -649,8 +644,7 @@ class WindowModel(BaseWindowModel):
             except ValueError:
                 print "Malformed WM_CLASS, ignoring"
             else:
-                self._internal_set_property("class", c)
-                self._internal_set_property("instance", i)
+                self._internal_set_property("class-instance", (c, i))
 
         transient_for = prop_get(self.client_window,
                                  "WM_TRANSIENT_FOR", "window")
