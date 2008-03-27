@@ -323,10 +323,16 @@ class XpraServer(gobject.GObject):
         (x, y, w, h) = window.get_property("geometry")
         self._send(["configure-override-redirect", x, y, w, h])
 
+    _all_metadata = ("title", "size-hints", "class", "instance")
+
     def _make_metadata(self, window, propname):
-        if propname == "title":
-            if window.get_property("title") is not None:
-                return {"title": window.get_property("title").encode("utf-8")}
+        assert propname in _all_metadata
+        if propname in ("title", "class", "instance"):
+            if window.get_property(propname) is not None:
+                # Luckily, the protocol name and the internal wimpiggy name
+                # for these metadata bits happen to be identical.  What were
+                # the chances?
+                return {propname: window.get_property(propname).encode("utf-8")}
             else:
                 return {}
         elif propname == "size-hints":
@@ -396,8 +402,8 @@ class XpraServer(gobject.GObject):
         id = self._window_to_id[window]
         (x, y, w, h) = self._desktop_manager.window_geometry(window)
         metadata = {}
-        metadata.update(self._make_metadata(window, "title"))
-        metadata.update(self._make_metadata(window, "size-hints"))
+        for propname in self._all_metadata:
+            metadata.update(self._make_metadata(window, propname))
         self._send(["new-window", id, x, y, w, h, metadata])
 
     def _send_new_or_window_packet(self, window):

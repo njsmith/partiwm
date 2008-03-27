@@ -103,6 +103,10 @@ class ClientWindow(gtk.Window):
                     hints[h] = size_metadata[a][0] * 1.0 / size_metadata[a][1]
             self.set_geometry_hints(None, **hints)
 
+        wmclass = self._metadata.get("class", "xpra").decode("utf-8")
+        instance = self._metadata.get("instance", "xpra").decode("utf-8")
+        self.set_wmclass(instance, wmclass)
+
     def _new_backing(self, w, h):
         old_backing = self._backing
         self._backing = gtk.gdk.Pixmap(gtk.gdk.get_default_root_window(),
