@@ -397,7 +397,7 @@ class WindowModel(BaseWindowModel):
                                             wclass=gtk.gdk.INPUT_OUTPUT,
                                             event_mask=gtk.gdk.PROPERTY_CHANGE_MASK)
         wimpiggy.lowlevel.substructureRedirect(self.corral_window)
-        add_event_receiver(self.corral_window, self)
+        wimpiggy.lowlevel.add_event_receiver(self.corral_window, self)
         print "created corral window 0x%x" % (self.corral_window.xid,)
 
         def setup_client():
@@ -416,7 +416,7 @@ class WindowModel(BaseWindowModel):
             self.client_window.set_events(self.client_window.get_events()
                                           | gtk.gdk.STRUCTURE_MASK
                                           | gtk.gdk.PROPERTY_CHANGE_MASK)
-            add_event_receiver(self.client_window, self)
+            wimpiggy.lowlevel.add_event_receiver(self.client_window, self)
 
             # Process properties
             self._read_initial_properties()
@@ -426,12 +426,10 @@ class WindowModel(BaseWindowModel):
             self._internal_set_property("iconic", False)
 
             wimpiggy.lowlevel.XAddToSaveSet(self.client_window)
-            print "reparenting 0x%x" % (self.client_window.xid,)
             self.client_window.reparent(self.corral_window, 0, 0)
             client_size = self.client_window.get_geometry()[2:4]
             self.corral_window.resize(*client_size)
             self.client_window.show_unraised()
-            print hex(self.client_window.get_parent().xid)
         try:
             trap.call(setup_client)
         except XError, e:
@@ -461,6 +459,7 @@ class WindowModel(BaseWindowModel):
         # Also, if we receive a *synthetic* UnmapNotify event, that always
         # means that the client has withdrawn the window (even if it was not
         # mapped in the first place) -- ICCCM section 4.1.4.
+        print "Client window unmapped"
         if event.send_event or event.serial != self.startup_unmap_serial:
             self.unmanage()
 

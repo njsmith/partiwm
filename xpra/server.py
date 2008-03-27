@@ -214,7 +214,6 @@ class XpraServer(gobject.GObject):
         self._potential_protocols = []
 
         for window in self._wm.get_property("windows"):
-            print "xpra found pre-existing window"
             self._add_new_window(window)
 
         for window in get_children(root):
