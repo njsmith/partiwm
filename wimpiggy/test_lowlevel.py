@@ -162,50 +162,48 @@ class TestLowlevelMisc(TestLowlevel):
         assert l.is_override_redirect(win)
 
 class _EventRoutingReceiver(MockEventReceiver):
-    def __init__(self, tag, store_in, limit):
+    def __init__(self, tag, store_in):
         MockEventReceiver.__init__(self)
         self.tag = tag
         self.store_in = store_in
-        self.limit = limit
     def do_wimpiggy_map_event(self, event):
         print "map_event in %s" % self.tag
         self.store_in.add(("map", self.tag))
-        if len(self.store_in) == self.limit:
-            gtk.main_quit()
+        gtk.main_quit()
     def do_wimpiggy_child_map_event(self, event):
         print "child_map_event in %s" % self.tag
         self.store_in.add(("child-map", self.tag))
-        if len(self.store_in) == self.limit:
-            gtk.main_quit()
+        gtk.main_quit()
 
 class TestEventRouting(TestLowlevel):
     def test_event_routing(self):
         w1 = self.window()
         w2 = self.window()
         w2.reparent(w1, 0, 0)
-        w1.set_events(gtk.gdk.SUBSTRUCTURE_MASK)
-        w2.set_events(gtk.gdk.STRUCTURE_MASK)
         results = set()
-        r1 = _EventRoutingReceiver(1, results, 4)
-        r2 = _EventRoutingReceiver(2, results, 4)
-        r3 = _EventRoutingReceiver(3, results, 4)
-        r4 = _EventRoutingReceiver(4, results, 4)
+        r1 = _EventRoutingReceiver(1, results)
+        r2 = _EventRoutingReceiver(2, results)
+        r3 = _EventRoutingReceiver(3, results)
+        r4 = _EventRoutingReceiver(4, results)
         l.add_event_receiver(w1, r1)
         l.add_event_receiver(w1, r2)
         l.add_event_receiver(w2, r3)
         l.add_event_receiver(w2, r4)
+
+        w1.set_events(gtk.gdk.SUBSTRUCTURE_MASK)
+        w2.set_events(gtk.gdk.STRUCTURE_MASK)
         w2.show()
-        gtk.main()
+        while len(results) != 4:
+            gtk.main()
         w2.hide()
         assert results == set([("child-map", 1), ("child-map", 2),
-                               ("map", 3), ("map", 4)])
+                                    ("map", 3), ("map", 4)])
         l.remove_event_receiver(w1, r2)
         l.remove_event_receiver(w2, r4)
-        r1.limit = 2
-        r3.limit = 2
         results.clear()
         w2.show()
-        gtk.main()
+        while len(results) != 2:
+            gtk.main()
         assert results == set([("child-map", 1), ("map", 3)])
 
 class TestFocusStuff(TestLowlevel, MockEventReceiver):

@@ -1046,8 +1046,8 @@ _x_event_signals = {
     MapNotify: ("wimpiggy-map-event", "wimpiggy-child-map-event"),
     UnmapNotify: ("wimpiggy-unmap-event", "wimpiggy-child-unmap-event"),
     DestroyNotify: ("wimpiggy-destroy-event", None),
-    PropertyNotify: ("wimpiggy-property-notify-event", None),
     ConfigureNotify: ("wimpiggy-configure-event", None),
+    PropertyNotify: ("wimpiggy-property-notify-event", None),
     KeyPress: ("wimpiggy-key-press-event", None),
     "XDamageNotify": ("wimpiggy-damage-event", None),
     }
