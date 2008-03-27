@@ -386,20 +386,6 @@ class WindowModel(BaseWindowModel):
         BaseWindowModel.__init__(self, client_window)
         self.parking_window = parking_window
 
-        # We count how many times we have asked that the child be unmapped, so
-        # that when the server tells us that the child has been unmapped, we
-        # can make a reasonable guess as to whether we were the ones who did
-        # it or not.
-        # FIXME: It is possible to do better than this by using Xlib's
-        # NextRequest function to find out what sequence number is assigned to
-        # our UnmapWindow request, and then ignoring UnmapNotify events that
-        # have a matching sequence number.  However, this only really matters
-        # for supporting ICCCM-noncompliant clients that withdraw their
-        # windows without sending a synthetic UnmapNotify (4.1.4), and
-        # metacity gets away with doing things this way, so I'm not going to
-        # worry about it too much...
-        self.pending_unmaps = 0
-
         self.connect("notify::iconic", self._handle_iconic_update)
 
         # We enable PROPERTY_CHANGE_MASK so that we can call
@@ -416,19 +402,17 @@ class WindowModel(BaseWindowModel):
 
         def setup_client():
             # The child might already be mapped, in case we inherited it from
-            # a previous window manager.  If so, we unmap it now, for
-            # consistency (otherwise we'd get an unmap event later when we
-            # reparent and confuse ourselves).
+            # a previous window manager.  If so, we unmap it now, and save the
+            # serial number of the request -- this way, when we get an
+            # UnmapNotify later, we'll know that it's just from us unmapping
+            # the window, not from the client withdrawing the window.
+            self.startup_unmap_serial = None
             if self.client_window.is_visible():
                 print "hiding inherited window"
-                self.client_window.hide()
+                self.startup_unmap_serial \
+                    = wimpiggy.lowlevel.unmap_with_serial(self.client_window)
             
-            # Start listening for important events.  Note: we *must* do this
-            # *after* the previous lines where we unmap the client window,
-            # because the unmap will generate an UnmapNotify, and when we get
-            # that we won't realize that we were the ones that unmapped the
-            # window; we'll think that the *client* just decided to withdraw
-            # its window, so we'll unmanage it, and that's dumb.
+            # Start listening for important events.
             self.client_window.set_events(self.client_window.get_events()
                                           | gtk.gdk.STRUCTURE_MASK
                                           | gtk.gdk.PROPERTY_CHANGE_MASK)
@@ -469,18 +453,16 @@ class WindowModel(BaseWindowModel):
         # because it was withdrawn/destroyed, or was it because we unmapped it
         # going into IconicState?
         #
-        # We are careful to count how many outstanding unmap requests we have
-        # out, so that is one clue.  However, if we receive a *synthetic*
-        # UnmapNotify event, that always means that the client has withdrawn
-        # it (even if it was not mapped in the first place) -- ICCCM section
-        # 4.1.4.
-        print ("Client window unmapped: send_event=%s, pending_unmaps=%s"
-               % (event.send_event, self.pending_unmaps))
-        assert self.pending_unmaps >= 0
-        if event.send_event or self.pending_unmaps == 0:
+        # At the moment, we never actually put windows into IconicState
+        # (i.e. unmap them), except in the special case when we start up and
+        # find windows that are already mapped.  So we only need to check
+        # against that one serial number.
+        #
+        # Also, if we receive a *synthetic* UnmapNotify event, that always
+        # means that the client has withdrawn the window (even if it was not
+        # mapped in the first place) -- ICCCM section 4.1.4.
+        if event.send_event or event.serial != self.startup_unmap_serial:
             self.unmanage()
-        else:
-            self.pending_unmaps -= 1
 
     def do_wimpiggy_destroy_event(self, event):
         assert event.window is self.client_window
@@ -488,9 +470,8 @@ class WindowModel(BaseWindowModel):
         # destroy a mapped window, then a UnmapNotify is always generated.
         # However, this allows us to catch the destruction of unmapped
         # ("iconified") windows, and also catch any mistakes we might have
-        # made with the annoying unmap heuristics we have to use above.  I
-        # love the smell of XDestroyWindow in the morning.  It makes for
-        # simple code:
+        # made with unmap heuristics.  I love the smell of XDestroyWindow in
+        # the morning.  It makes for simple code:
         self.unmanage()
 
     def do_unmanaged(self, exiting):
