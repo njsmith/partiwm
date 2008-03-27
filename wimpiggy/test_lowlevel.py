@@ -483,13 +483,13 @@ class TestSubstructureRedirect(TestLowlevel, MockEventReceiver):
     def test_configureAndNotify(self):
         self.conf_ev = None
         l.substructureRedirect(self.root())
+        l.add_event_receiver(self.root(), self)
         # Need to hold onto a handle to this, so connection doesn't get
         # dropped:
         client = self.clone_display()
         w1_client = self.window(client)
         gtk.gdk.flush()
         w1_wm = l.get_pywindow(self.display, l.get_xwindow(w1_client))
-        l.add_event_receiver(w1_wm, self)
 
         l.configureAndNotify(w1_client, 11, 12, 13, 14)
         gtk.main()
