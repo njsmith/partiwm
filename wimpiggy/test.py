@@ -198,6 +198,7 @@ class MockEventReceiver(gobject.GObject):
         "wimpiggy-focus-out-event": one_arg_signal,
         "wimpiggy-client-message-event": one_arg_signal,
         "wimpiggy-map-event": one_arg_signal,
+        "wimpiggy-unmap-event": one_arg_signal,
         "wimpiggy-child-map-event": one_arg_signal,
         }
     def do_child_map_request_event(self, event):
@@ -221,5 +222,7 @@ class MockEventReceiver(gobject.GObject):
     def do_wimpiggy_child_map_event(self, event):
         print "do_wimpiggy_child_map_event"
         assert False
+    def do_wimpiggy_unmap_event(self, event):
+        print "do_wimpiggy_unmap_event"
 gobject.type_register(MockEventReceiver)
 

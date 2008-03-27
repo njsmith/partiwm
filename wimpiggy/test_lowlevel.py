@@ -206,6 +206,26 @@ class TestEventRouting(TestLowlevel):
             gtk.main()
         assert results == set([("child-map", 1), ("map", 3)])
 
+class TestUnmapWithSerial(TestLowlevel, MockEventReceiver):
+    def do_wimpiggy_map_event(self, event):
+        pass
+
+    def do_wimpiggy_unmap_event(self, event):
+        print "hi!"
+        self._event = event
+        gtk.main_quit()
+
+    def test_unmap_with_serial(self):
+        w = self.window()
+        w.show()
+        self._event = None
+        l.add_event_receiver(w, self)
+        serial = l.unmap_with_serial(w)
+        print serial
+        gtk.main()
+        assert self._event is not None
+        assert self._event.serial == serial
+
 class TestFocusStuff(TestLowlevel, MockEventReceiver):
     def do_wimpiggy_focus_in_event(self, event):
         if event.window is self.w1:

@@ -257,6 +257,10 @@ cdef extern from *:
     # XKillClient
     int cXKillClient "XKillClient" (Display *, XID)
     
+    # XUnmapWindow
+    int XUnmapWindow(Display *, Window)
+    unsigned long NextRequest(Display *)
+
 ######
 # GDK primitives, and wrappers for Xlib
 ######
@@ -602,6 +606,15 @@ def ungrab_all_keys(pywindow):
 
 def XKillClient(pywindow):
     cXKillClient(get_xdisplay_for(pywindow), get_xwindow(pywindow))
+
+###################################
+# XUnmapWindow
+###################################
+
+def unmap_with_serial(pywindow):
+    serial = NextRequest(get_xdisplay_for(pywindow))
+    XUnmapWindow(get_xdisplay_for(pywindow), get_xwindow(pywindow))
+    return serial
 
 ###################################
 # XTest
@@ -1134,6 +1147,7 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     pyev.override_redirect = e.xmap.override_redirect
                 elif e.type == UnmapNotify:
                     print "UnmapNotify event received"
+                    pyev.serial = e.xany.serial
                     pyev.window = _gw(d, e.xunmap.window)
                 elif e.type == DestroyNotify:
                     print "DestroyNotify event received"
