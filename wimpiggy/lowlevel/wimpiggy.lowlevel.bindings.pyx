@@ -143,6 +143,10 @@ cdef extern from *:
         Window above
         int detail
         unsigned long value_mask
+    ctypedef struct XReparentEvent:
+        Window window
+        Window parent
+        int x, y
     ctypedef struct XCirculateRequestEvent:
         Window parent  # Same as xany.window, confusingly.
         Window window  
@@ -184,6 +188,7 @@ cdef extern from *:
         XClientMessageEvent xclient
         XMapEvent xmap
         XUnmapEvent xunmap
+        XReparentEvent xreparent
         XDestroyWindowEvent xdestroywindow
         XPropertyEvent xproperty
         XKeyEvent xkey
@@ -1060,6 +1065,7 @@ _x_event_signals = {
     UnmapNotify: ("wimpiggy-unmap-event", "wimpiggy-child-unmap-event"),
     DestroyNotify: ("wimpiggy-destroy-event", None),
     ConfigureNotify: ("wimpiggy-configure-event", None),
+    ReparentNotify: ("wimpiggy-reparent-event", None),
     PropertyNotify: ("wimpiggy-property-notify-event", None),
     KeyPress: ("wimpiggy-key-press-event", None),
     "XDamageNotify": ("wimpiggy-damage-event", None),
@@ -1164,6 +1170,9 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     pyev.y = e.xconfigure.y
                     pyev.width = e.xconfigure.width
                     pyev.height = e.xconfigure.height
+                elif e.type == ReparentNotify:
+                    print "ReparentNotify event received"
+                    pyev.window = _gw(d, e.xreparent.window)
                 elif e.type == KeyPress:
                     print "KeyPress event received"
                     pyev.window = _gw(d, e.xany.window)
