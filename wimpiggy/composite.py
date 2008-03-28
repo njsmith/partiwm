@@ -30,7 +30,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
         self._already_composited = already_composited
         if not self._already_composited:
             xcomposite_redirect_window(window)
-        self.refresh_pixmap()
+        self.invalidate_pixmap()
         self._damage_handle = xdamage_start(window)
 
         add_event_receiver(self._window, self)
@@ -40,7 +40,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
             trap.swallow(xcomposite_unredirect_window, self._window)
         trap.swallow(xdamage_stop, self._window, self._damage_handle)
         self._damage_handle = None
-        self._internal_set_property("contents-handle", None)
+        self._contents_handle = None
         remove_event_receiver(self._window, self)
         self._window = None
 
@@ -49,11 +49,18 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
             xdamage_acknowledge(self._window, self._damage_handle,
                                 x, y, w, h)
 
-    def refresh_pixmap(self):
-        def set_pixmap():
-            handle = xcomposite_name_window_pixmap(self._window)
-            self._internal_set_property("contents-handle", handle)
-        trap.swallow(set_pixmap)
+    def invalidate_pixmap(self):
+        print "invalidating named pixmap"
+        self._contents_handle = None
+
+    def do_get_property_contents_handle(self, name):
+        if self._contents_handle is None:
+            print "refreshing named pixmap"
+            def set_pixmap():
+                handle = xcomposite_name_window_pixmap(self._window)
+                self._contents_handle = handle
+            trap.swallow(set_pixmap)
+        return self._contents_handle
 
     def do_get_property_contents(self, name):
         handle = self.get_property("contents-handle")
@@ -63,13 +70,12 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
             return handle.pixmap
 
     def do_wimpiggy_map_event(self, *args):
-        self.refresh_pixmap()
+        self.invalidate_pixmap()
 
     def do_wimpiggy_configure_event(self, *args):
-        self.refresh_pixmap()
+        self.invalidate_pixmap()
 
     def do_wimpiggy_damage_event(self, event):
-        event.pixmap_handle = self.get_property("contents-handle")
         self.emit("contents-changed", event)
 
 gobject.type_register(CompositeHelper)

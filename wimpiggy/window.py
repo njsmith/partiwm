@@ -63,8 +63,8 @@ from wimpiggy.composite import CompositeHelper
 # They get reparented back and forth between widgets, and when there are no
 # widgets, they get reparented to a "parking area".  For now, we're just using
 # the root window as a parking area, so we also map/unmap the corral window
-# depending on whether we are parked or not; the corral and client windows are
-# left mapped at all times.
+# depending on whether we are parked or not; the corral and window is left
+# mapped at all times.
 #
 # When a particular WindowView controls the underlying client window, then two
 # things happen:
@@ -105,15 +105,15 @@ from wimpiggy.composite import CompositeHelper
 #   e.x, e.y, e.width, e.height:
 #      The part of the client window that was modified, and needs to be
 #      redrawn.
-#   e.pixmap_handle:
-#      A "handle" for the window contents.  So long as you hold a reference to
-#      this object, the window contents will be available in...
-#   e.pixmap_handle.pixmap:
-#      ...this gtk.gdk.Pixmap object.  This object will be destroyed as soon
-#      as pixmap_handle passes out of scope, so if you want do anything fancy,
-#      hold onto pixmap_handle, not just the pixmap itself.
-# You can also get the handle as the "client-contents-handle" property on the
-# (Base)WindowModel, and the pixmap itself as the "client-contents" property.
+# To get the actual contents of the window to draw, there is a "handle"
+# available as the "client-contents-handle" property on the
+# (Base)WindowModel.  So long as you hold a reference to this object, the
+# window contents will be available in its ".pixmap" member.  The pixmap
+# itself is also available as the "client-contents" property of the
+# (Base)WindowModel.  The pixmap object will be destroyed as soon as the
+# handle object leaves scope, so if you want to hold onto the pixmap for some
+# reason (animating a fade when a window is unmapped or whatever) then make
+# sure to hold a reference to the handle.
 #
 # But what if you'd like to do more than just look at your pretty composited
 # windows?  Maybe you'd like to, say, *interact* with them?  Then life is a
