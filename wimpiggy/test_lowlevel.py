@@ -92,7 +92,7 @@ class TestLowlevelMisc(TestLowlevel):
         assert_raises(l.BadPropertyType,
                       l.XGetWindowProperty, win, "ASDF", "ASDF")
 
-    def test_get_children_and_reparent(self):
+    def test_get_children_and_get_parent_and_reparent(self):
         d2 = self.clone_display()
         w1 = self.window(self.display)
         w2 = self.window(d2)
@@ -106,10 +106,15 @@ class TestLowlevelMisc(TestLowlevel):
         # connection, so there are some windows we don't know about:
         for known in xwins:
             assert known in xchildren
+        assert l.get_parent(w1) == w1.get_parent()
 
         w1.reparent(l.get_pywindow(w1, l.get_xwindow(w2)), 0, 0)
         gtk.gdk.flush()
         assert map(l.get_xwindow, l.get_children(w2)) == [l.get_xwindow(w1)]
+        assert l.get_parent(w1).xid == w2.xid
+
+    def test_get_parent_of_root(self):
+        assert l.get_parent(self.root()) is None
 
     def test_save_set(self):
         w1 = self.window(self.display)

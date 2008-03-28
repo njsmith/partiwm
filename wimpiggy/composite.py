@@ -15,6 +15,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
         "wimpiggy-damage-event": one_arg_signal,
         "wimpiggy-map-event": one_arg_signal,
         "wimpiggy-configure-event": one_arg_signal,
+        "wimpiggy-reparent-event": one_arg_signal,
         }
 
     __gproperties__ = {
@@ -32,6 +33,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
             xcomposite_redirect_window(window)
         self.invalidate_pixmap()
         self._damage_handle = xdamage_start(window)
+        self._ancestry_listening = None
 
         add_event_receiver(self._window, self)
 
@@ -41,6 +43,10 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
         trap.swallow(xdamage_stop, self._window, self._damage_handle)
         self._damage_handle = None
         self._contents_handle = None
+        if self._listening_to is not None:
+            for w in self._listening_to:
+                remove_event_receiver(w, self)
+            self._listening_to = None
         remove_event_receiver(self._window, self)
         self._window = None
 

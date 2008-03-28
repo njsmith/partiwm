@@ -453,7 +453,7 @@ def XAddToSaveSet(pywindow):
                    get_xwindow(pywindow))
 
 # Children listing
-def get_children(pywindow):
+def _query_tree(pywindow):
     cdef Window root, parent
     cdef Window * children
     cdef unsigned int nchildren
@@ -465,7 +465,19 @@ def get_children(pywindow):
         pychildren.append(get_pywindow(pywindow, children[i]))
     if children != NULL:
         XFree(children)
+    if parent != XNone:
+        pyparent = get_pywindow(pywindow, parent)
+    else:
+        pyparent = None
+    return (pyparent, pychildren)
+
+def get_children(pywindow):
+    (pyparent, pychildren) = _query_tree(pywindow)
     return pychildren
+
+def get_parent(pywindow):
+    (pyparent, pychildren) = _query_tree(pywindow)
+    return pyparent
 
 # Mapped status
 def is_mapped(pywindow):
