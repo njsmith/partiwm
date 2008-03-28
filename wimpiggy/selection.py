@@ -5,14 +5,13 @@
 
 import gobject
 import gtk
-import gtk.gdk
 from struct import pack, unpack
 import time
 
 from wimpiggy.util import no_arg_signal, one_arg_signal
 from wimpiggy.lowlevel import (get_xatom, get_pywindow, sendClientMessage,
                                myGetSelectionOwner, const,
-                               add_event_receiver)
+                               add_event_receiver, remove_event_receiver)
 from wimpiggy.error import *
 
 class AlreadyOwned(Exception):
@@ -29,7 +28,6 @@ class ManagerSelection(gobject.GObject):
         gobject.GObject.__init__(self)
         self.atom = selection
         self.clipboard = gtk.Clipboard(display, selection)
-        self.rloop = gobject.MainLoop()
 
     def _owner(self):
         return myGetSelectionOwner(self.clipboard,self.atom)
@@ -99,12 +97,12 @@ class ManagerSelection(gobject.GObject):
             else:
                 print "Waiting for previous owner to exit..."
                 add_event_receiver(window, self)
-                self.rloop.run()
+                gtk.main()
                 print "...they did."
 
-    def do_wimpiggy_destroy_event(self, *args):
-        if self.rloop.is_running():
-            self.rloop.quit()
+    def do_wimpiggy_destroy_event(self, event):
+        remove_event_receiver(event.window, self)
+        gtk.main_quit()
 
     def _get(self, clipboard, outdata, which, userdata):
         # We are compliant with ICCCM version 2.0 (see section 4.3)
