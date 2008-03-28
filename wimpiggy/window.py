@@ -396,6 +396,11 @@ class WindowModel(BaseWindowModel):
         print "created corral window 0x%x" % (self.corral_window.xid,)
 
         def setup_client():
+            # Start listening for important events.
+            self.client_window.set_events(self.client_window.get_events()
+                                          | gtk.gdk.STRUCTURE_MASK
+                                          | gtk.gdk.PROPERTY_CHANGE_MASK)
+
             # The child might already be mapped, in case we inherited it from
             # a previous window manager.  If so, we unmap it now, and save the
             # serial number of the request -- this way, when we get an
@@ -407,12 +412,6 @@ class WindowModel(BaseWindowModel):
                 self.startup_unmap_serial \
                     = wimpiggy.lowlevel.unmap_with_serial(self.client_window)
             
-            # Start listening for important events.
-            self.client_window.set_events(self.client_window.get_events()
-                                          | gtk.gdk.STRUCTURE_MASK
-                                          | gtk.gdk.PROPERTY_CHANGE_MASK)
-            wimpiggy.lowlevel.add_event_receiver(self.client_window, self)
-
             # Process properties
             self._read_initial_properties()
             self._write_initial_properties_and_setup()
@@ -441,6 +440,8 @@ class WindowModel(BaseWindowModel):
         pass
 
     def do_wimpiggy_unmap_event(self, event):
+        if event.delivered_to is self.corral_window:
+            return
         assert event.window is self.client_window
         # The client window got unmapped.  The question is, though, was that
         # because it was withdrawn/destroyed, or was it because we unmapped it
@@ -459,6 +460,8 @@ class WindowModel(BaseWindowModel):
             self.unmanage()
 
     def do_wimpiggy_destroy_event(self, event):
+        if event.delivered_to is self.corral_window:
+            return
         assert event.window is self.client_window
         # This is somewhat redundant with the unmap signal, because if you
         # destroy a mapped window, then a UnmapNotify is always generated.
@@ -479,6 +482,7 @@ class WindowModel(BaseWindowModel):
             if exiting:
                 self.client_window.show_unraised()
         trap.swallow(unmanageit)
+        self.corral_window.destroy()
         BaseWindowModel.do_unmanaged(self, exiting)
 
     def ownership_election(self):
@@ -553,6 +557,8 @@ class WindowModel(BaseWindowModel):
     ################################
     
     def do_wimpiggy_property_notify_event(self, event):
+        if event.delivered_to is self.corral_window:
+            return
         assert event.window is self.client_window
         self._handle_property_change(str(event.atom))
 
