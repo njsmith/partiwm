@@ -665,6 +665,48 @@ def xtest_fake_button(display_source, button, is_press):
     XTestFakeButtonEvent(get_xdisplay_for(display_source), button, is_press, 0)
 
 ###################################
+# Extension testing
+###################################
+
+# X extensions all have different APIs for negotiating their
+# availability/version number, but a number of the more recent ones are
+# similar enough to share code (in particular, Composite and DAMAGE, and
+# probably also Xfixes, Xrandr, etc.).  (But note that we don't actually have
+# to query for Xfixes support because 1) any server that can handle us at all
+# already has a sufficiently advanced version of Xfixes, and 2) GTK+ already
+# enables Xfixes for us automatically.)
+
+cdef _ensure_extension_support(display_source, major, minor, extension,
+                               Bool (*query_extension)(Display*, int*, int*),
+                               Status (*query_version)(Display*, int*, int*)):
+    cdef int event_base, ignored, cmajor, cminor
+    display = get_display_for(display_source)
+    key = extension + "-support"
+    event_key = extension + "-event-base"
+    if display.get_data(key) is None:
+        # Haven't checked for this extension before
+        display.set_data(key, False)
+        if (query_extension)(get_xdisplay_for(display),
+                              &event_base, &ignored):
+            display.set_data(event_key, event_base)
+            cmajor = major
+            cminor = minor
+            if (query_version)(get_xdisplay_for(display), &cmajor, &cminor):
+                # See X.org bug #14511:
+                if (cmajor, 0) < (major, minor) <= (cmajor, cminor):
+                    display.set_data(key, True)
+                else:
+                    raise (ValueError,
+                           "%s v%s.%s not supported; required: v%s.%s"
+                           % (extension, cmajor, cminor, major, minor))
+        else:
+            raise (ValueError,
+                   "X server does not support required %s extension"
+                   % extension)
+    if not display.get_data(key):
+        raise ValueError, "insufficient %s support in server" % extension
+
+###################################
 # Composite
 ###################################
 
@@ -681,46 +723,34 @@ cdef extern from "X11/extensions/Xcomposite.h":
 
     int XFreePixmap(Display *, Pixmap)
 
+       
+
 def _ensure_XComposite_support(display_source):
-    cdef int ignored
-    cdef int major
-    cdef int minor
-    display = get_display_for(display_source)
-    if display.get_data("XComposite-support") is None:
-        display.set_data("XComposite-support", False)
-        if XCompositeQueryExtension(get_xdisplay_for(display),
-                                    &ignored, &ignored):
-            # We need NameWindowPixmap, but we don't need the overlay window
-            # (v0.3) or the special manual-redirect clipping semantics (v0.4):
-            required_version = (0, 2)
-            (major, minor) = required_version
-            if XCompositeQueryVersion(get_xdisplay_for(display),
-                                      &major, &minor):
-                # See X.org bug #14511:
-                if (major, 0) <= required_version <= (major, minor):
-                    display.set_data("XComposite-support", True)
-    if not display.get_data("XComposite-support"):
-        raise ValueError, "Composite v%s.%s not supported" % (major, minor)
+    # We need NameWindowPixmap, but we don't need the overlay window
+    # (v0.3) or the special manual-redirect clipping semantics (v0.4).
+    _ensure_extension_support(display_source, 0, 2, "Composite",
+                              XCompositeQueryExtension,
+                              XCompositeQueryVersion)
 
 def xcomposite_redirect_window(window):
     _ensure_XComposite_support(window)
     XCompositeRedirectWindow(get_xdisplay_for(window), get_xwindow(window),
-                             CompositeRedirectManual)
+                             CompositeRedirectAutomatic)
 
 def xcomposite_redirect_subwindows(window):
     _ensure_XComposite_support(window)
     XCompositeRedirectSubwindows(get_xdisplay_for(window), get_xwindow(window),
-                                 CompositeRedirectManual)
+                                 CompositeRedirectAutomatic)
 
 def xcomposite_unredirect_window(window):
     _ensure_XComposite_support(window)
     XCompositeUnredirectWindow(get_xdisplay_for(window), get_xwindow(window),
-                               CompositeRedirectManual)
+                               CompositeRedirectAutomatic)
 
 def xcomposite_unredirect_subwindows(window):
     _ensure_XComposite_support(window)
     XCompositeUnredirectSubwindows(get_xdisplay_for(window), get_xwindow(window),
-                                   CompositeRedirectManual)
+                                   CompositeRedirectAutomatic)
 
 class _PixmapCleanupHandler(object):
     "Reference count a GdkPixmap that needs explicit cleanup."
@@ -781,25 +811,9 @@ cdef extern from "X11/extensions/Xdamage.h":
                          XserverRegion repair, XserverRegion parts)
 
 def _ensure_XDamage_support(display_source):
-    cdef int event_base
-    cdef int ignored
-    cdef int major
-    cdef int minor
-    display = get_display_for(display_source)
-    if display.get_data("XDamage-support") is None:
-        display.set_data("XDamage-support", False)
-        if XDamageQueryExtension(get_xdisplay_for(display),
-                                 &event_base, &ignored):
-            display.set_data("XDamage-event-base", event_base)
-            required_version = (1, 0)
-            (major, minor) = required_version
-            if XDamageQueryVersion(get_xdisplay_for(display),
-                                   &major, &minor):
-                # See X.org bug #14511:
-                if (major, 0) <= required_version <= (major, minor):
-                    display.set_data("XDamage-support", True)
-    if not display.get_data("XDamage-support"):
-        raise ValueError, "Xdamage v%s.%s not supported" % (major, minor)
+    _ensure_extension_support(display_source, 1, 0, "DAMAGE",
+                              XDamageQueryExtension,
+                              XDamageQueryVersion)
 
 def xdamage_start(window):
     _ensure_XDamage_support(window)
