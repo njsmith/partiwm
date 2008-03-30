@@ -733,22 +733,22 @@ def _ensure_XComposite_support(display_source):
 def xcomposite_redirect_window(window):
     _ensure_XComposite_support(window)
     XCompositeRedirectWindow(get_xdisplay_for(window), get_xwindow(window),
-                             CompositeRedirectAutomatic)
+                             CompositeRedirectManual)
 
 def xcomposite_redirect_subwindows(window):
     _ensure_XComposite_support(window)
     XCompositeRedirectSubwindows(get_xdisplay_for(window), get_xwindow(window),
-                                 CompositeRedirectAutomatic)
+                                 CompositeRedirectManual)
 
 def xcomposite_unredirect_window(window):
     _ensure_XComposite_support(window)
     XCompositeUnredirectWindow(get_xdisplay_for(window), get_xwindow(window),
-                               CompositeRedirectAutomatic)
+                               CompositeRedirectManual)
 
 def xcomposite_unredirect_subwindows(window):
     _ensure_XComposite_support(window)
     XCompositeUnredirectSubwindows(get_xdisplay_for(window), get_xwindow(window),
-                                   CompositeRedirectAutomatic)
+                                   CompositeRedirectManual)
 
 class _PixmapCleanupHandler(object):
     "Reference count a GdkPixmap that needs explicit cleanup."
@@ -1109,8 +1109,8 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
     try:
         d = wrap(<cGObject*>gdk_x11_lookup_xdisplay(e.xany.display))
         my_events = dict(_x_event_signals)
-        if d.get_data("XDamage-event-base") is not None:
-            damage_type = d.get_data("XDamage-event-base") + XDamageNotify
+        if d.get_data("DAMAGE-event-base") is not None:
+            damage_type = d.get_data("DAMAGE-event-base") + XDamageNotify
             my_events[damage_type] = my_events["XDamageNotify"]
         else:
             damage_type = -1
