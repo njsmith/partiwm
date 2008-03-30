@@ -693,7 +693,7 @@ cdef _ensure_extension_support(display_source, major, minor, extension,
             cminor = minor
             if (query_version)(get_xdisplay_for(display), &cmajor, &cminor):
                 # See X.org bug #14511:
-                if (cmajor, 0) < (major, minor) <= (cmajor, cminor):
+                if major == cmajor and minor <= cminor:
                     display.set_data(key, True)
                 else:
                     raise ValueError("%s v%s.%s not supported; required: v%s.%s"
