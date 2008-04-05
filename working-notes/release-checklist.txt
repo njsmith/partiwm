@@ -13,9 +13,9 @@
 
 4) python setup.py sdist
 
-5) Unpack dist/
+5) Unpack dist/parti-all-<whatever>
 
-6) ./run-tests
+6) ./run-tests in the unpacked tarball
 
 7) scp <tarball> roberts.vorpus.org:~parti/web/static/downloads
 
