@@ -1,3 +1,47 @@
+v0.0.4 (2008-04-04)
+===================
+
+Xpra:
+  -- Protocol changes break compatibility with 0.0.3, but:
+  -- New command 'xpra upgrade', to restart/upgrade an xpra server
+     without losing any client state.  (Won't work when upgrading from
+     0.0.3, unfortunately, but you're covered going forward.)
+  -- Fix bug that left stray busy-looping processes behind on server
+     when using ssh connections.
+  -- Export window class/instance hints (patch from Ethan Blanton).
+  -- Hack to make backspace key work (full support for keyboard maps
+     still TBD).
+  -- Added discussion of xmove to README.xpra.
+
+Wimpiggy:
+  -- Make compatible with current Pyrex releases (thanks to many
+     people for reporting this).
+  -- Work around X server bug #14648 (thanks to Ethan Blanton for help
+     tracking this down).  This improves speed dramatically.
+  -- Reverse-engineer X server lifetime rules for NameWindowPixmap,
+     and handle it properly.  Also handle it lazily.  This fixes the
+     bug where window contents stop updating.
+  -- Avoid crashing when acknowledging damage against an
+     already-closed window.
+  -- Improve server extension checking (thanks to 'moreilcon' for the
+     report).
+  -- Remove spurious (and harmless) assertion messages when a window
+     closes.
+  -- Make manager selection handling fully ICCCM-compliant (in
+     particular, we now pause properly while waiting for a previous
+     window manager to exit).
+  -- Make algorithm for classifying unmapped client windows fully
+     correct.
+  -- Reduce required version of Composite extension to 0.2.
+
+Parti:
+  -- Remove a stale import that caused a crash at runtime (thanks to
+     'astronouth7303' for the report).
+
+General:
+  -- Error out build with useful error message if required packages
+     are missing.
+
 Parti 0.0.3 (2008-02-20)
 ========================
 
