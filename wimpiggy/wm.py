@@ -269,10 +269,10 @@ class Wm(gobject.GObject):
         if event.window in self._windows:
             return
         print "Reconfigure on withdrawn window"
-        wimpiggy.lowlevel.configureAndNotify(event.window,
-                                          event.x, event.y,
-                                          event.width, event.height,
-                                          event.value_mask)
+        trap.swallow(wimpiggy.lowlevel.configureAndNotify,
+                     event.window, event.x, event.y,
+                     event.width, event.height,
+                     event.value_mask)
 
     def do_wimpiggy_focus_in_event(self, event):
         # The purpose of this function is to detect when the focus mode has
