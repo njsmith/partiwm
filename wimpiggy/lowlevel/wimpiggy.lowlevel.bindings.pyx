@@ -266,6 +266,9 @@ cdef extern from *:
     int XUnmapWindow(Display *, Window)
     unsigned long NextRequest(Display *)
 
+    # XMapWindow
+    int XMapWindow(Display *, Window)
+
 ######
 # GDK primitives, and wrappers for Xlib
 ######
@@ -632,6 +635,14 @@ def unmap_with_serial(pywindow):
     serial = NextRequest(get_xdisplay_for(pywindow))
     XUnmapWindow(get_xdisplay_for(pywindow), get_xwindow(pywindow))
     return serial
+
+###################################
+# XMapWindow
+###################################
+
+# This is provided solely as a way to work around GTK+ bug #526635
+def show_unraised_without_extra_stupid_stuff(pywindow):
+    XMapWindow(get_xdisplay_for(pywindow), get_xwindow(pywindow))
 
 ###################################
 # XTest
