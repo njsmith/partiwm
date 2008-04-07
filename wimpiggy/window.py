@@ -414,7 +414,7 @@ class WindowModel(BaseWindowModel):
             # UnmapNotify later, we'll know that it's just from us unmapping
             # the window, not from the client withdrawing the window.
             self.startup_unmap_serial = None
-            if self.client_window.is_visible():
+            if wimpiggy.lowlevel.is_mapped(self.client_window):
                 print "hiding inherited window"
                 self.startup_unmap_serial \
                     = wimpiggy.lowlevel.unmap_with_serial(self.client_window)
@@ -430,7 +430,8 @@ class WindowModel(BaseWindowModel):
             self.client_window.reparent(self.corral_window, 0, 0)
             client_size = self.client_window.get_geometry()[2:4]
             self.corral_window.resize(*client_size)
-            self.client_window.show_unraised()
+            # We CANNOT use .show_unraised here, because of GTK+ bug #526635:
+            wimpiggy.lowlevel.show_unraised_without_extra_stupid_stuff(self.client_window)
         try:
             trap.call(setup_client)
         except XError, e:
@@ -487,7 +488,9 @@ class WindowModel(BaseWindowModel):
                                         0, 0)
             wimpiggy.lowlevel.sendConfigureNotify(self.client_window)
             if exiting:
-                self.client_window.show_unraised()
+                # We CANNOT use .show_unraised here, because of GTK+ bug
+                # #526635:
+                wimpiggy.lowlevel.show_unraised_without_extra_stupid_stuff(self.client_window)
         trap.swallow(unmanageit)
         self.corral_window.destroy()
         BaseWindowModel.do_unmanaged(self, exiting)
