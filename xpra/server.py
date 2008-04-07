@@ -14,7 +14,7 @@ import socket
 import subprocess
 
 from wimpiggy.wm import Wm
-from wimpiggy.util import LameStruct, one_arg_signal
+from wimpiggy.util import LameStruct, one_arg_signal, gtk_main_quit_really
 from wimpiggy.lowlevel import (get_rectangle_from_region,
                                xtest_fake_key,
                                xtest_fake_button,
@@ -271,7 +271,7 @@ class XpraServer(gobject.GObject):
 
     def quit(self, upgrading):
         self._upgrading = upgrading
-        gtk.main_quit()
+        gtk_main_quit_really()
 
     def run(self):
         gtk.main()

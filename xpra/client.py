@@ -4,7 +4,7 @@ import cairo
 import os
 import os.path
 
-from wimpiggy.util import one_arg_signal
+from wimpiggy.util import one_arg_signal, gtk_main_quit_really
 from wimpiggy.prop import prop_get
 from wimpiggy.keys import grok_modifier_map
 from wimpiggy.lowlevel import add_event_receiver, remove_event_receiver
@@ -355,7 +355,7 @@ class XpraClient(gobject.GObject):
 
     def _process_connection_lost(self, packet):
         print "Connection lost"
-        gtk.main_quit()
+        gtk_main_quit_really()
 
     _packet_handlers = {
         "hello": _process_hello,

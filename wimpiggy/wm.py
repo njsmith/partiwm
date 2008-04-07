@@ -110,7 +110,8 @@ class Wm(gobject.GObject):
         # A new window has shown up:
         "new-window": one_arg_signal,
         # You can emit this to cause the WM to quit, or the WM may
-        # spontaneously raise it if another WM takes over the display:
+        # spontaneously raise it if another WM takes over the display.  By
+        # default, unmanages all windows:
         "quit": no_arg_signal,
         # Emit this when the list of desktop names has changed:
         "desktop-list-changed": one_arg_signal,

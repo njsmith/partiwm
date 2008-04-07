@@ -67,3 +67,17 @@ def non_none_list_accumulator(ihint, return_accu, handler_return):
     if handler_return is not None:
         return_accu += [handler_return]
     return True, return_accu
+
+
+# *Fully* exits the gtk main loop, even in the presence of recursive calls to
+# gtk.main().  Useful when you really just want to quit, and don't want to
+# care if you're inside a recursive mainloop.
+def gtk_main_quit_really():
+    # We import gtk inside here, rather than at the top of the file, because
+    # importing gtk has the side-effect of trying to connect to the X server
+    # (and this process may block, may cause us to later be killed if the X
+    # server goes away, etc.), and we don't want to impose that on every user
+    # of wimpiggy.util.
+    import gtk
+    for i in xrange(gtk.main_level()):
+        gtk.main_quit()

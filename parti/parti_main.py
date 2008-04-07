@@ -4,6 +4,7 @@ import wimpiggy.lowlevel
 
 from wimpiggy.wm import Wm
 from wimpiggy.keys import HotkeyManager
+from wimpiggy.util import gtk_main_quit_really
 
 from parti.world_organizer import WorldOrganizer
 
@@ -48,7 +49,7 @@ class Parti(object):
         gtk.main()
 
     def _wm_quit(self, *args):
-        gtk.main_quit()
+        gtk_main_quit_really()
 
     def _new_window_signaled(self, wm, window):
         self._add_new_window(window)
