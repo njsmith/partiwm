@@ -342,6 +342,10 @@ class WindowModel(BaseWindowModel):
                    "ICCCM 'iconic' state -- any sort of 'not on desktop'.", "",
                    False,
                    gobject.PARAM_READWRITE),
+        "can-focus": (gobject.TYPE_BOOLEAN,
+                      "Does this window ever accept keyboard input?", "",
+                      True,
+                      gobject.PARAM_READWRITE),
         "state": (gobject.TYPE_PYOBJECT,
                   "State, as per _NET_WM_STATE", "",
                   gobject.PARAM_READABLE),
@@ -394,6 +398,9 @@ class WindowModel(BaseWindowModel):
         wimpiggy.lowlevel.substructureRedirect(self.corral_window)
         wimpiggy.lowlevel.add_event_receiver(self.corral_window, self)
         print "created corral window 0x%x" % (self.corral_window.xid,)
+
+        # The WM_HINTS input field
+        self._input_field = True
 
         def setup_client():
             # Start listening for important events.
@@ -580,6 +587,11 @@ class WindowModel(BaseWindowModel):
             if wm_hints.urgency:
                 self.set_property("attention-requested", True)
 
+            print "wm_hints.input = %s" % (wm_hints.input,)
+            if wm_hints.input is not None:
+                self._input_field = wm_hints.input
+                self.notify("can-focus")
+
     _property_handlers["WM_HINTS"] = _handle_wm_hints
 
     def _handle_wm_normal_hints(self):
@@ -662,6 +674,7 @@ class WindowModel(BaseWindowModel):
         if protocols is None:
             protocols = []
         self._internal_set_property("protocols", protocols)
+        self.notify("can-focus")
 
         window_types = prop_get(self.client_window,
                                 "_NET_WM_WINDOW_TYPE", ["atom"])
@@ -782,6 +795,10 @@ class WindowModel(BaseWindowModel):
         else:
             AutoPropGObjectMixin.do_set_property(self, pspec, value)
 
+    def do_get_property_can_focus(self, name):
+        assert name == "can-focus"
+        return self._input_field or "WM_TAKE_FOCUS" in self.get_property("protocols")
+
     def do_get_property(self, pspec):
         if pspec.name in self._state_properties:
             return self._state_isset(self._state_properties[pspec.name])
@@ -839,13 +856,26 @@ class WindowModel(BaseWindowModel):
         # actually get around to requesting the focus until after we have
         # already changed our mind and decided to give it to someone else).
         now = gtk.gdk.x11_get_server_time(self.corral_window)
+        # ICCCM 4.1.7 *claims* to describe how we are supposed to give focus
+        # to a window, but it is completely opaque.  From reading the
+        # metacity, kwin, gtk+, and qt code, it appears that the actual rules
+        # for giving focus are:
+        #   -- the WM_HINTS input field determines whether the WM should call
+        #      XSetInputFocus
+        #   -- independently, the WM_TAKE_FOCUS protocol determines whether
+        #      the WM should send a WM_TAKE_FOCUS ClientMessage.
+        # If both are set, both methods MUST be used together. For example,
+        # GTK+ apps respect WM_TAKE_FOCUS alone but I'm not sure they handle
+        # XSetInputFocus well, while Qt apps ignore (!!!) WM_TAKE_FOCUS
+        # (unless they have a modal window), and just expect to get focus from
+        # the WM's XSetInputFocus.
+        if self._input_field:
+            print "... using XSetInputFocus"
+            trap.swallow(wimpiggy.lowlevel.XSetInputFocus,
+                         self.client_window, now)
         if "WM_TAKE_FOCUS" in self.get_property("protocols"):
             print "... using WM_TAKE_FOCUS"
             trap.swallow(wimpiggy.lowlevel.send_wm_take_focus,
-                         self.client_window, now)
-        else:
-            print "... using XSetInputFocus"
-            trap.swallow(wimpiggy.lowlevel.XSetInputFocus,
                          self.client_window, now)
 
     ################################
@@ -893,8 +923,7 @@ class WindowView(gtk.Widget):
         # Standard GTK double-buffering is useless for us, because it's on our
         # "official" window, and we don't draw to that.
         self.set_double_buffered(False)
-        # FIXME: make this dependent on whether the client accepts input focus
-        self.set_property("can-focus", True)
+        self.set_property("can-focus", self.model.get_property("can-focus"))
 
 
     def _unmanaged(self, model, wm_is_exiting):
