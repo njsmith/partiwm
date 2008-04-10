@@ -99,6 +99,8 @@ Make sure you have the dependencies, at least:
 On Debian-based OSes, I think it's:
   # aptitude install libx11-dev libxtst-dev libxcomposite-dev \
     libxdamage-dev python-gobject-dev python-gtk2-dev xvfb python-pyrex
+(If you work out a similar line for another OS, like Fedora or FreeBSD
+or whatever, please send it in.)
 
 Build it:
   tar xvzf parti-all-<whatever>.tar.gz

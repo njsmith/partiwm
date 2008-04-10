@@ -89,13 +89,12 @@ running the "parti-repl" command interesting.
 
 Running Parti requires at least:
    python
-   xlib
+   xlib (including extension libraries like libXtst.so)
    pygobject
    pygtk
    dbus-python
    ipython
-And an X server with support for a relatively recent version of the
-Composite extension.
+And an X server with support for Composite.
 
 Developing on Parti also requires:
    pyrex
@@ -115,7 +114,8 @@ The ipython dependency should probably become optional (it is only
 needed for the REPL support).  Patches accepted.
 
 On Debian-based OSes, try:
-  # aptitude install libx11-dev python-pyrex python-gobject-dev \
+  # aptitude install libx11-dev libxtst-dev libxcomposite-dev \
+    libxdamage-dev python-pyrex python-gobject-dev \
     python-gtk2-dev python-dbus ipython xserver-xephyr \
     xvfb python-nose python-codespeak-lib
 
