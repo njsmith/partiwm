@@ -346,7 +346,7 @@ class XpraServer(gobject.GObject):
                 ("min_aspect_ratio", "minimum-aspect"),
                 ("max_aspect_ratio", "maximum-aspect"),
                 ]:
-                if hasattr(hints, attr):
+                if hints is not None and getattr(hints, attr) is not None:
                     hints_metadata[metakey] = getattr(hints, attr)
             return {"size-constraints": hints_metadata}
         elif propname == "class-instance":
