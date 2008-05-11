@@ -4,6 +4,9 @@ import zlib
 from wimpiggy.util import dump_exc
 from xpra.bencode import bencode, bdecode
 
+from wimpiggy.log import Logger
+log = Logger("xpra.protocol")
+
 def repr_ellipsized(obj, limit):
     if isinstance(obj, str) and len(obj) > limit:
         return repr(obj[:limit]) + "..."
@@ -52,7 +55,7 @@ class Protocol(object):
             return
         packet, self._source_has_more = self.source.next_packet()
         if packet is not None:
-            print "sending %s" % (dump_packet(packet),)
+            log("sending %s", dump_packet(packet), type="raw.send")
             data = bencode(packet)
             if self._compressor is not None:
                 self._write_buf += self._compressor.compress(data)
@@ -100,13 +103,13 @@ class Protocol(object):
         except ValueError:
             return 0
         try:
-            print "got %s" % (dump_packet(decoded),)
+            log("got %s", dump_packet(decoded), type="raw.receive")
             self._process_packet_cb(self, decoded)
         except KeyboardInterrupt:
             raise
         except:
-            print "Unhandled error while processing packet from peer"
-            dump_exc()
+            log.warn("Unhandled error while processing packet from peer",
+                     exc_info=True)
             # Ignore and continue, maybe things will work out anyway
         return consumed
 

@@ -9,6 +9,9 @@ from wimpiggy.prop import prop_get
 from wimpiggy.keys import grok_modifier_map
 from wimpiggy.lowlevel import add_event_receiver, remove_event_receiver
 
+from wimpiggy.log import Logger
+log = Logger("xpra.client")
+
 from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
 
@@ -155,7 +158,7 @@ class ClientWindow(gtk.Window):
         return (x, y, w, h)
 
     def do_map_event(self, event):
-        print "Got map event"
+        log("Got map event")
         gtk.Window.do_map_event(self, event)
         if not self._override_redirect:
             x, y, w, h = self._geometry()
@@ -164,7 +167,7 @@ class ClientWindow(gtk.Window):
             self._size = (w, h)
 
     def do_configure_event(self, event):
-        print "Got configure event"
+        log("Got configure event")
         gtk.Window.do_configure_event(self, event)
         if not self._override_redirect:
             x, y, w, h = self._geometry()
@@ -285,7 +288,7 @@ class XpraClient(gobject.GObject):
         root = gtk.gdk.get_default_root_window()
         assert event.window is root
         if str(event.atom) == "_NET_CLIENT_LIST_STACKING":
-            print "_NET_CLIENT_LIST_STACKING changed"
+            log("_NET_CLIENT_LIST_STACKING changed")
             stacking = prop_get(root, "_NET_CLIENT_LIST_STACKING", ["window"])
             our_windows = dict([(w.window, id)
                                 for (w, id) in self._window_to_id.iteritems()])
@@ -303,8 +306,8 @@ class XpraClient(gobject.GObject):
         if "deflate" in capabilities:
             self._protocol.enable_deflate(capabilities["deflate"])
         if capabilities.get("__prerelease_version") != xpra.__version__:
-            print ("sorry, I only know how to talk to v%s servers"
-                   % xpra.__version__)
+            log.error("sorry, I only know how to talk to v%s servers",
+                      xpra.__version__)
 
     def _process_new_common(self, packet, override_redirect):
         (_, id, x, y, w, h, metadata) = packet
@@ -354,7 +357,7 @@ class XpraClient(gobject.GObject):
         window.destroy()
 
     def _process_connection_lost(self, packet):
-        print "Connection lost"
+        log.error("Connection lost")
         gtk_main_quit_really()
 
     _packet_handlers = {

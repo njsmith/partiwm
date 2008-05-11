@@ -1,4 +1,4 @@
-# Todo:
+r# Todo:
 #   cursors
 #   copy/paste (dnd?)
 #   xsync resize stuff
@@ -23,6 +23,9 @@ from wimpiggy.lowlevel import (get_rectangle_from_region,
                                get_children)
 from wimpiggy.window import OverrideRedirectWindowModel, Unmanageable
 from wimpiggy.keys import grok_modifier_map
+
+from wimpiggy.log import Logger
+log = Logger("xpra.server")
 
 import xpra
 from xpra.address import server_sock
@@ -99,7 +102,7 @@ class DesktopManager(gtk.Widget):
     def window_position(self, model, w, h):
         (x, y, w0, h0) = self._models[model].geom
         if (w0, h0) != (w, h):
-            print "Uh-oh, our size doesn't fit window sizing constraints!"
+            log.warn("Uh-oh, our size doesn't fit window sizing constraints!")
         return (x, y)
 
 gobject.type_register(DesktopManager)
@@ -148,7 +151,7 @@ class ServerSource(object):
             window.acknowledge_changes(x, y, w, h)
             pixmap = window.get_property("client-contents")
             if pixmap is None:
-                print "wtf, pixmap is None?"
+                log.error("wtf, pixmap is None?")
                 packet = None
             else:
                 (x2, y2, w2, h2, data) = self._get_rgb_data(pixmap, x, y, w, h)
@@ -278,7 +281,7 @@ class XpraServer(gobject.GObject):
         return self._upgrading
 
     def _new_connection(self, *args):
-        print "New connection received"
+        log.info("New connection received")
         sock, addr = self._listener.accept()
         self._potential_protocols.append(Protocol(sock, self.process_packet))
         return True
@@ -458,11 +461,11 @@ class XpraServer(gobject.GObject):
 
     def _process_hello(self, proto, packet):
         (_, client_capabilities) = packet
-        print "Handshake complete; enabling connection"
+        log.info("Handshake complete; enabling connection")
         capabilities = self._calculate_capabilities(client_capabilities)
         if capabilities.get("__prerelease_version") != xpra.__version__:
-            print ("Sorry, this pre-release server only works with clients "
-                   + "of exactly the same version (v%s)" % xpra.__version__)
+            log.error("Sorry, this pre-release server only works with clients "
+                      + "of exactly the same version (v%s)", xpra.__version__)
             proto.close()
             return
         # Okay, things are okay, so let's boot out any existing connection and
@@ -548,7 +551,7 @@ class XpraServer(gobject.GObject):
         window.request_close()
 
     def _process_connection_lost(self, proto, packet):
-        print "Connection lost"
+        log.info("Connection lost")
         proto.close()
         if proto in self._potential_protocols:
             self._potential_protocols.remove(proto)
@@ -556,7 +559,7 @@ class XpraServer(gobject.GObject):
             self._protocol = None
 
     def _process_shutdown_server(self, proto, packet):
-        print "Shutting down in response to request"
+        log.info("Shutting down in response to request")
         self.quit(False)
 
     _packet_handlers = {
