@@ -30,7 +30,7 @@ class ManagerSelection(gobject.GObject):
         self.clipboard = gtk.Clipboard(display, selection)
 
     def _owner(self):
-        return myGetSelectionOwner(self.clipboard,self.atom)
+        return myGetSelectionOwner(self.clipboard, self.atom)
 
     def owned(self):
         "Returns True if someone owns the given selection."
