@@ -4,6 +4,8 @@ import wimpiggy.lowlevel
 import wimpiggy.window
 import wimpiggy.prop
 from wimpiggy.error import trap
+from wimpiggy.log import Logger
+log = Logger()
 
 # This file defines Wimpiggy's top-level widget.  It is a magic window that
 # always and exactly covers the entire screen (possibly crossing multiple

@@ -10,6 +10,9 @@ from wimpiggy.lowlevel import (xcomposite_redirect_window,
                                add_event_receiver, remove_event_receiver,
                                get_parent, addXSelectInput, const)
 
+from wimpiggy.log import Logger
+log = Logger()
+
 class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
     __gsignals__ = {
         "contents-changed": one_arg_signal,
@@ -55,7 +58,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
                          self._window, self._damage_handle, x, y, w, h)
 
     def invalidate_pixmap(self):
-        print "invalidating named pixmap"
+        log("invalidating named pixmap", type="pixmap")
         if self._listening_to is not None:
             # Don't want to stop listening to self._window!:
             assert self._window not in self._listening_to
@@ -66,7 +69,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
 
     def do_get_property_contents_handle(self, name):
         if self._contents_handle is None:
-            print "refreshing named pixmap"
+            log("refreshing named pixmap", type="pixmap")
             assert self._listening_to is None
             def set_pixmap():
                 # The tricky part here is that the pixmap returned by

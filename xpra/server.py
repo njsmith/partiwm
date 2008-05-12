@@ -25,7 +25,7 @@ from wimpiggy.window import OverrideRedirectWindowModel, Unmanageable
 from wimpiggy.keys import grok_modifier_map
 
 from wimpiggy.log import Logger
-log = Logger("xpra.server")
+log = Logger()
 
 import xpra
 from xpra.address import server_sock

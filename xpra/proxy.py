@@ -4,8 +4,8 @@ import socket
 
 import sys
 
-import logging
-log = logging.getLogger("xpra.proxy")
+from wimpiggy.log import Logger
+log = Logger()
 
 class ChannelProxy(gobject.GObject):
     """Copies bytes from 'readfd' to 'writefd'.
@@ -40,7 +40,7 @@ class ChannelProxy(gobject.GObject):
 
     def _set_state(self, state):
         # Set up new state
-        log.debug("%s: state: %s -> %s" % (id(self), self._state, state))
+        log("%s: state: %s -> %s", id(self), self._state, state)
         if self._state is state:
             return
         # Clear old state
@@ -106,5 +106,5 @@ class XpraProxy(object):
         self._mainloop.run()
 
     def _quit(self, *args):
-        log.debug("exiting main loop")
+        log("exiting main loop")
         self._mainloop.quit()

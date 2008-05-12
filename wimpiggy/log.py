@@ -1,5 +1,6 @@
 import sys
 import logging
+# This module is used by non-GUI programs and thus must not import gtk.
 
 # A wrapper around 'logging' with some convenience stuff.  In particular:
 #   -- You initialize it with a prefix (like "wimpiggy.window"), but can pass
@@ -8,9 +9,13 @@ import logging
 #   -- You can pass exc_info=True to any method, and sys.exc_info() will be
 #      substituted.
 #   -- __call__ is an alias for debug
+#   -- The default logging target is set to the name of the module where
+#      Logger() was called.
 
 class Logger(object):
-    def __init__(self, base):
+    def __init__(self, base=None):
+        if base is None:
+            base = sys._getframe(1).f_globals["__name__"]
         self._base = base
 
     def getLogger(self, type=None):

@@ -5,7 +5,7 @@ from wimpiggy.util import dump_exc
 from xpra.bencode import bencode, bdecode
 
 from wimpiggy.log import Logger
-log = Logger("xpra.protocol")
+log = Logger()
 
 def repr_ellipsized(obj, limit):
     if isinstance(obj, str) and len(obj) > limit:

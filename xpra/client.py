@@ -10,7 +10,7 @@ from wimpiggy.keys import grok_modifier_map
 from wimpiggy.lowlevel import add_event_receiver, remove_event_receiver
 
 from wimpiggy.log import Logger
-log = Logger("xpra.client")
+log = Logger()
 
 from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
