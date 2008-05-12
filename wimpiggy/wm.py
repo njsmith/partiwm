@@ -12,6 +12,9 @@ from wimpiggy.util import no_arg_signal, one_arg_signal
 
 from wimpiggy.window import WindowModel, Unmanageable
 
+from wimpiggy.log import Logger
+log = Logger()
+
 class Wm(gobject.GObject):
     _NET_SUPPORTED = [
         "_NET_SUPPORTED", # a bit redundant, perhaps...
@@ -178,7 +181,7 @@ class Wm(gobject.GObject):
             if (w.get_window_type() == gtk.gdk.WINDOW_FOREIGN
                 and not wimpiggy.lowlevel.is_override_redirect(w)
                 and wimpiggy.lowlevel.is_mapped(w)):
-                print "Wm managing pre-existing child"
+                log("Wm managing pre-existing child")
                 self._manage_client(w)
 
         # Also watch for focus change events on the root window
@@ -204,7 +207,7 @@ class Wm(gobject.GObject):
         try:
             win = WindowModel(self._root, gdkwindow)
         except Unmanageable:
-            print "Window disappeared on us, never mind"
+            log("Window disappeared on us, never mind")
             return
         win.connect("unmanaged", self._handle_client_unmanaged)
         self._windows[gdkwindow] = win
@@ -248,7 +251,7 @@ class Wm(gobject.GObject):
         pass
 
     def _lost_wm_selection(self, selection):
-        print "Lost WM selection, exiting"
+        log.info("Lost WM selection, exiting")
         self.emit("quit")
 
     def do_quit(self):
@@ -256,7 +259,7 @@ class Wm(gobject.GObject):
             win.unmanage(True)
 
     def do_child_map_request_event(self, event):
-        print "Found a potential client"
+        log("Found a potential client")
         self._manage_client(event.window)
 
     def do_child_configure_request_event(self, event):
@@ -269,7 +272,7 @@ class Wm(gobject.GObject):
         # accurate info on what the app is actually requesting.
         if event.window in self._windows:
             return
-        print "Reconfigure on withdrawn window"
+        log("Reconfigure on withdrawn window")
         trap.swallow(wimpiggy.lowlevel.configureAndNotify,
                      event.window, event.x, event.y,
                      event.width, event.height,

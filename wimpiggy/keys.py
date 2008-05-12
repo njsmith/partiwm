@@ -6,6 +6,9 @@ from wimpiggy.lowlevel import (get_display_for,
                                get_modifier_map, grab_key, ungrab_all_keys,
                                add_event_receiver, remove_event_receiver)
 
+from wimpiggy.log import Logger
+log = Logger()
+
 class HotkeyManager(gobject.GObject):
     __gsignals__ = {
         "hotkey": (gobject.SIGNAL_RUN_LAST | gobject.SIGNAL_DETAILED,
@@ -72,10 +75,10 @@ class HotkeyManager(gobject.GObject):
                 self.normalized_hotkeys[unparsed] = target
 
     def do_wimpiggy_key_press_event(self, event):
-        print "got hotkey event, maybe"
+        log("got hotkey event, maybe")
         unparsed = unparse_key(event.state, event.hardware_keycode,
                                self.keymap, self.modifier_map)
-        print "unparsed = %s" % unparsed
+        log("unparsed = %s", unparsed)
         if unparsed in self.normalized_hotkeys:
             target = self.normalized_hotkeys[unparsed]
             self.emit("hotkey::%s" % (target,), target)

@@ -12,6 +12,9 @@ import gtk.gdk
 from wimpiggy.util import dump_exc, LameStruct
 from wimpiggy.error import trap, XError
 
+from wimpiggy.log import Logger
+log = Logger("wimpiggy.lowlevel")
+
 ###################################
 # Headers, python magic
 ###################################
@@ -514,7 +517,7 @@ def printFocus(display_source):
     cdef Window w
     cdef int revert_to
     cXGetInputFocus(get_xdisplay_for(display_source), &w, &revert_to)
-    print "Current focus: %s, %s" % (hex(w), revert_to)
+    log("Current focus: %s, %s", hex(w), revert_to)
     
 # Geometry hints
 
@@ -866,7 +869,7 @@ def sendClientMessage(target, propagate, event_mask,
     display = get_xdisplay_for(target)
     cdef Window w
     w = get_xwindow(target)
-    print "sending message to %s" % hex(w)
+    log("sending message to %s", hex(w))
     cdef XEvent e
     e.type = ClientMessage
     e.xany.display = display
@@ -901,7 +904,7 @@ def sendConfigureNotify(pywindow):
                                  0, 0,
                                  &dest_x, &dest_y, &child):
         # Window seems to have disappeared, so never mind.
-        print "couldn't TranslateCoordinates (maybe window is gone)"
+        log("couldn't TranslateCoordinates (maybe window is gone)")
         return
 
     # Send synthetic ConfigureNotify (ICCCM 4.2.3, for example)
@@ -1069,10 +1072,10 @@ def _maybe_send_event(window, signal, event):
     if handlers is not None:
         for handler in list(handlers):
             if signal in gobject.signal_list_names(handler):
-                print ("  forwarding event to a %s handler"
-                       % type(handler).__name__)
+                log("  forwarding event to a %s handler",
+                    type(handler).__name__)
                 handler.emit(signal, event)
-                print "  forwarded"
+                log("  forwarded")
 
 def _route_event(event, signal, parent_signal):
     # Sometimes we get GDK events with event.window == None, because they are
@@ -1134,10 +1137,10 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
             try:
                 pyev.delivered_to = _gw(d, e.xany.window)
                 if e.type == MapRequest:
-                    print "MapRequest received"
+                    log("MapRequest received")
                     pyev.window = _gw(d, e.xmaprequest.window)
                 elif e.type == ConfigureRequest:
-                    print "ConfigureRequest received"
+                    log("ConfigureRequest received")
                     pyev.window = _gw(d, e.xconfigurerequest.window)
                     pyev.x = e.xconfigurerequest.x
                     pyev.y = e.xconfigurerequest.y
@@ -1157,64 +1160,64 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     pyev.detail = e.xconfigurerequest.detail
                     pyev.value_mask = e.xconfigurerequest.value_mask
                 elif e.type in (FocusIn, FocusOut):
-                    print "FocusIn/FocusOut received"
+                    log("FocusIn/FocusOut received")
                     pyev.window = _gw(d, e.xfocus.window)
                     pyev.mode = e.xfocus.mode
                     pyev.detail = e.xfocus.detail
                 elif e.type == ClientMessage:
-                    print "ClientMessage received"
+                    log("ClientMessage received")
                     pyev.window = _gw(d, e.xany.window)
                     if long(e.xclient.message_type) > (long(2) ** 32):
-                        print ("Xlib claims that this ClientEvent's 32-bit "
-                               + "message_type is %s.  "
-                               + "Note that this is >2^32.  "
-                               + "This makes no sense, so I'm ignoring it."
-                               ) % e.xclient.message_type
+                        log.warn("Xlib claims that this ClientEvent's 32-bit "
+                                 + "message_type is %s.  "
+                                 + "Note that this is >2^32.  "
+                                 + "This makes no sense, so I'm ignoring it.",
+                                 e.xclient.message_type)
                         return GDK_FILTER_CONTINUE
                     pyev.message_type = get_pyatom(pyev.display,
                                                    e.xclient.message_type)
                     pyev.format = e.xclient.format
                     # I am lazy.  Add this later if needed for some reason.
                     if pyev.format != 32:
-                        print "Ignoring ClientMessage with format != 32"
+                        log("Ignoring ClientMessage with format != 32")
                         return GDK_FILTER_CONTINUE
                     pieces = []
                     for i in xrange(5):
                         pieces.append(int(e.xclient.data.l[i]))
                     pyev.data = tuple(pieces)
                 elif e.type == MapNotify:
-                    print "MapNotify event received"
+                    log("MapNotify event received")
                     pyev.window = _gw(d, e.xmap.window)
                     pyev.override_redirect = e.xmap.override_redirect
                 elif e.type == UnmapNotify:
-                    print "UnmapNotify event received"
+                    log("UnmapNotify event received")
                     pyev.serial = e.xany.serial
                     pyev.window = _gw(d, e.xunmap.window)
                 elif e.type == DestroyNotify:
-                    print "DestroyNotify event received"
+                    log("DestroyNotify event received")
                     pyev.window = _gw(d, e.xdestroywindow.window)
                 elif e.type == PropertyNotify:
-                    print "PropertyNotify event received"
+                    log("PropertyNotify event received")
                     pyev.window = _gw(d, e.xany.window)
                     pyev.atom = trap.call_synced(get_pyatom, d,
                                                  e.xproperty.atom)
                 elif e.type == ConfigureNotify:
-                    print "ConfigureNotify event received"
+                    log("ConfigureNotify event received")
                     pyev.window = _gw(d, e.xconfigure.window)
                     pyev.x = e.xconfigure.x
                     pyev.y = e.xconfigure.y
                     pyev.width = e.xconfigure.width
                     pyev.height = e.xconfigure.height
                 elif e.type == ReparentNotify:
-                    print "ReparentNotify event received"
+                    log("ReparentNotify event received")
                     pyev.window = _gw(d, e.xreparent.window)
                 elif e.type == KeyPress:
-                    print "KeyPress event received"
+                    log("KeyPress event received")
                     pyev.window = _gw(d, e.xany.window)
                     pyev.hardware_keycode = e.xkey.keycode
                     pyev.state = e.xkey.state
                 elif e.type == damage_type:
-                    #print "DamageNotify received"
+                    #log("DamageNotify received")
                     damage_e = <XDamageNotifyEvent*>e
                     pyev.window = _gw(d, e.xany.window)
                     pyev.damage = damage_e.damage
@@ -1223,14 +1226,13 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     pyev.width = damage_e.area.width
                     pyev.height = damage_e.area.height
             except XError, e:
-                print ("Some window in our event disappeared before we could "
-                       + "handle the event; so I'm just ignoring it instead.")
+                log("Some window in our event disappeared before we could "
+                    + "handle the event; so I'm just ignoring it instead.")
             else:
                 # Dispatch:
                 _route_event(pyev, *my_events[e.type])
     except:
-        print "Unhandled exception in x_event_filter:"
-        dump_exc()
+        log.warn("Unhandled exception in x_event_filter:", exc_info=True)
     return GDK_FILTER_CONTINUE
 
 gdk_window_add_filter(<cGdkWindow*>0, x_event_filter, <void*>0)

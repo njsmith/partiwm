@@ -13,14 +13,16 @@ from wimpiggy.lowlevel import \
      get_xatom, get_pyatom, get_xwindow, get_pywindow, const, \
      get_display_for
 from wimpiggy.error import trap, XError
+from wimpiggy.log import Logger
+log = Logger()
 
 def unsupported(*args):
     raise UnsupportedException
 
 def _force_length(data, length):
     if len(data) != length:
-        print ("Odd-lengthed prop, wanted %s bytes, got %s: %r"
-               % (length, len(data), data))
+        log.warn("Odd-lengthed prop, wanted %s bytes, got %s: %r"
+                 % (length, len(data), data))
     # Zero-pad data
     data += "\0" * length
     return data[:length]
@@ -110,10 +112,10 @@ def _read_image(disp, stream):
         (width, height) = struct.unpack("@II", header)
         bytes = stream.read(width * height * 4)
         if len(bytes) < width * height * 4:
-            print "Corrupt _NET_WM_ICON"
+            log.warn("Corrupt _NET_WM_ICON")
             return None
     except Exception, e:
-        print "Weird corruption in _NET_WM_ICON: %s" % (e,)
+        log.warn("Weird corruption in _NET_WM_ICON: %s", e)
         return None
     # Cairo wants a native-endian array here, and since the icon is
     # transmitted as CARDINALs, that's what we get.
@@ -260,14 +262,15 @@ def prop_get(target, key, type):
         data = trap.call_synced(XGetWindowProperty, target, key, atom)
         #print atom, repr(data[:100])
     except (XError, PropertyError):
-        print ("Missing window or missing property or wrong property type %s (%s)"
-               % (key, type))
+        log.info("Missing window or missing property or wrong property type %s (%s)",
+                 key, type)
         return None
     try:
         return _prop_decode(target, type, data)
     except:
-        print (("Error parsing property %s (type %s); this may be a\n"
-                + "  misbehaving application, or bug in Wimpiggy\n"
-                + "  Data: %r[...?]") % (key, type, data[:100],))
+        log.warn("Error parsing property %s (type %s); this may be a\n"
+                 + "  misbehaving application, or bug in Wimpiggy\n"
+                 + "  Data: %r[...?]",
+                 key, type, data[:100])
         raise
         return None

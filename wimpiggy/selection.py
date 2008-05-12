@@ -14,6 +14,9 @@ from wimpiggy.lowlevel import (get_xatom, get_pywindow, sendClientMessage,
                                add_event_receiver, remove_event_receiver)
 from wimpiggy.error import *
 
+from wimpiggy.log import Logger
+log = Logger()
+
 class AlreadyOwned(Exception):
     pass
 
@@ -91,14 +94,14 @@ class ManagerSelection(gobject.GObject):
                 return window
             try:
                 window = trap.call(getwin)
-                print "got window"
+                log("got window")
             except XError, e:
-                print "Previous owner is already gone, not blocking"
+                log("Previous owner is already gone, not blocking")
             else:
-                print "Waiting for previous owner to exit..."
+                log("Waiting for previous owner to exit...")
                 add_event_receiver(window, self)
                 gtk.main()
-                print "...they did."
+                log("...they did.")
 
     def do_wimpiggy_destroy_event(self, event):
         remove_event_receiver(event.window, self)

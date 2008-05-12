@@ -19,6 +19,9 @@ from wimpiggy.error import *
 from wimpiggy.prop import prop_get, prop_set
 from wimpiggy.composite import CompositeHelper
 
+from wimpiggy.log import Logger
+log = Logger()
+
 # Todo:
 #   client focus hints
 #   _NET_WM_SYNC_REQUEST
@@ -397,7 +400,7 @@ class WindowModel(BaseWindowModel):
                                             event_mask=gtk.gdk.PROPERTY_CHANGE_MASK)
         wimpiggy.lowlevel.substructureRedirect(self.corral_window)
         wimpiggy.lowlevel.add_event_receiver(self.corral_window, self)
-        print "created corral window 0x%x" % (self.corral_window.xid,)
+        log("created corral window 0x%x", self.corral_window.xid)
 
         # The WM_HINTS input field
         self._input_field = True
@@ -415,7 +418,7 @@ class WindowModel(BaseWindowModel):
             # the window, not from the client withdrawing the window.
             self.startup_unmap_serial = None
             if wimpiggy.lowlevel.is_mapped(self.client_window):
-                print "hiding inherited window"
+                log("hiding inherited window")
                 self.startup_unmap_serial \
                     = wimpiggy.lowlevel.unmap_with_serial(self.client_window)
             
@@ -463,7 +466,7 @@ class WindowModel(BaseWindowModel):
         # Also, if we receive a *synthetic* UnmapNotify event, that always
         # means that the client has withdrawn the window (even if it was not
         # mapped in the first place) -- ICCCM section 4.1.4.
-        print "Client window unmapped"
+        log("Client window unmapped")
         if event.send_event or event.serial != self.startup_unmap_serial:
             self.unmanage()
 
@@ -480,7 +483,7 @@ class WindowModel(BaseWindowModel):
         self.unmanage()
 
     def do_unmanaged(self, exiting):
-        print "unmanaging window"
+        log("unmanaging window")
         self._internal_set_property("owner", None)
         def unmanageit():
             self._scrub_withdrawn_window()
@@ -575,7 +578,7 @@ class WindowModel(BaseWindowModel):
     _property_handlers = {}
 
     def _handle_property_change(self, name):
-        print "Property changed on %s: %s" % (self.client_window.xid, name)
+        log("Property changed on %s: %s", self.client_window.xid, name)
         if name in self._property_handlers:
             self._property_handlers[name](self)
 
@@ -590,7 +593,7 @@ class WindowModel(BaseWindowModel):
             if wm_hints.urgency:
                 self.set_property("attention-requested", True)
 
-            print "wm_hints.input = %s" % (wm_hints.input,)
+            log("wm_hints.input = %s", wm_hints.input)
             if wm_hints.input is not None:
                 self._input_field = wm_hints.input
                 self.notify("can-focus")
@@ -643,12 +646,12 @@ class WindowModel(BaseWindowModel):
     _property_handlers["_NET_WM_STRUT_PARTIAL"] = _handle_wm_strut
 
     def _handle_net_wm_icon(self):
-        print "_NET_WM_ICON changed on %s, re-reading" % (self.client_window.xid,)
+        log("_NET_WM_ICON changed on %s, re-reading", self.client_window.xid)
         self._internal_set_property("icon",
                                     prop_get(self.client_window,
                                              "_NET_WM_ICON", "icon"))
 
-        print "icon is now %r" % (self.get_property("icon"),)
+        log("icon is now %r", self.get_property("icon"))
     _property_handlers["_NET_WM_ICON"] = _handle_net_wm_icon
 
     def _read_initial_properties(self):
