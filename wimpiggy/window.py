@@ -666,7 +666,7 @@ class WindowModel(BaseWindowModel):
             try:
                 (c, i, fluff) = class_instance.split("\0")
             except ValueError:
-                print "Malformed WM_CLASS, ignoring"
+                log.warn("Malformed WM_CLASS, ignoring")
             else:
                 self._internal_set_property("class-instance", (c, i))
 
@@ -855,7 +855,7 @@ class WindowModel(BaseWindowModel):
     def give_client_focus(self):
         """The focus manager has decided that our client should recieve X
         focus.  See world_window.py for details."""
-        print "Giving focus to client"
+        log("Giving focus to client")
         # Have to fetch the time, not just use CurrentTime, both because ICCCM
         # says that WM_TAKE_FOCUS must use a real time and because there are
         # genuine race conditions here (e.g. suppose the client does not
@@ -876,11 +876,11 @@ class WindowModel(BaseWindowModel):
         # (unless they have a modal window), and just expect to get focus from
         # the WM's XSetInputFocus.
         if self._input_field:
-            print "... using XSetInputFocus"
+            log("... using XSetInputFocus")
             trap.swallow(wimpiggy.lowlevel.XSetInputFocus,
                          self.client_window, now)
         if "WM_TAKE_FOCUS" in self.get_property("protocols"):
-            print "... using WM_TAKE_FOCUS"
+            log("... using WM_TAKE_FOCUS")
             trap.swallow(wimpiggy.lowlevel.send_wm_take_focus,
                          self.client_window, now)
 
@@ -904,7 +904,7 @@ class WindowModel(BaseWindowModel):
             try:
                 os.kill(pid, 9)
             except OSError:
-                print "failed to kill() client with pid %s" % (pid,)
+                log.warn("failed to kill() client with pid %s", pid)
         trap.swallow(wimpiggy.lowlevel.XKillClient, self.client_window)
 
 gobject.type_register(WindowModel)
@@ -953,7 +953,7 @@ class WindowView(gtk.Widget):
         # blow-up.
         # This is gnome bug #518999.
         if not hasattr(self, "_got_inited"):
-            print "nasty gobject bug #518999 triggered, working around"
+            log.warn("nasty gobject bug #518999 triggered, working around")
             return
         self.model.disconnect(self._redraw_handle)
         self.model.disconnect(self._election_handle)
@@ -1109,7 +1109,7 @@ class WindowView(gtk.Widget):
 
     def do_size_allocate(self, allocation):
         self.allocation = allocation
-        print "New allocation = %r" % (tuple(self.allocation),)
+        log("New allocation = %r", tuple(self.allocation))
         if self.flags() & gtk.REALIZED:
             self.window.move_resize(*allocation)
             self._image_window.resize(allocation.width, allocation.height)
@@ -1128,7 +1128,7 @@ class WindowView(gtk.Widget):
         window.lower()
 
     def do_realize(self):
-        print "Realizing (allocation = %r)" % (tuple(self.allocation),)
+        log("Realizing (allocation = %r)", tuple(self.allocation))
 
         self.set_flags(gtk.REALIZED)
         self.window = gtk.gdk.Window(self.get_parent_window(),
@@ -1155,29 +1155,29 @@ class WindowView(gtk.Widget):
         self._image_window.set_user_data(self)
         self._image_window.show()
 
-        print "Realized"
+        log("Realized")
 
     def do_map(self):
         assert self.flags() & gtk.REALIZED
         if self.flags() & gtk.MAPPED:
             return
-        print "Mapping"
+        log("Mapping")
         self.set_flags(gtk.MAPPED)
         self.model.ownership_election()
         self.window.show_unraised()
-        print "Mapped"
+        log("Mapped")
 
     def do_unmap(self):
         if not (self.flags() & gtk.MAPPED):
             return
-        print "Unmapping"
+        log("Unmapping")
         self.unset_flags(gtk.MAPPED)
         self.window.hide()
         self.model.ownership_election()
-        print "Unmapped"
+        log("Unmapped")
             
     def do_unrealize(self):
-        print "Unrealizing"
+        log("Unrealizing")
         # Takes care of checking mapped status, issuing signals, calling
         # do_unmap, etc.
         self.unmap()
@@ -1187,6 +1187,6 @@ class WindowView(gtk.Widget):
         if self.window:
             self.window.set_user_data(None)
         self._image_window = None
-        print "Unrealized"
+        log("Unrealized")
             
 gobject.type_register(WindowView)

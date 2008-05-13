@@ -30,12 +30,26 @@ def main(cmdline):
                       dest="daemon", default=True,
                       help="Don't daemonize when running as a server")
     parser.add_option("--remote-xpra", action="store",
-                      dest="remote_xpra", default="xpra",
+                      dest="remote_xpra", default="xpra", metavar="CMD",
                       help="How to run 'xpra' on the remote host")
+    parser.add_option("-d", "--debug", action="store",
+                      dest="debug", default=None, metavar="FILTER1,FILTER2,...",
+                      help="List of categories to enable debugging for (or \"all\")")
     (options, args) = parser.parse_args(cmdline[1:])
 
     if not args:
         parser.error("need a mode")
+
+    logging.root.setLevel(logging.INFO)
+    if options.debug is not None:
+        categories = options.debug.split(",")
+        for cat in categories:
+            if cat == "all":
+                logger = logging.root
+            else:
+                logger = logging.getLogger(cat)
+            logger.setLevel(logging.DEBUG)
+    logging.root.addHandler(logging.StreamHandler(sys.stderr))
 
     mode = args[0]
     if mode in ("start", "upgrade"):
@@ -86,7 +100,6 @@ def run_client(parser, opts, extra_args):
 
 def run_proxy(parser, opts, extra_args):
     from xpra.proxy import XpraProxy
-    logging.getLogger("").addHandler(logging.StreamHandler(sys.stderr))
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     app = XpraProxy(0, 1, client_sock(parser, opts, extra_args))

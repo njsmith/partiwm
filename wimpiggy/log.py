@@ -27,16 +27,18 @@ class Logger(object):
     def log(self, level, msg, *args, **kwargs):
         if kwargs.get("exc_info") is True:
             kwargs["exc_info"] = sys.exc_info()
-        self.getLogger(kwargs.get("type")).log(level, msg, *args, **kwargs)
+        type = None
+        if "type" in kwargs:
+            type = kwargs["type"]
+            del kwargs["type"]
+        self.getLogger(type).log(level, msg, *args, **kwargs)
 
-    def debug(self, msg, *args, **kwargs):
-        self.log(logging.DEBUG, msg, *args, **kwargs)
+    def _method_maker(level):
+        return (lambda self, msg, *args, **kwargs:
+                self.log(level, msg, *args, **kwargs))
 
-    def info(self, msg, *args, **kwargs):
-        self.log(logging.INFO, msg, *args, **kwargs)
-
-    def warn(self, msg, *args, **kwargs):
-        self.log(logging.WARNING, msg, *args, **kwargs)
-
-    def __call__(self, msg, *args, **kwargs):
-        self.debug(msg, *args, **kwargs)
+    debug = _method_maker(logging.DEBUG)
+    __call__ = debug
+    info = _method_maker(logging.INFO)
+    warn = _method_maker(logging.WARNING)
+    error = _method_maker(logging.ERROR)
