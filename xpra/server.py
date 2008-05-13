@@ -1,4 +1,4 @@
-r# Todo:
+# Todo:
 #   cursors
 #   copy/paste (dnd?)
 #   xsync resize stuff
