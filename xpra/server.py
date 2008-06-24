@@ -28,7 +28,6 @@ from wimpiggy.log import Logger
 log = Logger()
 
 import xpra
-from xpra.address import server_sock
 from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
 

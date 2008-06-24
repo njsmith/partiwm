@@ -9,7 +9,7 @@ import signal
 from wimpiggy.prop import prop_set, prop_get
 
 from xpra.server import XpraServer
-from xpra.address import server_sock
+from xpra.dotxpra import DotXpra
 
 _cleanups = []
 def run_cleanups():
@@ -91,7 +91,8 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
 
     assert mode in ("start", "upgrade")
     upgrading = (mode == "upgrade")
-    sockpath = server_sock(display_name, upgrading)
+    sockdir = DotXpra()
+    sockpath = sockdir.server_socket_path(display_name, upgrading)
     logpath = sockpath + ".log"
     scriptpath = sockpath + ".xpra.sh"
 

@@ -1,7 +1,6 @@
 import gobject
 import sys
 import os
-import stat
 import socket
 import subprocess
 from optparse import OptionParser
@@ -9,8 +8,7 @@ import logging
 
 import xpra
 from xpra.bencode import bencode
-from xpra.address import (sockdir, sockpath,
-                          server_state, LIVE, DEAD, UNKNOWN)
+from xpra.dotxpra import DotXpra
 
 def nox():
     if "DISPLAY" in os.environ:
@@ -85,18 +83,18 @@ def client_sock(parser, opts, extra_args):
                              + remote_xpra + ["_proxy", display],
                              stdin=b.fileno(), stdout=b.fileno(),
                              bufsize=0)
-        return a
+        return a, False
     else:
-        path = sockpath(display_name)
+        sockdir = DotXpra()
         sock = socket.socket(socket.AF_UNIX)
-        sock.connect(path)
-        return sock
+        sock.connect(sockdir.socket_path(display_name))
+        return sock, True
 
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
-    sock = client_sock(parser, opts, extra_args)
+    sock, local = client_sock(parser, opts, extra_args)
     app = XpraClient(sock)
     sys.stdout.write("Attached\n")
     app.run()
@@ -105,7 +103,7 @@ def run_proxy(parser, opts, extra_args):
     from xpra.proxy import XpraProxy
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
-    app = XpraProxy(0, 1, client_sock(parser, opts, extra_args))
+    app = XpraProxy(0, 1, client_sock(parser, opts, extra_args)[0])
     app.run()
 
 def run_stop(parser, opts, extra_args):
@@ -114,43 +112,42 @@ def run_stop(parser, opts, extra_args):
     display_name = extra_args[0]
     magic_string = bencode(["hello", []]) + bencode(["shutdown-server"])
 
-    sock = client_sock(parser, opts, extra_args)
+    sock, local = client_sock(parser, opts, extra_args)
     sock.sendall(magic_string)
     while sock.recv(4096):
         pass
-    final_state = server_state(display_name)
-    if final_state is DEAD:
-        print "xpra at %s has exited." % display_name
-        sys.exit(0)
-    elif final_state is UNKNOWN:
-        print ("How odd... I'm not sure what's going on with xpra at %s"
-               % display_name)
-        sys.exit(1)
-    elif final_state is LIVE:
-        print "Failed to shutdown xpra at %s" % display_name
-        sys.exit(1)
+    if local:
+        sockdir = DotXpra()
+        final_state = sockdir.server_state(display_name)
+        if final_state is DotXpra.DEAD:
+            print "xpra at %s has exited." % display_name
+            sys.exit(0)
+        elif final_state is DotXpra.UNKNOWN:
+            print ("How odd... I'm not sure what's going on with xpra at %s"
+                   % display_name)
+            sys.exit(1)
+        elif final_state is DotXpra.LIVE:
+            print "Failed to shutdown xpra at %s" % display_name
+            sys.exit(1)
+        else:
+            assert False
     else:
-        assert False
+        print "Sent shutdown command"
 
 def run_list(parser, opts, extra_args):
     if extra_args:
         parser.error("too many arguments for mode")
-    results = []
-    potential_socket_leafs = os.listdir(sockdir())
-    for leaf in potential_socket_leafs:
-        full = os.path.join(sockdir(), leaf)
-        if stat.S_ISSOCK(os.stat(full).st_mode):
-            state = server_state(full)
-            results.append((state, leaf))
+    sockdir = DotXpra()
+    results = sockdir.sockets()
     if not results:
         sys.stdout.write("No xpra sessions found\n")
     else:
         sys.stdout.write("Found the following xpra sessions:\n")
-        for state, leaf in results:
-            sys.stdout.write("\t%s session at %s" % (state, leaf))
-            if state is DEAD:
+        for state, display in results:
+            sys.stdout.write("\t%s session at %s" % (state, display))
+            if state is DotXpra.DEAD:
                 try:
-                    os.unlink(os.path.join(sockdir(), leaf))
+                    os.unlink(sockdir.socket_path(display))
                 except OSError:
                     pass
                 else:
