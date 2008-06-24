@@ -38,7 +38,49 @@ def get_pid():
     return prop_get(gtk.gdk.get_default_root_window(),
                     "_XPRA_SERVER_PID", "u32")
 
-def run_server(parser, opts, mode, extra_args):
+def sh_quotemeta(s):
+    safe = ("abcdefghijklmnopqrstuvwxyz"
+            + "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            + "0123456789"
+            + "/._:,-+")
+    quoted_chars = []
+    for char in s:
+        if char not in safe:
+            quoted_chars.append("\\")
+        quoted_chars.append(char)
+    return "\"%s\"" % ("".join(quoted_chars),)
+
+def xpra_runner_shell_script(xpra_file):
+    script = []
+    script.append("#!/bin/sh\n")
+    script.append("cd %s\n" % sh_quotemeta(os.getcwd()))
+    for var, value in os.environ.iteritems():
+        # :-separated envvars that people might change while their server is
+        # going:
+        if var in ("PATH", "LD_LIBRARY_PATH", "PYTHONPATH"):
+            script.append("%s=%s:\"$%s\"; export %s\n"
+                          % (var, sh_quotemeta(value), var, var))
+        else:
+            script.append("%s=%s; export %s\n"
+                          % (var, sh_quotemeta(value), var))
+    script.append("_XPRA_PYTHON=%s\n" % (sh_quotemeta(sys.executable),))
+    script.append("_XPRA_SCRIPT=%s\n" % (sh_quotemeta(xpra_file),))
+    script.append("""
+if which "$_XPRA_PYTHON" > /dev/null && [ -e "$_XPRA_SCRIPT" ]; then
+    # Happypath:
+    exec "$_XPRA_PYTHON" "$_XPRA_SCRIPT" "$@"
+else
+    cat >2 <<END
+    Could not find one or both of '$_XPRA_PYTHON' and '$_XPRA_SCRIPT'
+    Perhaps your environment has changed since the xpra server was started?
+    I'll just try executing 'xpra' with current PATH, and hope...
+END
+    exec xpra "$@"
+fi
+""")
+    return "".join(script)
+
+def run_server(parser, opts, mode, xpra_file, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     display_name = extra_args[0]
@@ -51,6 +93,7 @@ def run_server(parser, opts, mode, extra_args):
     upgrading = (mode == "upgrade")
     sockpath = server_sock(display_name, upgrading)
     logpath = sockpath + ".log"
+    scriptpath = sockpath + ".xpra.sh"
 
     # Daemonize:
     if opts.daemon:
@@ -90,6 +133,14 @@ def run_server(parser, opts, mode, extra_args):
         # Make these line-buffered:
         sys.stdout = os.fdopen(1, "w", 1)
         sys.stderr = os.fdopen(2, "w", 1)
+
+    # Write out a shell-script so that we can start our proxy in a clean
+    # environment:
+    open(scriptpath, "w").write(xpra_runner_shell_script(xpra_file))
+    # Unix is a little silly sometimes:
+    umask = os.umask(0)
+    os.umask(umask)
+    os.chmod(scriptpath, 0777 & ~umask)
 
     if not upgrading:
         # We need to set up a new server environment

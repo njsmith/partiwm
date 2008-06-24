@@ -18,7 +18,7 @@ def nox():
     import warnings
     warnings.filterwarnings("ignore", "could not open display")
 
-def main(cmdline):
+def main(script_file, cmdline):
     parser = OptionParser(version="xpra v%s" % xpra.__version__,
                           usage=("\n"
                                  + "\t%prog start DISPLAY\n"
@@ -55,7 +55,7 @@ def main(cmdline):
     if mode in ("start", "upgrade"):
         nox()
         from xpra.scripts.server import run_server
-        run_server(parser, options, mode, args[1:])
+        run_server(parser, options, mode, script_file, args[1:])
     elif mode == "attach":
         run_client(parser, options, args[1:])
     elif mode == "stop":
