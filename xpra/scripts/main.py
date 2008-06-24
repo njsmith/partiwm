@@ -30,7 +30,7 @@ def main(script_file, cmdline):
                       dest="daemon", default=True,
                       help="Don't daemonize when running as a server")
     parser.add_option("--remote-xpra", action="store",
-                      dest="remote_xpra", default="xpra", metavar="CMD",
+                      dest="remote_xpra", default=None, metavar="CMD",
                       help="How to run 'xpra' on the remote host")
     parser.add_option("-d", "--debug", action="store",
                       dest="debug", default=None, metavar="FILTER1,FILTER2,...",
@@ -77,7 +77,10 @@ def client_sock(parser, opts, extra_args):
         (_, host, display) = display_name.split(":", 2)
         display = ":" + display
         (a, b) = socket.socketpair()
-        remote_xpra = opts.remote_xpra.split()
+        if opts.remote_xpra is not None:
+            remote_xpra = opts.remote_xpra.split()
+        else:
+            remote_xpra = ["$HOME/.xpra/%s.xpra.sh" % (display,)]
         p = subprocess.Popen(["ssh", host, "-e", "none"]
                              + remote_xpra + ["_proxy", display],
                              stdin=b.fileno(), stdout=b.fileno(),
