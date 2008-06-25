@@ -15,6 +15,9 @@ class DotXpra(object):
         if not os.path.exists(self._dir):
             os.mkdir(dir, 0700)
 
+    def dir(self):
+        return self._dir
+
     def _normalize_local_display_name(self, local_display_name):
         if not local_display_name.startswith(":"):
             local_display_name = ":" + local_display_name
@@ -30,17 +33,12 @@ class DotXpra(object):
     DEAD = "DEAD"
     UNKNOWN = "UNKNOWN"
     def server_state(self, local_display_name):
-        print local_display_name
         path = self.socket_path(local_display_name)
-        print path
         if not os.path.exists(path):
-            print "no there there"
             return self.DEAD
         sock = socket.socket(socket.AF_UNIX)
         try:
-            print "tryin gto connect to ", path
             sock.connect(path)
-            print "connected"
         except socket.error, e:
             err = e.args[0]
             if err in (errno.ECONNREFUSED, errno.ENOENT):

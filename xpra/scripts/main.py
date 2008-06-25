@@ -67,20 +67,42 @@ def main(script_file, cmdline):
     else:
         parser.error("invalid mode '%s'" % mode)
 
-def client_sock(parser, opts, extra_args):
-    if len(extra_args) != 1:
-        parser.error("connect to what?")
-    display_name = extra_args[0]
+def pick_display(parser, extra_args):
+    if len(extra_args) == 0:
+        # Pick a default server
+        sockdir = DotXpra()
+        servers = sockdir.sockets()
+        live_servers = [display
+                        for (state, display) in servers
+                        if state is DotXpra.LIVE]
+        if len(live_servers) == 0:
+            parser.error("cannot find a live server to connect to")
+        elif len(live_servers) == 1:
+            return live_servers[0]
+        else:
+            parser.error("there are multiple servers running, please specify")
+    elif len(extra_args) == 1:
+        return extra_args[0]
+    else:
+        parser.error("too many arguments")
+
+def client_sock(parser, opts, display_name):
     if display_name.startswith("ssh:"):
-        (_, host, display) = display_name.split(":", 2)
-        display = ":" + display
+        sshspec = display_name[len("ssh:"):]
+        if ":" in sshspec:
+            (host, display) = sshspec.split(":", 1)
+            display_args = [":" + display]
+        else:
+            host = sshspec
+            display_args = []
         (a, b) = socket.socketpair()
         if opts.remote_xpra is not None:
             remote_xpra = opts.remote_xpra.split()
         else:
-            remote_xpra = ["$HOME/.xpra/%s.xpra.sh" % (display,)]
+            remote_xpra = ["$HOME/.xpra/run-xpra.sh"]
+        
         p = subprocess.Popen(["ssh", host, "-e", "none"]
-                             + remote_xpra + ["_proxy", display],
+                             + remote_xpra + ["_proxy"] + display_args,
                              stdin=b.fileno(), stdout=b.fileno(),
                              bufsize=0)
         return a, False
@@ -92,27 +114,21 @@ def client_sock(parser, opts, extra_args):
 
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
-    if len(extra_args) != 1:
-        parser.error("need exactly 1 extra argument")
-    sock, local = client_sock(parser, opts, extra_args)
+    sock, local = client_sock(parser, opts, pick_display(parser, extra_args))
     app = XpraClient(sock)
     sys.stdout.write("Attached\n")
     app.run()
 
 def run_proxy(parser, opts, extra_args):
     from xpra.proxy import XpraProxy
-    if len(extra_args) != 1:
-        parser.error("need exactly 1 extra argument")
-    app = XpraProxy(0, 1, client_sock(parser, opts, extra_args)[0])
+    app = XpraProxy(0, 1, client_sock(parser, opts, pick_display(parser, extra_args))[0])
     app.run()
 
 def run_stop(parser, opts, extra_args):
-    if len(extra_args) != 1:
-        parser.error("need exactly 1 extra argument")
-    display_name = extra_args[0]
     magic_string = bencode(["hello", []]) + bencode(["shutdown-server"])
 
-    sock, local = client_sock(parser, opts, extra_args)
+    display_name = pick_display(parser, extra_args)
+    sock, local = client_sock(parser, opts, display_name)
     sock.sendall(magic_string)
     while sock.recv(4096):
         pass

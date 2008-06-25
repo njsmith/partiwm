@@ -53,7 +53,6 @@ def sh_quotemeta(s):
 def xpra_runner_shell_script(xpra_file):
     script = []
     script.append("#!/bin/sh\n")
-    script.append("cd %s\n" % sh_quotemeta(os.getcwd()))
     for var, value in os.environ.iteritems():
         # :-separated envvars that people might change while their server is
         # going:
@@ -63,6 +62,9 @@ def xpra_runner_shell_script(xpra_file):
         else:
             script.append("%s=%s; export %s\n"
                           % (var, sh_quotemeta(value), var))
+    # We ignore failures in cd'ing, b/c it's entirely possible that we were
+    # started from some temporary directory and all paths are absolute.
+    script.append("cd %s\n" % sh_quotemeta(os.getcwd()))
     script.append("_XPRA_PYTHON=%s\n" % (sh_quotemeta(sys.executable),))
     script.append("_XPRA_SCRIPT=%s\n" % (sh_quotemeta(xpra_file),))
     script.append("""
@@ -94,7 +96,15 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     sockdir = DotXpra()
     sockpath = sockdir.server_socket_path(display_name, upgrading)
     logpath = sockpath + ".log"
-    scriptpath = sockpath + ".xpra.sh"
+    # This used to be given a display-specific name, but now we give it a
+    # single fixed name and if multiple servers are started then the last one
+    # will clobber the rest.  This isn't great, but the tradeoff is that it
+    # makes it possible to use bare 'ssh:hostname' display names and
+    # autodiscover the proper numeric display name when only one xpra server
+    # is running on the remote host.  Might need to revisit this later if
+    # people run into problems or autodiscovery turns out to be less useful
+    # than expected.
+    scriptpath = os.path.join(sockdir.dir(), "run-xpra.sh")
 
     # Daemonize:
     if opts.daemon:
