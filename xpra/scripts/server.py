@@ -5,6 +5,7 @@ import os
 import os.path
 import atexit
 import signal
+import time
 
 from wimpiggy.prop import prop_set, prop_get
 
@@ -81,6 +82,21 @@ END
 fi
 """)
     return "".join(script)
+
+def safe_gdk_connect(x_display_name):
+    TIMEOUT = 3
+    start = time.time()
+    first_time = True
+    while (time.time() - start) < TIMEOUT:
+        if not first_time:
+            time.sleep(0.2)
+        first_time = False
+        try:
+            return gtk.gdk.Display(x_display_name)
+        except RuntimeError:
+            pass
+    raise RuntimeError, ("could not connect to server after %s seconds"
+                         % TIMEOUT)
 
 def run_server(parser, opts, mode, xpra_file, extra_args):
     if len(extra_args) != 1:
@@ -172,7 +188,7 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     # Whether we spawned our server or not, it is now running, and we can
     # connect to it.
     os.environ["DISPLAY"] = display_name
-    display = gtk.gdk.Display(display_name)
+    display = safe_gdk_connect(display_name)
     manager = gtk.gdk.display_manager_get()
     default_display = manager.get_default_display()
     if default_display is not None:
