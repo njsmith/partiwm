@@ -213,17 +213,28 @@ class ClientWindow(gtk.Window):
         self._client.send_mouse_position(["pointer-position", self._id,
                                           pointer, modifiers])
         
-    def _button_action(self, event, depressed):
+    def _button_action(self, button, event, depressed):
         (pointer, modifiers) = self._pointer_modifiers(event)
         self._client.send_positional(["button-action", self._id,
-                                      event.button, depressed,
+                                      button, depressed,
                                       pointer, modifiers])
 
     def do_button_press_event(self, event):
-        self._button_action(event, True)
+        self._button_action(event.button, event, True)
 
     def do_button_release_event(self, event):
-        self._button_action(event, False)
+        self._button_action(event.button, event, False)
+
+    def do_scroll_event(self, event):
+        # Map scroll directions back to mouse buttons.  Mapping is taken from
+        # gdk/x11/gdkevents-x11.c.
+        scroll_map = {gtk.gdk.SCROLL_UP: 4,
+                      gtk.gdk.SCROLL_DOWN: 5,
+                      gtk.gdk.SCROLL_LEFT: 6,
+                      gtk.gdk.SCROLL_RIGHT: 7,
+                      }
+        self._button_action(scroll_map[event.direction], event, True)
+        self._button_action(scroll_map[event.direction], event, False)
 
     def _focus_change(self, *args):
         self._client.update_focus(self._id,
