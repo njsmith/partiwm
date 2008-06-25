@@ -73,11 +73,13 @@ class DesktopManager(gtk.Widget):
     def visible(self, model):
         return self._models[model].shown
 
-    def reorder_windows(self, models_bottom_to_top):
-        for model in models_bottom_to_top:
-            win = self._models[model].window
-            if win is not None:
-                win.raise_()
+    def raise_window(self, model):
+        if isinstance(model, OverrideRedirectWindowModel):
+            model.get_property("client-window").raise_()
+        else:
+            window = self._models[model].window
+            if window is not None:
+                window.raise_()
 
     ## For communicating with WindowModels:
 
@@ -476,7 +478,13 @@ class XpraServer(gobject.GObject):
         self._send(["hello", capabilities])
         if "deflate" in capabilities:
             self._protocol.enable_deflate(capabilities["deflate"])
-        for window in self._window_to_id.keys():
+        # We send the new-window packets sorted by id because this sorts them
+        # from oldest to newest -- and preserving window creation order means
+        # that the earliest override-redirect windows will be on the bottom,
+        # which is usually how things work.  (I don't know that anyone cares
+        # about this kind of correctness at all, but hey, doesn't hurt.)
+        for id in sorted(self._id_to_window.iterkeys()):
+            window = self._id_to_window[id]
             if isinstance(window, OverrideRedirectWindowModel):
                 self._send_new_or_window_packet(window)
             else:
@@ -516,12 +524,6 @@ class XpraServer(gobject.GObject):
         (x, y, _, _) = self._desktop_manager.window_geometry(window)
         self._desktop_manager.configure_window(window, x, y, w, h)
 
-    def _process_window_order(self, proto, packet):
-        (_, ids_bottom_to_top) = packet
-        windows_bottom_to_top = [self._id_to_window[id]
-                                 for id in ids_bottom_to_top]
-        self._desktop_manager.reorder_windows(windows_bottom_to_top)
-
     def _process_focus(self, proto, packet):
         (_, id) = packet
         self._focus(id)
@@ -534,14 +536,16 @@ class XpraServer(gobject.GObject):
                        self._keycode(keyname), depressed)
 
     def _process_button_action(self, proto, packet):
-        (_, button, depressed, pointer, modifiers) = packet
+        (_, id, button, depressed, pointer, modifiers) = packet
         self._make_keymask_match(modifiers)
+        self._desktop_manager.raise_window(self._id_to_window[id])
         self._move_pointer(pointer)
         xtest_fake_button(gtk.gdk.display_get_default(), button, depressed)
 
     def _process_pointer_position(self, proto, packet):
-        (_, pointer, modifiers) = packet
+        (_, id, pointer, modifiers) = packet
         self._make_keymask_match(modifiers)
+        self._desktop_manager.raise_window(self._id_to_window[id])
         self._move_pointer(pointer)
 
     def _process_close_window(self, proto, packet):
@@ -567,7 +571,6 @@ class XpraServer(gobject.GObject):
         "unmap-window": _process_unmap_window,
         "move-window": _process_move_window,
         "resize-window": _process_resize_window,
-        "window-order": _process_window_order,
         "focus": _process_focus,
         "key-action": _process_key_action,
         "button-action": _process_button_action,

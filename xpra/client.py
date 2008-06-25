@@ -210,13 +210,14 @@ class ClientWindow(gtk.Window):
 
     def do_motion_notify_event(self, event):
         (pointer, modifiers) = self._pointer_modifiers(event)
-        self._client.send_mouse_position(["pointer-position", pointer,
-                                          modifiers])
+        self._client.send_mouse_position(["pointer-position", self._id,
+                                          pointer, modifiers])
         
     def _button_action(self, event, depressed):
         (pointer, modifiers) = self._pointer_modifiers(event)
-        self._client.send_positional(["button-action", event.button,
-                                      depressed, pointer, modifiers])
+        self._client.send_positional(["button-action", self._id,
+                                      event.button, depressed,
+                                      pointer, modifiers])
 
     def do_button_press_event(self, event):
         self._button_action(event, True)
@@ -283,23 +284,6 @@ class XpraClient(gobject.GObject):
 
     def send_mouse_position(self, packet):
         self._protocol.source.queue_mouse_position_packet(packet)
-
-    def do_wimpiggy_property_notify_event(self, event):
-        root = gtk.gdk.get_default_root_window()
-        assert event.window is root
-        if str(event.atom) == "_NET_CLIENT_LIST_STACKING":
-            log("_NET_CLIENT_LIST_STACKING changed")
-            stacking = prop_get(root, "_NET_CLIENT_LIST_STACKING", ["window"])
-            our_windows = dict([(w.window, id)
-                                for (w, id) in self._window_to_id.iteritems()])
-            if None in our_windows:
-                del our_windows[None]
-            our_stacking = [our_windows[win]
-                            for win in stacking
-                            if win in our_windows]
-            if self._stacking != our_stacking and len(our_stacking) > 1:
-                self.send(["window-order", our_stacking])
-            self._stacking = our_stacking
 
     def _process_hello(self, packet):
         (_, capabilities) = packet
