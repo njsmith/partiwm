@@ -88,7 +88,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
                 # we are safe.  (I think.)
                 listening = []
                 win = get_parent(self._window)
-                while win is not gtk.gdk.get_default_root_window():
+                while win.get_parent() is not None:
                     # We have to use a lowlevel function to manipulate the
                     # event selection here, because SubstructureRedirectMask
                     # does not roundtrip through the GDK event mask

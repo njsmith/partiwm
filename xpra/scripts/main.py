@@ -49,21 +49,21 @@ def main(script_file, cmdline):
             logger.setLevel(logging.DEBUG)
     logging.root.addHandler(logging.StreamHandler(sys.stderr))
 
-    mode = args[0]
+    mode = args.pop(0)
     if mode in ("start", "upgrade"):
         nox()
         from xpra.scripts.server import run_server
-        run_server(parser, options, mode, script_file, args[1:])
+        run_server(parser, options, mode, script_file, args)
     elif mode == "attach":
-        run_client(parser, options, args[1:])
+        run_client(parser, options, args)
     elif mode == "stop":
         nox()
-        run_stop(parser, options, args[1:])
+        run_stop(parser, options, args)
     elif mode == "list":
-        run_list(parser, options, args[1:])
+        run_list(parser, options, args)
     elif mode == "_proxy":
         nox()
-        run_proxy(parser, options, args[1:])
+        run_proxy(parser, options, args)
     else:
         parser.error("invalid mode '%s'" % mode)
 

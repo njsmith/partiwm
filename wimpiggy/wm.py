@@ -166,6 +166,7 @@ class Wm(gobject.GObject):
 
         # Load up our full-screen widget
         self._world_window = WorldWindow()
+        self._world_window.set_screen(self._display.get_default_screen())
         self.notify("toplevel")
         self._world_window.show_all()
 
