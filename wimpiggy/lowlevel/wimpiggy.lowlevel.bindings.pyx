@@ -1084,14 +1084,21 @@ def _route_event(event, signal, parent_signal):
     # matters for override redirect windows when they disappear, and we don't
     # care about those anyway.
     if event.window is None:
+        log("event.window is None, ignoring")
         assert event.type in (gtk.gdk.UNMAP, gtk.gdk.DESTROY)
         return
     if event.window is event.delivered_to:
         if signal is not None:
+            log("forwarding to involved window's handler")
             _maybe_send_event(event.window, signal, event)
+        else:
+            log("would forward to involved window's handler but there is none")
     else:
         if parent_signal is not None:
+            log("forwarding to parent window's handler")
             _maybe_send_event(event.delivered_to, parent_signal, event)
+        else:
+            log("would forward to parent window's handler but there is none")
 
 _x_event_signals = {
     MapRequest: (None, "child-map-request-event"),
