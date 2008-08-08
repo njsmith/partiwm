@@ -35,7 +35,8 @@ def deadly_signal(signum, frame):
 # child to exit and us to receive the SIGCHLD before our fork() returns (and
 # thus before we even know the pid of the child).  So be careful:
 class ChildReaper(object):
-    def __init__(self, survive_children):
+    def __init__(self, app, survive_children):
+        self._app = app
         self._children_pids = None
         self._dead_pids = set()
         self._survive_children = survive_children
@@ -49,7 +50,7 @@ class ChildReaper(object):
         if (self._children_pids
             and self._children_pids.issubset(self._dead_pids)):
             print "all children have exited and --survive-children was not specified, exiting"
-            os.exit(0)
+            self._app.quit(False)
 
     def __call__(self, signum, frame):
         while 1:
@@ -242,7 +243,16 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     if xvfb_pid is not None:
         save_pid(xvfb_pid)
 
-    child_reaper = ChildReaper(opts.survive_children)
+    app = XpraServer(sockpath, upgrading)
+    def cleanup_socket(self):
+        print "removing socket"
+        try:
+            os.unlink(sockpath)
+        except:
+            pass
+    _cleanups.append(cleanup_socket)
+
+    child_reaper = ChildReaper(app, opts.survive_children)
     # Always register the child reaper, because even if survive_children is
     # true, we still need to reap them somehow to avoid zombies:
     signal.signal(signal.SIGCHLD, child_reaper)
@@ -252,14 +262,6 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
             children_pids.add(subprocess.Popen(child_cmd, shell=True).pid)
         child_reaper.set_children_pids(children_pids)
 
-    app = XpraServer(sockpath, upgrading)
-    def cleanup_socket(self):
-        print "removing socket"
-        try:
-            os.unlink(sockpath)
-        except:
-            pass
-    _cleanups.append(cleanup_socket)
     if app.run():
         # Upgrading, so leave X server running
         _cleanups.remove(kill_xvfb)
