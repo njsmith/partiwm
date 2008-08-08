@@ -370,13 +370,18 @@ class XpraServer(gobject.GObject):
         (_, _, current_mask) = gtk.gdk.get_default_root_window().get_pointer()
         current = set(mask_to_names(current_mask, self._modifier_map))
         wanted = set(modifier_list)
+        log.debug("current mask: %s, wanted: %s", current, wanted)
         for modifier in current.difference(wanted):
+            keyname = self._keyname_for_mod[modifier]
+            log.debug("unpressing %s", keyname)
             xtest_fake_key(gtk.gdk.display_get_default(),
-                           self._keycode(self._keyname_for_mod[modifier]),
+                           self._keycode(keyname),
                            False)
         for modifier in wanted.difference(current):
+            keyname = self._keyname_for_mod[modifier]
+            log.debug("pressing %s", keyname)
             xtest_fake_key(gtk.gdk.display_get_default(),
-                           self._keycode(self._keyname_for_mod[modifier]),
+                           self._keycode(keyname),
                            True)
 
     def _focus(self, id):
@@ -532,6 +537,7 @@ class XpraServer(gobject.GObject):
         (_, id, keyname, depressed, modifiers) = packet
         self._make_keymask_match(modifiers)
         self._focus(id)
+        log.debug("now %spressing key %s", depressed, keyname)
         xtest_fake_key(gtk.gdk.display_get_default(),
                        self._keycode(keyname), depressed)
 
