@@ -1072,10 +1072,15 @@ def _maybe_send_event(window, signal, event):
         # to be added or removed from it while we are iterating:
         for handler in list(handlers):
             if signal in gobject.signal_list_names(handler):
-                log("  forwarding event to a %s handler",
-                    type(handler).__name__)
+                log("  forwarding event to a %s handler's %s signal",
+                    type(handler).__name__, signal)
                 handler.emit(signal, event)
                 log("  forwarded")
+            else:
+                log("  not forwarding to %s handler, it has no %s signal",
+                    type(handler).__name__, signal)
+    else:
+        log("  no handler registered for this window, ignoring event")
 
 def _route_event(event, signal, parent_signal):
     # Sometimes we get GDK events with event.window == None, because they are
@@ -1084,21 +1089,21 @@ def _route_event(event, signal, parent_signal):
     # matters for override redirect windows when they disappear, and we don't
     # care about those anyway.
     if event.window is None:
-        log("event.window is None, ignoring")
+        log("  event.window is None, ignoring")
         assert event.type in (gtk.gdk.UNMAP, gtk.gdk.DESTROY)
         return
     if event.window is event.delivered_to:
         if signal is not None:
-            log("forwarding to involved window's handler")
+            log("  event was delivered to window itself")
             _maybe_send_event(event.window, signal, event)
         else:
-            log("would forward to involved window's handler but there is none")
+            log("  received event on window itself but have no signal for that")
     else:
         if parent_signal is not None:
-            log("forwarding to parent window's handler")
+            log("  event was delivered to parent window")
             _maybe_send_event(event.delivered_to, parent_signal, event)
         else:
-            log("would forward to parent window's handler but there is none")
+            log("  received event on a parent window but have no parent signal")
 
 _x_event_signals = {
     MapRequest: (None, "child-map-request-event"),
@@ -1224,7 +1229,7 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     pyev.hardware_keycode = e.xkey.keycode
                     pyev.state = e.xkey.state
                 elif e.type == damage_type:
-                    #log("DamageNotify received")
+                    log("DamageNotify received")
                     damage_e = <XDamageNotifyEvent*>e
                     pyev.window = _gw(d, e.xany.window)
                     pyev.damage = damage_e.damage
