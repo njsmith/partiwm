@@ -31,6 +31,37 @@ def deadly_signal(signum, frame):
     #kill(os.getpid(), signum)
     os._exit(128 + signum)
 
+# Note that this class has async subtleties -- e.g., it is possible for a
+# child to exit and us to receive the SIGCHLD before our fork() returns (and
+# thus before we even know the pid of the child).  So be careful:
+class ChildReaper(object):
+    def __init__(self, survive_children):
+        self._children_pids = None
+        self._dead_pids = set()
+        self._survive_children = survive_children
+
+    def set_children_pids(self, children_pids):
+        assert self._children_pids is None
+        self._children_pids = children_pids
+        self.check()
+
+    def check(self):
+        if (self._children_pids
+            and self._children_pids.issubset(self._dead_pids)):
+            print "all children have exited and --survive-children was not specified, exiting"
+            os.exit(0)
+
+    def __call__(self, signum, frame):
+        while 1:
+            try:
+                pid, status = os.waitpid(-1, os.WNOHANG)
+            except OSError:
+                break
+            if pid == 0:
+                break
+            self._dead_pids.add(pid)
+            self.check()
+
 def save_pid(pid):
     prop_set(gtk.gdk.get_default_root_window(),
              "_XPRA_SERVER_PID", "u32", pid)
@@ -101,7 +132,7 @@ def safe_gdk_connect(x_display_name):
 def run_server(parser, opts, mode, xpra_file, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
-    display_name = extra_args[0]
+    display_name = extra_args.pop(0)
 
     atexit.register(run_cleanups)
     signal.signal(signal.SIGINT, deadly_signal)
@@ -210,6 +241,16 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
 
     if xvfb_pid is not None:
         save_pid(xvfb_pid)
+
+    child_reaper = ChildReaper(opts.survive_children)
+    # Always register the child reaper, because even if survive_children is
+    # true, we still need to reap them somehow to avoid zombies:
+    signal.signal(signal.SIGCHLD, child_reaper)
+    if opts.children:
+        children_pids = set()
+        for child_cmd in opts.children:
+            children_pids.add(subprocess.Popen(child_cmd, shell=True).pid)
+        child_reaper.set_children_pids(children_pids)
 
     app = XpraServer(sockpath, upgrading)
     def cleanup_socket(self):

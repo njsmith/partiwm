@@ -27,12 +27,21 @@ def main(script_file, cmdline):
     parser.add_option("--no-daemon", action="store_false",
                       dest="daemon", default=True,
                       help="Don't daemonize when running as a server")
+    parser.add_option("--no-automatic-stop", action="store_false",
+                      dest="automatic_stop", default=True,
+                      help="Don't terminate server when client on start command exits")
     parser.add_option("--remote-xpra", action="store",
                       dest="remote_xpra", default=None, metavar="CMD",
                       help="How to run 'xpra' on the remote host")
     parser.add_option("-d", "--debug", action="store",
                       dest="debug", default=None, metavar="FILTER1,FILTER2,...",
                       help="List of categories to enable debugging for (or \"all\")")
+    parser.add_option("--start-child", action="append",
+                      dest="children",
+                      help="program to spawn in new server (may be repeated)")
+    parser.add_option("--survive-children", action="store_true",
+                      dest="survive_children", default=False,
+                      help="Don't terminate server when --start-child command(s) exit")
     (options, args) = parser.parse_args(cmdline[1:])
 
     if not args:
