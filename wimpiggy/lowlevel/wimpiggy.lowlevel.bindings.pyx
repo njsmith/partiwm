@@ -1066,10 +1066,10 @@ def remove_event_receiver(window, receiver):
     window.set_data(_ev_receiver_key, receivers)
 
 def _maybe_send_event(window, signal, event):
-    # Copy the 'handlers' list, because signal handlers might cause items to
-    # be added or removed from it while we are iterating:
     handlers = window.get_data(_ev_receiver_key)
     if handlers is not None:
+        # Copy the 'handlers' list, because signal handlers might cause items
+        # to be added or removed from it while we are iterating:
         for handler in list(handlers):
             if signal in gobject.signal_list_names(handler):
                 log("  forwarding event to a %s handler",
