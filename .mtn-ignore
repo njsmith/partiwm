@@ -1,0 +1,6 @@
+^build
+^install
+^wimpiggy/lowlevel/wimpiggy.lowlevel.bindings.c$
+^wimpiggy/lowlevel/constants.pxi$
+^MANIFEST$
+^dist
