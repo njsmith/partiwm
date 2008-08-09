@@ -63,24 +63,37 @@ class Protocol(object):
             else:
                 self._write_buf += data
 
+    def _connection_lost(self):
+        self._accept_packets = False
+        self._process_packet_cb(self, [Protocol.CONNECTION_LOST])
+
     def _socket_writeable(self, *args):
         if not self._write_buf:
             # Underflow: refill buffer from source.
-            # We can't get here unless either _write_buf is non-empty, or
-            # _source_has_more == True, because of the guard in
-            # _update_write_watch.
+            # We can't get into this function at all unless either _write_buf
+            # is non-empty, or _source_has_more == True, because of the guard
+            # in _update_write_watch.
             assert self._source_has_more
             self._flush_one_packet_into_buffer()
-        sent = self._sock.send(self._write_buf)
-        self._write_buf = self._write_buf[sent:]
-        self._update_write_watch()
+        try:
+            sent = self._sock.send(self._write_buf)
+        except socket.error:
+            print "Error writing to socket"
+            self._connection_lost()
+        else:
+            self._write_buf = self._write_buf[sent:]
+            self._update_write_watch()
         return True
 
     def _socket_readable(self, *args):
-        buf = self._sock.recv(4096)
+        try:
+            buf = self._sock.recv(4096)
+        except socket.error:
+            print "Error reading from socket"
+            self._connection_lost()
+            return False
         if not buf:
-            self._accept_packets = False
-            self._process_packet_cb(self, [Protocol.CONNECTION_LOST])
+            self._connection_lost()
             return False
         if self._decompressor is not None:
             buf = self._decompressor.decompress(buf)
