@@ -1,4 +1,5 @@
 import gtk
+import gobject
 import subprocess
 import sys
 import os
@@ -262,6 +263,13 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
         for child_cmd in opts.children:
             children_pids.add(subprocess.Popen(child_cmd, shell=True).pid)
         child_reaper.set_children_pids(children_pids)
+    # Check once after the mainloop is running, just in case the exit
+    # conditions are satisfied before we even enter the main loop.
+    # (Programming with unix the signal API sure is annoying.)
+    def check_once():
+        child_reaper.check()
+        return False # Only call once
+    gobject.timeout_add(0, check_once)
 
     if app.run():
         # Upgrading, so leave X server running
