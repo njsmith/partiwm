@@ -1,4 +1,5 @@
 import gtk
+import gobject
 import subprocess
 import sys
 import os
@@ -30,6 +31,39 @@ def deadly_signal(signum, frame):
     #signal.signal(signum, signal.SIG_DFL)
     #kill(os.getpid(), signum)
     os._exit(128 + signum)
+
+# Note that this class has async subtleties -- e.g., it is possible for a
+# child to exit and us to receive the SIGCHLD before our fork() returns (and
+# thus before we even know the pid of the child).  So be careful:
+class ChildReaper(object):
+    def __init__(self, app, exit_with_children):
+        self._app = app
+        self._children_pids = None
+        self._dead_pids = set()
+        self._exit_with_children = exit_with_children
+
+    def set_children_pids(self, children_pids):
+        assert self._children_pids is None
+        self._children_pids = children_pids
+        self.check()
+
+    def check(self):
+        if (self._children_pids
+            and self._exit_with_children
+            and self._children_pids.issubset(self._dead_pids)):
+            print "all children have exited and --survive-children was not specified, exiting"
+            self._app.quit(False)
+
+    def __call__(self, signum, frame):
+        while 1:
+            try:
+                pid, status = os.waitpid(-1, os.WNOHANG)
+            except OSError:
+                break
+            if pid == 0:
+                break
+            self._dead_pids.add(pid)
+            self.check()
 
 def save_pid(pid):
     prop_set(gtk.gdk.get_default_root_window(),
@@ -101,7 +135,11 @@ def safe_gdk_connect(x_display_name):
 def run_server(parser, opts, mode, xpra_file, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
-    display_name = extra_args[0]
+    display_name = extra_args.pop(0)
+
+    if opts.exit_with_children and not opts.children:
+        print "--exit-with-children specified without any children to spawn; exiting immediately"
+        return
 
     atexit.register(run_cleanups)
     signal.signal(signal.SIGINT, deadly_signal)
@@ -219,6 +257,26 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
         except:
             pass
     _cleanups.append(cleanup_socket)
+
+    child_reaper = ChildReaper(app, opts.exit_with_children)
+    # Always register the child reaper, because even if exit_with_children is
+    # false, we still need to reap them somehow to avoid zombies:
+    signal.signal(signal.SIGCHLD, child_reaper)
+    if opts.exit_with_children:
+        assert opts.children
+    if opts.children:
+        children_pids = set()
+        for child_cmd in opts.children:
+            children_pids.add(subprocess.Popen(child_cmd, shell=True).pid)
+        child_reaper.set_children_pids(children_pids)
+    # Check once after the mainloop is running, just in case the exit
+    # conditions are satisfied before we even enter the main loop.
+    # (Programming with unix the signal API sure is annoying.)
+    def check_once():
+        child_reaper.check()
+        return False # Only call once
+    gobject.timeout_add(0, check_once)
+
     if app.run():
         # Upgrading, so leave X server running
         _cleanups.remove(kill_xvfb)
