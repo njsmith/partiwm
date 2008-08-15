@@ -36,11 +36,11 @@ def deadly_signal(signum, frame):
 # child to exit and us to receive the SIGCHLD before our fork() returns (and
 # thus before we even know the pid of the child).  So be careful:
 class ChildReaper(object):
-    def __init__(self, app, survive_children):
+    def __init__(self, app, exit_with_children):
         self._app = app
         self._children_pids = None
         self._dead_pids = set()
-        self._survive_children = survive_children
+        self._exit_with_children = exit_with_children
 
     def set_children_pids(self, children_pids):
         assert self._children_pids is None
@@ -49,7 +49,7 @@ class ChildReaper(object):
 
     def check(self):
         if (self._children_pids
-            and not self._survive_children
+            and self._exit_with_children
             and self._children_pids.issubset(self._dead_pids)):
             print "all children have exited and --survive-children was not specified, exiting"
             self._app.quit(False)
@@ -136,6 +136,10 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
     display_name = extra_args.pop(0)
+
+    if opts.exit_with_children and not opts.children:
+        print "--exit-with-children specified without any children to spawn; exiting immediately"
+        return
 
     atexit.register(run_cleanups)
     signal.signal(signal.SIGINT, deadly_signal)
@@ -254,10 +258,12 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
             pass
     _cleanups.append(cleanup_socket)
 
-    child_reaper = ChildReaper(app, opts.survive_children)
-    # Always register the child reaper, because even if survive_children is
-    # true, we still need to reap them somehow to avoid zombies:
+    child_reaper = ChildReaper(app, opts.exit_with_children)
+    # Always register the child reaper, because even if exit_with_children is
+    # false, we still need to reap them somehow to avoid zombies:
     signal.signal(signal.SIGCHLD, child_reaper)
+    if opts.exit_with_children:
+        assert opts.children
     if opts.children:
         children_pids = set()
         for child_cmd in opts.children:

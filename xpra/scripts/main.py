@@ -39,9 +39,9 @@ def main(script_file, cmdline):
     parser.add_option("--start-child", action="append",
                       dest="children",
                       help="program to spawn in new server (may be repeated)")
-    parser.add_option("--survive-children", action="store_true",
-                      dest="survive_children", default=False,
-                      help="Don't terminate server when --start-child command(s) exit")
+    parser.add_option("--exit-with-children", action="store_true",
+                      dest="exit_with_children", default=False,
+                      help="Terminate server when --start-child command(s) exit")
     (options, args) = parser.parse_args(cmdline[1:])
 
     if not args:
