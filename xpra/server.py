@@ -328,7 +328,8 @@ class XpraServer(gobject.GObject):
 
     def _or_window_geometry_changed(self, window, pspec):
         (x, y, w, h) = window.get_property("geometry")
-        self._send(["configure-override-redirect", x, y, w, h])
+        id = self._window_to_id[window]
+        self._send(["configure-override-redirect", id, x, y, w, h])
 
     _all_metadata = ("title", "size-hints", "class-instance")
 
