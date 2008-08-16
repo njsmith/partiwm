@@ -17,6 +17,14 @@ def nox():
     warnings.filterwarnings("ignore", "could not open display")
 
 def main(script_file, cmdline):
+    #################################################################
+    ## NOTE NOTE NOTE
+    ##
+    ## If you modify anything here, then remember to update the man page
+    ## (xpra.1) as well!
+    ##
+    ## NOTE NOTE NOTE
+    #################################################################
     parser = OptionParser(version="xpra v%s" % xpra.__version__,
                           usage=("\n"
                                  + "\t%prog start DISPLAY\n"
