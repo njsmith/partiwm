@@ -20,28 +20,25 @@ def main(script_file, cmdline):
     parser = OptionParser(version="xpra v%s" % xpra.__version__,
                           usage=("\n"
                                  + "\t%prog start DISPLAY\n"
-                                 + "\t%prog attach DISPLAY\n"
-                                 + "\t%prog stop DISPLAY\n"
+                                 + "\t%prog attach [DISPLAY]\n"
+                                 + "\t%prog stop [DISPLAY]\n"
                                  + "\t%prog list\n"
                                  + "\t%prog upgrade DISPLAY"))
+    parser.add_option("--start-child", action="append",
+                      dest="children", metavar="CMD",
+                      help="program to spawn in new server (may be repeated)")
+    parser.add_option("--exit-with-children", action="store_true",
+                      dest="exit_with_children", default=False,
+                      help="Terminate server when --start-child command(s) exit")
     parser.add_option("--no-daemon", action="store_false",
                       dest="daemon", default=True,
                       help="Don't daemonize when running as a server")
-    parser.add_option("--no-automatic-stop", action="store_false",
-                      dest="automatic_stop", default=True,
-                      help="Don't terminate server when client on start command exits")
     parser.add_option("--remote-xpra", action="store",
                       dest="remote_xpra", default=None, metavar="CMD",
                       help="How to run 'xpra' on the remote host")
     parser.add_option("-d", "--debug", action="store",
                       dest="debug", default=None, metavar="FILTER1,FILTER2,...",
                       help="List of categories to enable debugging for (or \"all\")")
-    parser.add_option("--start-child", action="append",
-                      dest="children",
-                      help="program to spawn in new server (may be repeated)")
-    parser.add_option("--exit-with-children", action="store_true",
-                      dest="exit_with_children", default=False,
-                      help="Terminate server when --start-child command(s) exit")
     (options, args) = parser.parse_args(cmdline[1:])
 
     if not args:
@@ -108,7 +105,7 @@ def client_sock(parser, opts, display_name):
         if opts.remote_xpra is not None:
             remote_xpra = opts.remote_xpra.split()
         else:
-            remote_xpra = ["$HOME/.xpra/run-xpra.sh"]
+            remote_xpra = ["$HOME/.xpra/run-xpra"]
         
         p = subprocess.Popen(["ssh", host, "-e", "none"]
                              + remote_xpra + ["_proxy"] + display_args,

@@ -158,7 +158,7 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     # is running on the remote host.  Might need to revisit this later if
     # people run into problems or autodiscovery turns out to be less useful
     # than expected.
-    scriptpath = os.path.join(sockdir.dir(), "run-xpra.sh")
+    scriptpath = os.path.join(sockdir.dir(), "run-xpra")
 
     # Daemonize:
     if opts.daemon:
