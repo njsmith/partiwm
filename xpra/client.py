@@ -251,10 +251,6 @@ class XpraClient(gobject.GObject):
         gobject.GObject.__init__(self)
         self._window_to_id = {}
         self._id_to_window = {}
-        self._stacking = []
-
-        if not gtk.gdk.net_wm_supports("_NET_CLIENT_LIST_STACKING"):
-            assert False, "this program requires an EWMH-compliant window manager"
 
         root = gtk.gdk.get_default_root_window()
         root.set_events(root.get_events() | gtk.gdk.PROPERTY_NOTIFY)
