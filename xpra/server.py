@@ -324,7 +324,6 @@ class XpraServer(gobject.GObject):
         self._add_new_window_common(window)
         window.connect("notify::geometry", self._or_window_geometry_changed)
         self._send_new_or_window_packet(window)
-        self._send_or_stacking_packet()
 
     def _or_window_geometry_changed(self, window, pspec):
         (x, y, w, h) = window.get_property("geometry")
@@ -428,19 +427,6 @@ class XpraServer(gobject.GObject):
         self._send(["new-override-redirect", id, x, y, w, h, {}])
         self._damage(window, 0, 0, w, h)
 
-    def _send_or_stacking_packet(self):
-        raw_or_to_id = {}
-        for window, id in self._window_to_id.iteritems():
-            if isinstance(window, OverrideRedirectWindowModel):
-                raw_or_to_id[window.get_property("client-window")] = id
-        or_stacking = []
-        root = gtk.gdk.get_default_root_window()
-        for raw_window in get_children(root):
-            if raw_window in raw_or_to_id:
-                or_stacking.append(raw_or_to_id[raw_window])
-        if or_stacking:
-            self._send(["override-redirect-order", or_stacking])
-        
     def _update_metadata(self, window, pspec):
         id = self._window_to_id[window]
         metadata = self._make_metadata(window, pspec.name)
@@ -496,7 +482,6 @@ class XpraServer(gobject.GObject):
             else:
                 self._desktop_manager.hide_window(window)
                 self._send_new_window_packet(window)
-        self._send_or_stacking_packet()
 
     def _process_map_window(self, proto, packet):
         (_, id, x, y, width, height) = packet

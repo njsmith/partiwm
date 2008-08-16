@@ -325,16 +325,6 @@ class XpraClient(gobject.GObject):
         window = self._id_to_window[id]
         window.update_metadata(metadata)
 
-    def _process_override_redirect_order(self, packet):
-        (_, order) = packet
-        try:
-            gtk.gdk.x11_grab_server()
-            for id in order:
-                window = self._id_to_window[id]
-                window.window.raise_()
-        finally:
-            gtk.gdk.x11_ungrab_server()
-
     def _process_configure_override_redirect(self, packet):
         (_, id, x, y, w, h) = packet
         window = self._id_to_window[id]
@@ -357,7 +347,6 @@ class XpraClient(gobject.GObject):
         "new-override-redirect": _process_new_override_redirect,
         "draw": _process_draw,
         "window-metadata": _process_window_metadata,
-        "override-redirect-order": _process_override_redirect_order,
         "configure-override-redirect": _process_configure_override_redirect,
         "lost-window": _process_lost_window,
         Protocol.CONNECTION_LOST: _process_connection_lost,
