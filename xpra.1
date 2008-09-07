@@ -216,9 +216,12 @@ attach\fP (see also the discussion of \fB\-\-remote\-xpra\fP).
 Xpra has no test suite.
 
 Xpra does not fully handle all aspects of the X protocol; for
-instance, as of August 2008 it does not yet forward clipboards,
-cursors, beeps, some window icons, some window manager hints, and
-probably other more obscure parts of the X protocol.
+instance, as of September 2008 it does not yet forward window icons,
+clipboards, custom cursors, beeps, fancy input features like
+pressure-sensitivity on tablets, some window manager hints, and
+probably other more obscure parts of the X protocol.  It does,
+however, degrade gracefully, and patches for each feature would be
+gratefully accepted.
 
 The mapping between local and remote keyboard events is not very
 robust; in particular, it is possible in some situations for modifier
