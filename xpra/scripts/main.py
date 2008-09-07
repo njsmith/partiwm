@@ -13,8 +13,10 @@ from xpra.dotxpra import DotXpra
 def nox():
     if "DISPLAY" in os.environ:
         del os.environ["DISPLAY"]
+    # This is an error on Fedora/RH, so make it an error everywhere so it will
+    # be noticed:
     import warnings
-    warnings.filterwarnings("ignore", "could not open display")
+    warnings.filterwarnings("error", "could not open display")
 
 def main(script_file, cmdline):
     #################################################################

@@ -70,6 +70,10 @@ setup(
                 **pkgconfig("pygobject-2.0", "gdk-x11-2.0", "gtk+-x11-2.0",
                             "xtst", "xfixes", "xcomposite", "xdamage")
                 ),
+      Extension("xpra.wait_for_x_server",
+                ["xpra/xpra.wait_for_x_server.pyx"],
+                **pkgconfig("x11")
+                ),
       ],
     # Turn on Pyrex-sensitivity:
     cmdclass = {'build_ext': build_ext}

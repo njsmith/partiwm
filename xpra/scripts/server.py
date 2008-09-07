@@ -1,4 +1,5 @@
-import gtk
+# DO NOT IMPORT GTK HERE: see http://partiwm.org/ticket/34
+# (also do not import anything that imports gtk)
 import gobject
 import subprocess
 import sys
@@ -8,9 +9,7 @@ import atexit
 import signal
 import time
 
-from wimpiggy.prop import prop_set, prop_get
-
-from xpra.server import XpraServer
+from xpra.wait_for_x_server import wait_for_x_server
 from xpra.dotxpra import DotXpra
 
 _cleanups = []
@@ -66,12 +65,16 @@ class ChildReaper(object):
             self.check()
 
 def save_pid(pid):
-    prop_set(gtk.gdk.get_default_root_window(),
-             "_XPRA_SERVER_PID", "u32", pid)
+    import gtk
+    import wimpiggy.prop
+    wimpiggy.prop.prop_set(gtk.gdk.get_default_root_window(),
+                           "_XPRA_SERVER_PID", "u32", pid)
              
 def get_pid():
-    return prop_get(gtk.gdk.get_default_root_window(),
-                    "_XPRA_SERVER_PID", "u32")
+    import gtk
+    import wimpiggy.prop
+    return wimpiggy.prop.prop_get(gtk.gdk.get_default_root_window(),
+                                  "_XPRA_SERVER_PID", "u32")
 
 def sh_quotemeta(s):
     safe = ("abcdefghijklmnopqrstuvwxyz"
@@ -117,21 +120,6 @@ fi
 """)
     return "".join(script)
 
-def safe_gdk_connect(x_display_name):
-    TIMEOUT = 3
-    start = time.time()
-    first_time = True
-    while (time.time() - start) < TIMEOUT:
-        if not first_time:
-            time.sleep(0.2)
-        first_time = False
-        try:
-            return gtk.gdk.Display(x_display_name)
-        except RuntimeError:
-            pass
-    raise RuntimeError, ("could not connect to server after %s seconds"
-                         % TIMEOUT)
-
 def run_server(parser, opts, mode, xpra_file, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
@@ -167,8 +155,6 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
             os.unlink(logpath)
         logfd = os.open(logpath, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0666)
         assert logfd > 2
-        for display in gtk.gdk.display_manager_get().list_displays():
-            display.close()
         os.chdir("/")
 
         if os.fork():
@@ -207,11 +193,15 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     os.umask(umask)
     os.chmod(scriptpath, 0777 & ~umask)
 
+    # Do this after writing out the shell script:
+    os.environ["DISPLAY"] = display_name
+
     if not upgrading:
         # We need to set up a new server environment
         xauthority = os.environ.get("XAUTHORITY",
                                     os.path.expanduser("~/.Xauthority"))
-        xvfb = subprocess.Popen(["Xvfb-for-Xpra", display_name,
+        xvfb = subprocess.Popen(["Xvfb-for-Xpra-%s" % display_name,
+                                 display_name,
                                  "-auth", xauthority,
                                  "+extension", "Composite",
                                  "-screen", "0", "2048x2048x24+32",
@@ -223,10 +213,12 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
         assert not subprocess.call(["xauth", "add", display_name,
                                     "MIT-MAGIC-COOKIE-1", baked_cookie])
 
-    # Whether we spawned our server or not, it is now running, and we can
-    # connect to it.
-    os.environ["DISPLAY"] = display_name
-    display = safe_gdk_connect(display_name)
+    # Whether we spawned our server or not, it is now running -- or at least
+    # starting.  First wait for it to start up:
+    wait_for_x_server(display_name, 3) # 3s timeout
+    # Now we can safely load gtk and connect:
+    import gtk
+    display = gtk.gdk.Display(display_name)
     manager = gtk.gdk.display_manager_get()
     default_display = manager.get_default_display()
     if default_display is not None:
@@ -249,7 +241,9 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     if xvfb_pid is not None:
         save_pid(xvfb_pid)
 
-    app = XpraServer(sockpath, upgrading)
+    # This import is delayed because the module depends on gtk:
+    import xpra.server
+    app = xpra.server.XpraServer(sockpath, upgrading)
     def cleanup_socket(self):
         print "removing socket"
         try:
