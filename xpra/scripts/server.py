@@ -110,7 +110,7 @@ if which "$_XPRA_PYTHON" > /dev/null && [ -e "$_XPRA_SCRIPT" ]; then
     # Happypath:
     exec "$_XPRA_PYTHON" "$_XPRA_SCRIPT" "$@"
 else
-    cat >2 <<END
+    cat >&2 <<END
     Could not find one or both of '$_XPRA_PYTHON' and '$_XPRA_SCRIPT'
     Perhaps your environment has changed since the xpra server was started?
     I'll just try executing 'xpra' with current PATH, and hope...
