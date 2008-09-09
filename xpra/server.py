@@ -132,6 +132,7 @@ class ServerSource(object):
             del self._damage[id]
         
     def damage(self, id, window, x, y, w, h):
+        log("damage %s (%s, %s, %s, %s)", id, x, y, w, h)
         window, region = self._damage.setdefault(id,
                                                  (window, gtk.gdk.Region()))
         region.union_with_rect(gtk.gdk.Rectangle(x, y, w, h))
@@ -166,6 +167,12 @@ class ServerSource(object):
 
     def _get_rgb_data(self, pixmap, x, y, width, height):
         pixmap_w, pixmap_h = pixmap.get_size()
+        # Just in case we somehow end up with damage larger than the pixmap,
+        # we don't want to start requesting random chunks of memory (this
+        # could happen if a window is resized but we don't throw away our
+        # existing damage map):
+        assert x >= 0
+        assert y >= 0
         if x + width > pixmap_w:
             width = pixmap_w - x
         if y + height > pixmap_h:

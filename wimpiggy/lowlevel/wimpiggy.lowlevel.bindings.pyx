@@ -504,6 +504,13 @@ def is_override_redirect(pywindow):
                          &attrs)
     return attrs.override_redirect
 
+def geometry_with_border(pywindow):
+    cdef XWindowAttributes attrs
+    XGetWindowAttributes(get_xdisplay_for(pywindow),
+                         get_xwindow(pywindow),
+                         &attrs)
+    return (attrs.x, attrs.y, attrs.width, attrs.height, attrs.border_width)
+
 # Focus management
 def XSetInputFocus(pywindow, time=None):
     # Always does RevertToParent
@@ -1223,6 +1230,7 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     pyev.y = e.xconfigure.y
                     pyev.width = e.xconfigure.width
                     pyev.height = e.xconfigure.height
+                    pyev.border_width = e.xconfigure.border_width
                 elif e.type == ReparentNotify:
                     log("ReparentNotify event received")
                     pyev.window = _gw(d, e.xreparent.window)

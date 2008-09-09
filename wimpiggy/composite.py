@@ -8,7 +8,8 @@ from wimpiggy.lowlevel import (xcomposite_redirect_window,
                                xdamage_start, xdamage_stop,
                                xdamage_acknowledge,
                                add_event_receiver, remove_event_receiver,
-                               get_parent, addXSelectInput, const)
+                               get_parent, addXSelectInput, const,
+                               geometry_with_border)
 
 from wimpiggy.log import Logger
 log = Logger()
@@ -34,8 +35,11 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
         super(CompositeHelper, self).__init__()
         self._window = window
         self._already_composited = already_composited
-        if not self._already_composited:
-            xcomposite_redirect_window(window)
+        def setup():
+            if not self._already_composited:
+                xcomposite_redirect_window(window)
+            (_, _, _, _, self._border_width) = geometry_with_border(window)
+        trap.swallow(setup)
         self._listening_to = None
         self.invalidate_pixmap()
         self._damage_handle = xdamage_start(window)
@@ -55,7 +59,10 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
     def acknowledge_changes(self, x, y, w, h):
         if self._damage_handle is not None:
             trap.swallow(xdamage_acknowledge,
-                         self._window, self._damage_handle, x, y, w, h)
+                         self._window, self._damage_handle,
+                         x - self._border_width,
+                         y - self._border_width,
+                         w, h)
 
     def invalidate_pixmap(self):
         log("invalidating named pixmap", type="pixmap")
@@ -116,13 +123,16 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
     def do_wimpiggy_unmap_event(self, *args):
         self.invalidate_pixmap()
 
-    def do_wimpiggy_configure_event(self, *args):
+    def do_wimpiggy_configure_event(self, event):
+        self._border_width = event.border_width
         self.invalidate_pixmap()
 
     def do_wimpiggy_reparent_event(self, *args):
         self.invalidate_pixmap()
 
     def do_wimpiggy_damage_event(self, event):
+        event.x += self._border_width
+        event.y += self._border_width
         self.emit("contents-changed", event)
 
 gobject.type_register(CompositeHelper)

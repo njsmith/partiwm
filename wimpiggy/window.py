@@ -184,6 +184,9 @@ class BaseWindowModel(AutoPropGObjectMixin, gobject.GObject):
         "client-window": (gobject.TYPE_PYOBJECT,
                           "gtk.gdk.Window representing the client toplevel", "",
                           gobject.PARAM_READABLE),
+        "geometry": (gobject.TYPE_PYOBJECT,
+                     "current (border-corrected, relative to parent) coordinates (x, y, w, h) for the window", "",
+                     gobject.PARAM_READABLE),
         # NB "notify" signal never fires for the client-contents properties:
         "client-contents": (gobject.TYPE_PYOBJECT,
                             "gtk.gdk.Pixmap containing the window contents", "",
@@ -195,6 +198,8 @@ class BaseWindowModel(AutoPropGObjectMixin, gobject.GObject):
     __gsignals__ = {
         "client-contents-changed": one_arg_signal,
         "unmanaged": one_arg_signal,
+
+        "wimpiggy-configure-event": one_arg_signal,
         }
     
     def __init__(self, client_window):
@@ -212,6 +217,8 @@ class BaseWindowModel(AutoPropGObjectMixin, gobject.GObject):
             h = self._composite.connect("contents-changed",
                                         self._forward_contents_changed)
             self._damage_forward_handle = h
+            gwb = wimpiggy.lowlevel.geometry_with_border
+            self._geometry = gwb(self.client_window)
         try:
             trap.call(setup)
         except XError, e:
@@ -229,6 +236,15 @@ class BaseWindowModel(AutoPropGObjectMixin, gobject.GObject):
     def acknowledge_changes(self, x, y, w, h):
         self._composite.acknowledge_changes(x, y, w, h)
 
+    def do_wimpiggy_configure_event(self, event):
+        self._geometry = (event.x, event.y, event.width, event.height,
+                          event.border_width)
+        self.notify("geometry")
+
+    def do_get_property_geometry(self, pspec):
+        (x, y, w, h, b) = self._geometry
+        return (x, y, w + 2*b, h + 2*b)
+
     def unmanage(self, exiting=False):
         self.emit("unmanaged", exiting)
 
@@ -244,14 +260,8 @@ gobject.type_register(BaseWindowModel)
 # ordinary managed windows; so some of that code should get pushed up into the
 # superclass sooner or later.  When someone cares, presumably.
 class OverrideRedirectWindowModel(BaseWindowModel):
-    __gproperties__ = {
-        "geometry": (gobject.TYPE_PYOBJECT,
-                     "current (x, y, w, h) for the window", "",
-                     gobject.PARAM_READABLE),
-        }
     __gsignals__ = {
         "wimpiggy-unmap-event": one_arg_signal,
-        "wimpiggy-configure-event": one_arg_signal,
         }
 
     def __init__(self, client_window):
@@ -259,8 +269,6 @@ class OverrideRedirectWindowModel(BaseWindowModel):
         def setup():
             self.client_window.set_events(self.client_window.get_events()
                                           | gtk.gdk.STRUCTURE_MASK)
-            (x, y, w, h, d) = self.client_window.get_geometry()
-            self._internal_set_property("geometry", (x, y, w, h))
         try:
             trap.call(setup)
         except XError, e:
@@ -268,10 +276,6 @@ class OverrideRedirectWindowModel(BaseWindowModel):
 
     def do_wimpiggy_unmap_event(self, event):
         self.unmanage()
-
-    def do_wimpiggy_configure_event(self, event):
-        self._internal_set_property("geometry", (event.x, event.y,
-                                                 event.width, event.height))
 
 gobject.type_register(OverrideRedirectWindowModel)
 
