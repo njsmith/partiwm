@@ -195,7 +195,11 @@ class ClientWindow(gtk.Window):
     def _key_action(self, event, depressed):
         modifiers = self._client.mask_to_names(event.state)
         name = gtk.gdk.keyval_name(event.keyval)
-        self._client.send(["key-action", self._id, name, depressed, modifiers])
+        # Apparently some weird keys (e.g. "media keys") can have no keyval or
+        # no keyval name (I believe that both give us a None here).  Another
+        # reason to overhaul keyboard support:
+        if name is not None:
+            self._client.send(["key-action", self._id, name, depressed, modifiers])
 
     def do_key_press_event(self, event):
         self._key_action(event, True)
