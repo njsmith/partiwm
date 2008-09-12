@@ -463,9 +463,10 @@ def _query_tree(pywindow):
     cdef Window root, parent
     cdef Window * children
     cdef unsigned int nchildren
-    XQueryTree(get_xdisplay_for(pywindow),
-               get_xwindow(pywindow),
-               &root, &parent, &children, &nchildren)
+    if not XQueryTree(get_xdisplay_for(pywindow),
+                      get_xwindow(pywindow),
+                      &root, &parent, &children, &nchildren):
+        return (None, [])
     pychildren = []
     for i from 0 <= i < nchildren:
         pychildren.append(get_pywindow(pywindow, children[i]))
