@@ -31,6 +31,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
                             "", "", gobject.PARAM_READABLE),
         }        
 
+    # This may raise XError.
     def __init__(self, window, already_composited):
         super(CompositeHelper, self).__init__()
         self._window = window
@@ -39,7 +40,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
             if not self._already_composited:
                 xcomposite_redirect_window(window)
             (_, _, _, _, self._border_width) = geometry_with_border(window)
-        trap.swallow(setup)
+        trap.call(setup)
         self._listening_to = None
         self.invalidate_pixmap()
         self._damage_handle = xdamage_start(window)
@@ -95,7 +96,7 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
                 # we are safe.  (I think.)
                 listening = []
                 win = get_parent(self._window)
-                while win.get_parent() is not None:
+                while win is not None and win.get_parent() is not None:
                     # We have to use a lowlevel function to manipulate the
                     # event selection here, because SubstructureRedirectMask
                     # does not roundtrip through the GDK event mask
@@ -107,9 +108,11 @@ class CompositeHelper(AutoPropGObjectMixin, gobject.GObject):
                     add_event_receiver(win, self)
                     listening.append(win)
                     win = get_parent(win)
-                self._listening_to = listening
                 handle = xcomposite_name_window_pixmap(self._window)
                 self._contents_handle = handle
+                # Don't save the listening set until after NameWindowPixmap
+                # has succeeded, to maintain our invariant:
+                self._listening_to = listening
             trap.swallow(set_pixmap)
         return self._contents_handle
 
