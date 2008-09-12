@@ -205,6 +205,8 @@ class BaseWindowModel(AutoPropGObjectMixin, gobject.GObject):
     def __init__(self, client_window):
         super(BaseWindowModel, self).__init__()
 
+        log("new window %s", hex(client_window.xid))
+
         self.client_window = client_window
         self._internal_set_property("client-window", client_window)
         wimpiggy.lowlevel.add_event_receiver(client_window, self)
@@ -269,6 +271,12 @@ class OverrideRedirectWindowModel(BaseWindowModel):
         def setup():
             self.client_window.set_events(self.client_window.get_events()
                                           | gtk.gdk.STRUCTURE_MASK)
+            # So now if the window becomes unmapped in the future then we will
+            # notice... but it might be unmapped already, and any event
+            # already generated, and our request for that event is too late!
+            # So double check now, *after* putting in our request:
+            if not wimpiggy.lowlevel.is_mapped(self.client_window):
+                raise Unmanageable, "window already unmapped"
         try:
             trap.call(setup)
         except XError, e:
