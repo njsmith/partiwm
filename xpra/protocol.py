@@ -1,4 +1,5 @@
 import gobject
+import socket # for socket.error
 import zlib
 
 from wimpiggy.util import dump_exc
