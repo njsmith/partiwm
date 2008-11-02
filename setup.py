@@ -64,6 +64,7 @@ setup(
     scripts=["scripts/parti", "scripts/parti-repl",
              "scripts/xpra",
              ],
+    data_files = [("share/man/man1", ["xpra.1"])],
     ext_modules=[ 
       Extension("wimpiggy.lowlevel.bindings",
                 ["wimpiggy/lowlevel/wimpiggy.lowlevel.bindings.pyx"],
