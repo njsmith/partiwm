@@ -1,6 +1,8 @@
 v0.0.5 (2008-11-02)
 ===================
 
+This release primarily contains cleanups and bugfixes for xpra.
+
 General:
   -- Logging cleanup -- all logging now goes through the Python
      logging framework instead of using raw 'prints'.  By default
@@ -42,6 +44,7 @@ Xpra:
   -- Windows with non-empty X borders (e.g., xterm popup menus) are
      now handled properly.
   -- Withdrawn windows no longer reappear after 'xpra upgrade'.
+  
 
 Wimpiggy:
   -- Do not segfault when querying the tree structure of destroyed
