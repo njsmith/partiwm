@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. do-build
+./do-build
 
 #RUNNER="valgrind python"
 #RUNNER="gdb --args python"
