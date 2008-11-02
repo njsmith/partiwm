@@ -35,6 +35,10 @@ class TestLowlevelMisc(TestLowlevel):
 
         assert_raises(l.XError, l.get_pywindow, self.display, 0)
 
+        # This is necessary to stop some mysterious failure (perhaps d2 being
+        # garbage collected before r2):
+        del r2
+
     def test_get_display_for(self):
         assert l.get_display_for(self.display) is self.display
         win = self.window()
