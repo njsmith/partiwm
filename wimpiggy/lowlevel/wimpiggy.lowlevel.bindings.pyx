@@ -823,8 +823,8 @@ cdef extern from "X11/extensions/Xfixes.h":
 
 cdef extern from "X11/extensions/Xdamage.h":
     ctypedef XID Damage
-    #unsigned int XDamageReportDeltaRectangles
-    unsigned int XDamageReportRawRectangles
+    unsigned int XDamageReportDeltaRectangles
+    #unsigned int XDamageReportRawRectangles
     unsigned int XDamageNotify
     ctypedef struct XDamageNotifyEvent:
         Damage damage
@@ -845,28 +845,35 @@ def _ensure_XDamage_support(display_source):
 
 def xdamage_start(window):
     _ensure_XDamage_support(window)
-    # Our design all assumes we are using DeltaRectangles, rather than
-    # RawRectangles -- if we settle on using RawRectangles permanently, then
-    # we should rip out all the xdamage_acknowledge stuff.  But the only
-    # reason we're using RawRectangles is that DeltaRectangles mode is broken,
-    # and hopefully it will be fixed in X.org 7.4 (see freedesktop.org bug
-    # #14648 for details):
     return XDamageCreate(get_xdisplay_for(window), get_xwindow(window),
-                         XDamageReportRawRectangles)
+                         XDamageReportDeltaRectangles)
 
 def xdamage_stop(display_source, handle):
     _ensure_XDamage_support(display_source)
     XDamageDestroy(get_xdisplay_for(display_source), handle)
 
 def xdamage_acknowledge(display_source, handle, x, y, width, height):
-    cdef XRectangle rect
-    rect.x = x
-    rect.y = y
-    rect.width = width
-    rect.height = height
-    repair = XFixesCreateRegion(get_xdisplay_for(display_source), &rect, 1)
-    XDamageSubtract(get_xdisplay_for(display_source), handle, repair, XNone)
-    XFixesDestroyRegion(get_xdisplay_for(display_source), repair)
+    # cdef XRectangle rect
+    # rect.x = x
+    # rect.y = y
+    # rect.width = width
+    # rect.height = height
+    # repair = XFixesCreateRegion(get_xdisplay_for(display_source), &rect, 1)
+    # XDamageSubtract(get_xdisplay_for(display_source), handle, repair, XNone)
+    # XFixesDestroyRegion(get_xdisplay_for(display_source), repair)
+
+    # DeltaRectangles mode + XDamageSubtract is broken, because repair
+    # operations trigger a flood of re-reported events (see freedesktop.org bug
+    # #14648 for details).  So instead we always repair all damage.  This
+    # means we may get redundant damage notifications if areas outside of the
+    # rectangle we actually repaired get re-damaged, but it avoids the
+    # quadratic blow-up that fixing just the correct area causes, and still
+    # reduces the number of events we receive as compared to just using
+    # RawRectangles mode.  This is very important for things like, say,
+    # drawing a scatterplot in R, which may make hundreds of thousands of
+    # draws to the same location, and with RawRectangles mode xpra can lag by
+    # seconds just trying to keep track of the damage.
+    XDamageSubtract(get_xdisplay_for(display_source), handle, XNone, XNone)
 
 ###################################
 # Smarter convenience wrappers
