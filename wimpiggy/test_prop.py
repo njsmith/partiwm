@@ -31,15 +31,15 @@ class TestProp(TestWithSession):
         self.enc("latin1", u"\u00c2", "\xc2")
         self.enc(["latin1"], [u"a", u"\u00c2"], "a\x00\xc2")
         # These are X predefined atoms with fixed numeric values
-        self.enc("atom", "PRIMARY", struct.pack("@i", 1))
-        self.enc(["atom"], ["PRIMARY", "SECONDARY"], struct.pack("@ii", 1, 2))
-        self.enc("u32", 1, struct.pack("@i", 1))
-        self.enc("u32", 0xffffffff, struct.pack("@i", 0xffffffff))
-        self.enc(["u32"], [1, 2], struct.pack("@ii", 1, 2))
+        self.enc("atom", "PRIMARY", struct.pack("@I", 1))
+        self.enc(["atom"], ["PRIMARY", "SECONDARY"], struct.pack("@II", 1, 2))
+        self.enc("u32", 1, struct.pack("@I", 1))
+        self.enc("u32", 0xffffffff, struct.pack("@I", 0xffffffff))
+        self.enc(["u32"], [1, 2], struct.pack("@II", 1, 2))
         self.enc("window", self.win,
-                 struct.pack("@i", wimpiggy.lowlevel.get_xwindow(self.win)))
+                 struct.pack("@I", wimpiggy.lowlevel.get_xwindow(self.win)))
         self.enc(["window"], [self.win, self.win2],
-                 struct.pack("@ii", *map(wimpiggy.lowlevel.get_xwindow,
+                 struct.pack("@II", *map(wimpiggy.lowlevel.get_xwindow,
                                          (self.win, self.win2))))
 
     def test_prop_get_set_errors(self):
@@ -142,8 +142,8 @@ class TestProp(TestWithSession):
         small_cr.set_source(pat)
         small_cr.paint()
 
-        small_dat = struct.pack("@ii", SMALL_W, SMALL_H) + str(small.get_data())
-        large_dat = struct.pack("@ii", LARGE_W, LARGE_H) + str(large.get_data())
+        small_dat = struct.pack("@II", SMALL_W, SMALL_H) + str(small.get_data())
+        large_dat = struct.pack("@II", LARGE_W, LARGE_H) + str(large.get_data())
 
         icon_bytes = small_dat + large_dat + small_dat
 
