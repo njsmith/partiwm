@@ -3,6 +3,7 @@ import sys
 import os
 import socket
 import subprocess
+import time
 from optparse import OptionParser
 import logging
 
@@ -150,7 +151,12 @@ def run_stop(parser, opts, extra_args):
         pass
     if local:
         sockdir = DotXpra()
-        final_state = sockdir.server_state(display_name)
+        for i in xrange(6):
+            final_state = sockdir.server_state(display_name)
+            if final_state is DotXpra.LIVE:
+                time.sleep(0.5)
+            else:
+                break
         if final_state is DotXpra.DEAD:
             print "xpra at %s has exited." % display_name
             sys.exit(0)
