@@ -505,7 +505,8 @@ class WindowModel(BaseWindowModel):
             # reparenting, because according to the X spec, windows that are
             # in our save set are always Mapped when we exit, *even if those
             # windows are no longer inferior to any of our windows!* (see
-            # section 10. Connection Close):
+            # section 10. Connection Close).  This causes "ghost windows", see
+            # bug #27:
             wimpiggy.lowlevel.XRemoveFromSaveSet(self.client_window)
             wimpiggy.lowlevel.sendConfigureNotify(self.client_window)
             if exiting:
