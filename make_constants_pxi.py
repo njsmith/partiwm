@@ -7,6 +7,9 @@ def main(progname, args):
         sys.stderr.write("Usage: %s CONSTANT-LIST PXI-OUTPUT\n")
         sys.exit(2)
     (constants_path, pxi_path) = args
+    make_constants_pxi(constants_path, pxi_path)
+
+def make_constants_pxi(constants_path, pxi_path):
     constants = []
     for line in open(constants_path):
         data = line.split("#", 1)[0].strip()
