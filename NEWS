@@ -1,3 +1,56 @@
+v0.0.5 (2008-11-02)
+===================
+
+General:
+  -- Logging cleanup -- all logging now goes through the Python
+     logging framework instead of using raw 'prints'.  By default
+     debug logging is suppressed, but can be enabled in a fine- or
+     coarse-grained way.
+
+Xpra:
+  -- Protocol changes; v0.0.5 clients can only be used with v0.0.5
+     servers, and vice-versa.  Use 'xpra upgrade' to upgrade old
+     servers without losing your session state.
+  -- Man page now included.
+  Important bug fixes:
+  -- Qt apps formerly could not receive keyboard input due to a focus
+     handling bug; now fixed.
+  -- Fedora's pygtk2 has mysterious local hacks that broke xpra;
+     a workaround is now included.
+  UI improvements:
+  -- 'xpra attach ssh:machine' now works out-of-the-box even if xpra
+     is not present in the remote machine's PATH, or requires
+     PYTHONPATH tweaks, or whatever.  (The server does still need to
+     be running on the remote machine, though, of course.)
+  -- Commands that connect to a running xpra server ('attach', 'stop',
+     etc.) now can generally be used without specifying the name of
+     the server, assuming only one server is running.  (E.g., instead
+     of 'xpra attach :10', you can use 'xpra attach'; ditto for remote
+     hosts, you can now use plain 'xpra attach ssh:remote'.)
+  -- Mouse scroll wheels now supported.
+  -- 'xpra start' can now spawn child programs directly (--with-child)
+     and exit automatically when these children have exited
+     (--exit-with-children).
+  Other:
+  -- More robust strategy for handling window stacking order.
+     (Side-effect: the xpra client no longer requires you to be using
+     an EWMH-compliant window manager.)
+  -- The xpra client no longer crashes when receiving an unknown key
+     event (e.g. a multimedia key).
+  -- Very brief transient windows (e.g., tooltips) no longer create
+     persistent "litter" on the screen.
+  -- Windows with non-empty X borders (e.g., xterm popup menus) are
+     now handled properly.
+  -- Withdrawn windows no longer reappear after 'xpra upgrade'.
+
+Wimpiggy:
+  -- Do not segfault when querying the tree structure of destroyed
+     windows.
+  -- Other bugfixes.
+
+Parti:
+  -- No changes.
+
 v0.0.4 (2008-04-04)
 ===================
 
