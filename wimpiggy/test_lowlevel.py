@@ -119,36 +119,65 @@ class TestLowlevelMisc(TestLowlevel):
     def test_save_set(self):
         w1 = self.window(self.display)
         w2 = self.window(self.display)
+        w3 = self.window(self.display)
         gtk.gdk.flush()
         
         import os
-        def do_child(disp_name, xwindow1, xwindow2):
+        def do_child(disp_name, xwindow1, xwindow2, xwindow3):
+            print "child: in do_child"
             d2 = gtk.gdk.Display(disp_name)
             w1on2 = l.get_pywindow(d2, xwindow1)
             w2on2 = l.get_pywindow(d2, xwindow2)
+            w3on2 = l.get_pywindow(d2, xwindow3)
             mywin = self.window(d2)
-            print "mywin == %s" % l.get_xwindow(mywin)
+            print "child: mywin == %s" % l.get_xwindow(mywin)
             w1on2.reparent(mywin, 0, 0)
             w2on2.reparent(mywin, 0, 0)
+            w3on2.reparent(mywin, 0, 0)
             gtk.gdk.flush()
+            # w1 gets saved:
             l.XAddToSaveSet(w1on2)
+            # w2 does not
+            # w3 is saved, but then unsaved (to test RemoveFromSaveSet):
+            l.XAddToSaveSet(w3on2)
+            l.XRemoveFromSaveSet(w3on2)
             gtk.gdk.flush()
-            # But we don't XAddToSaveSet(w2on2)
+            print "child: finished"
+        print "prefork: ", os.getpid()
         pid = os.fork()
         if not pid:
             # Child
             try:
-                do_child(self.display.get_name(), l.get_xwindow(w1), l.get_xwindow(w2))
+                print "child: pid ", os.getpid()
+                name = self.display.get_name()
+                # This is very important, though I don't know why.  If we
+                # don't close this display then something inside
+                # xcb_wait_for_reply gets Very Confused and the *parent*
+                # process gets a spurious IO error with nonsense errno
+                # (because errno is not actually being set, because there is
+                # no IO error, just something going weird inside xcb).  I'm
+                # not even sure that this actually fixes the underlying
+                # problem, but it makes the test pass, so...
+                self.display.close()
+                do_child(name,
+                         l.get_xwindow(w1),
+                         l.get_xwindow(w2),
+                         l.get_xwindow(w3))
             finally:
                 os._exit(0)
         # Parent
+        print "parent: ", os.getpid()
+        print "parent: child is ", pid
+        print "parent: waiting for child"
         os.waitpid(pid, 0)
+        print "parent: child exited"
         # Is there a race condition here, where the child exits but the X
         # server doesn't notice until after we send our commands?
-        print map(l.get_xwindow, [w1, w2])
+        print map(l.get_xwindow, [w1, w2, w3])
         print map(l.get_xwindow, l.get_children(self.root()))
         assert w1 in l.get_children(self.root())
         assert w2 not in l.get_children(self.root())
+        assert w3 not in l.get_children(self.root())
 
     def test_is_mapped(self):
         win = self.window()

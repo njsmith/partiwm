@@ -215,7 +215,8 @@ cdef extern from *:
         (Display * display, Window w, Atom property)
 
 
-    int cXAddToSaveSet "XAddToSaveSet" (Display * display, Window w)
+    int cXAddToSaveSet "XAddToSaveSet" (Display *, Window w)
+    int cXRemoveFromSaveSet "XRemoveFromSaveSet" (Display *, Window w)
 
     ctypedef struct XWindowAttributes:
         int x, y, width, height, border_width
@@ -457,6 +458,10 @@ def XDeleteProperty(pywindow, property):
 def XAddToSaveSet(pywindow):
     cXAddToSaveSet(get_xdisplay_for(pywindow),
                    get_xwindow(pywindow))
+
+def XRemoveFromSaveSet(pywindow):
+    cXRemoveFromSaveSet(get_xdisplay_for(pywindow),
+                        get_xwindow(pywindow))
 
 # Children listing
 def _query_tree(pywindow):
