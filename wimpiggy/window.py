@@ -501,6 +501,12 @@ class WindowModel(BaseWindowModel):
             self._scrub_withdrawn_window()
             self.client_window.reparent(gtk.gdk.get_default_root_window(),
                                         0, 0)
+            # It is important to remove from our save set, even after
+            # reparenting, because according to the X spec, windows that are
+            # in our save set are always Mapped when we exit, *even if those
+            # windows are no longer inferior to any of our windows!* (see
+            # section 10. Connection Close):
+            wimpiggy.lowlevel.XRemoveFromSaveSet(self.client_window)
             wimpiggy.lowlevel.sendConfigureNotify(self.client_window)
             if exiting:
                 # We CANNOT use .show_unraised here, because of GTK+ bug
