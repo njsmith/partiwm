@@ -44,7 +44,6 @@ Xpra:
   -- Windows with non-empty X borders (e.g., xterm popup menus) are
      now handled properly.
   -- Withdrawn windows no longer reappear after 'xpra upgrade'.
-  
 
 Wimpiggy:
   -- Do not segfault when querying the tree structure of destroyed
