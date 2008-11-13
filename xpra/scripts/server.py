@@ -1,3 +1,4 @@
+
 # DO NOT IMPORT GTK HERE: see http://partiwm.org/ticket/34
 # (also do not import anything that imports gtk)
 import gobject
@@ -88,7 +89,7 @@ def sh_quotemeta(s):
         quoted_chars.append(char)
     return "\"%s\"" % ("".join(quoted_chars),)
 
-def xpra_runner_shell_script(xpra_file):
+def xpra_runner_shell_script(xpra_file, starting_dir):
     script = []
     script.append("#!/bin/sh\n")
     for var, value in os.environ.iteritems():
@@ -102,7 +103,7 @@ def xpra_runner_shell_script(xpra_file):
                           % (var, sh_quotemeta(value), var))
     # We ignore failures in cd'ing, b/c it's entirely possible that we were
     # started from some temporary directory and all paths are absolute.
-    script.append("cd %s\n" % sh_quotemeta(os.getcwd()))
+    script.append("cd %s\n" % sh_quotemeta(starting_dir))
     script.append("_XPRA_PYTHON=%s\n" % (sh_quotemeta(sys.executable),))
     script.append("_XPRA_SCRIPT=%s\n" % (sh_quotemeta(xpra_file),))
     script.append("""
@@ -148,6 +149,10 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     # than expected.
     scriptpath = os.path.join(sockdir.dir(), "run-xpra")
 
+    # Save the starting dir now, because we'll lose track of it when we
+    # daemonize:
+    starting_dir = os.getcwd()
+
     # Daemonize:
     if opts.daemon:
         # Do some work up front, so any errors don't get lost.
@@ -187,7 +192,8 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
 
     # Write out a shell-script so that we can start our proxy in a clean
     # environment:
-    open(scriptpath, "w").write(xpra_runner_shell_script(xpra_file))
+    open(scriptpath, "w").write(xpra_runner_shell_script(xpra_file,
+                                                         starting_dir))
     # Unix is a little silly sometimes:
     umask = os.umask(0)
     os.umask(umask)
