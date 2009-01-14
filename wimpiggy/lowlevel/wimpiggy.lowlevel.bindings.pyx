@@ -1266,7 +1266,11 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                     + "handle the event; so I'm just ignoring it instead.")
             else:
                 # Dispatch:
-                _route_event(pyev, *my_events[e.type])
+                # The int() here forces a cast from a C integer to a Python
+                # integer, to work around a bug in some versions of Pyrex:
+                #   http://www.mail-archive.com/pygr-dev@googlegroups.com/msg00142.html
+                #   http://lists.partiwm.org/pipermail/parti-discuss/2009-January/000071.html
+                _route_event(pyev, *my_events[int(e.type)])
     except:
         log.warn("Unhandled exception in x_event_filter:", exc_info=True)
     return GDK_FILTER_CONTINUE
