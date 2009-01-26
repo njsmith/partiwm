@@ -107,8 +107,10 @@ Build it:
   cd parti-all-<whatever>
   ./do-build
   export PYTHONPATH=$PWD/install/lib/python:$PYTHONPATH
-(If running and displaying apps on two different machines, then you'll
-need to do this on both of them, obviously.)
+Note 1: If running and displaying apps on two different machines, then
+  you'll need to do this on both of them, obviously.
+Note 2: If you're on a 64-bit Redhat-ish distro (one with multilib
+  support), then you may need to replace 'lib' with 'lib64' above.
 
 On the machine where you will run the apps:
   install/bin/xpra start :13
