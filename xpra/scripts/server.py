@@ -155,6 +155,9 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
 
     # Daemonize:
     if opts.daemon:
+        sys.stderr.write("Entering daemon mode; "
+                         + "any further errors will be reported to:\n"
+                         + ("  %s\n" % logpath))
         # Do some work up front, so any errors don't get lost.
         if os.path.exists(logpath):
             os.unlink(logpath)
@@ -206,18 +209,23 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
         # We need to set up a new server environment
         xauthority = os.environ.get("XAUTHORITY",
                                     os.path.expanduser("~/.Xauthority"))
-        xvfb = subprocess.Popen(["Xvfb-for-Xpra-%s" % display_name,
-                                 display_name,
-                                 "-auth", xauthority,
-                                 "+extension", "Composite",
-                                 "-screen", "0", "2048x2048x24+32",
-                                 "-once"],
-                                executable="Xvfb")
-
+        try:
+            xvfb = subprocess.Popen(["Xvfb-for-Xpra-%s" % display_name,
+                                     display_name,
+                                     "-auth", xauthority,
+                                     "+extension", "Composite",
+                                     "-screen", "0", "2048x2048x24+32",
+                                     "-once"],
+                                    executable="Xvfb")
+        except OSError, e:
+            sys.stderr.write("Error starting Xvfb: %s\n" % (e,))
         raw_cookie = os.urandom(16)
         baked_cookie = raw_cookie.encode("hex")
-        assert not subprocess.call(["xauth", "add", display_name,
-                                    "MIT-MAGIC-COOKIE-1", baked_cookie])
+        try:
+            assert not subprocess.call(["xauth", "add", display_name,
+                                        "MIT-MAGIC-COOKIE-1", baked_cookie])
+        except OSError, e:
+            sys.stderr.write("Error running xauth: %s\n" % e)
 
     # Whether we spawned our server or not, it is now running -- or at least
     # starting.  First wait for it to start up:
@@ -267,7 +275,11 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     if opts.children:
         children_pids = set()
         for child_cmd in opts.children:
-            children_pids.add(subprocess.Popen(child_cmd, shell=True).pid)
+            try:
+                children_pids.add(subprocess.Popen(child_cmd, shell=True).pid)
+            except OSError, e:
+                sys.stderr.write("Error spawning child '%s': %s\n"
+                                 % (child_cmd, e))
         child_reaper.set_children_pids(children_pids)
     # Check once after the mainloop is running, just in case the exit
     # conditions are satisfied before we even enter the main loop.

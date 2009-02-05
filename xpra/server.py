@@ -243,7 +243,10 @@ class XpraServer(gobject.GObject):
         self._keymap.connect("keys-changed", self._keys_changed)
         self._keys_changed()
 
-        xmodmap = subprocess.Popen(["xmodmap", "-"], stdin=subprocess.PIPE)
+        try:
+            xmodmap = subprocess.Popen(["xmodmap", "-"], stdin=subprocess.PIPE)
+        except OSError, e:
+            sys.stderr.write("Error running xmodmap: %s\n" % (e,))
         xmodmap.communicate("""clear Lock
                                clear Shift
                                clear Control
