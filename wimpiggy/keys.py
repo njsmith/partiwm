@@ -137,6 +137,9 @@ def grok_modifier_map(display_source):
             keycode = keycodes[i * max_keypermod + j]
             if keycode:
                 entries = keymap.get_entries_for_keycode(keycode)
+                if entries is None:
+                    # This keycode has no entry in the keymap:
+                    continue
                 for (keyval, _, _, _) in entries:
                     keyval_name = gtk.gdk.keyval_name(keyval)
                     if keyval_name in meanings:
