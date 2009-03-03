@@ -23,6 +23,7 @@ from wimpiggy.lowlevel import (get_rectangle_from_region,
                                get_children)
 from wimpiggy.window import OverrideRedirectWindowModel, Unmanageable
 from wimpiggy.keys import grok_modifier_map
+from wimpiggy.error import XError, trap
 
 from wimpiggy.log import Logger
 log = Logger()
@@ -542,7 +543,14 @@ class XpraServer(gobject.GObject):
         self._make_keymask_match(modifiers)
         self._desktop_manager.raise_window(self._id_to_window[id])
         self._move_pointer(pointer)
-        xtest_fake_button(gtk.gdk.display_get_default(), button, depressed)
+        try:
+            trap.call_unsynced(xtest_fake_button,
+                               gtk.gdk.display_get_default(),
+                               button, depressed)
+        except XError, e:
+            log.warn("Failed to pass on (un)press of mouse button %s"
+                     + " (perhaps your Xvfb does not support mousewheels?)",
+                     button)
 
     def _process_pointer_position(self, proto, packet):
         (_, id, pointer, modifiers) = packet
