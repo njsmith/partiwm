@@ -626,7 +626,8 @@ class WindowModel(BaseWindowModel):
         # gets no-op updated -- some apps like FSF Emacs 21 like to update
         # their properties every time they see a ConfigureNotify, and this
         # reduces the chance for us to get caught in loops:
-        if size_hints.__dict__ != self.get_property("size-hints").__dict__:
+        old_hints = self.get_property("size-hints")
+        if old_hints is None or size_hints.__dict__ != old_hints.__dict__:
             self._internal_set_property("size-hints", size_hints)
             self._update_client_geometry()
 
