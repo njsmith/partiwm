@@ -622,8 +622,13 @@ class WindowModel(BaseWindowModel):
     def _handle_wm_normal_hints(self):
         size_hints = prop_get(self.client_window,
                               "WM_NORMAL_HINTS", "wm-size-hints")
-        self._internal_set_property("size-hints", size_hints)
-        self._update_client_geometry()
+        # Don't send out notify and ConfigureNotify events when this property
+        # gets no-op updated -- some apps like FSF Emacs 21 like to update
+        # their properties every time they see a ConfigureNotify, and this
+        # reduces the chance for us to get caught in loops:
+        if size_hints.__dict__ != self.get_property("size-hints").__dict__:
+            self._internal_set_property("size-hints", size_hints)
+            self._update_client_geometry()
 
     _property_handlers["WM_NORMAL_HINTS"] = _handle_wm_normal_hints
 
