@@ -669,3 +669,13 @@ class TestRegion(object):
         (x, y, w, h) = l.get_rectangle_from_region(region)
         assert (x, y, w, h) == (10, 11, 12, 13)
         print 5
+
+class TestImageOptimizations(object):
+    def test_premultiply_argb_in_place(self):
+        import array
+        ar = array.array("I", [0x80ffffff, 0x306090b0])
+        l.premultiply_argb_in_place(ar)
+        # Got each byte by calculating e.g.:
+        #   hex(int(0xb0 * (0x30 / 255.))) == 0x21
+        assert ar[0] == 0x80808080
+        assert ar[1] == 0x30121b21

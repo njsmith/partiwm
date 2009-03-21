@@ -11,7 +11,7 @@ import cairo
 from wimpiggy.lowlevel import \
      XGetWindowProperty, XChangeProperty, PropertyError, \
      get_xatom, get_pyatom, get_xwindow, get_pywindow, const, \
-     get_display_for
+     get_display_for, premultiply_argb_in_place
 from wimpiggy.error import trap, XError
 from wimpiggy.log import Logger
 log = Logger()
@@ -119,12 +119,16 @@ def _read_image(disp, stream):
         return None
     # Cairo wants a native-endian array here, and since the icon is
     # transmitted as CARDINALs, that's what we get. It might seem more
-    # sensible to use ImageSurface.create_for_data (it did to me!) but then
-    # you end up with a surface that refers to the memory you pass in
+    # sensible to use ImageSurface.create_for_data (at least it did to me!)
+    # but then you end up with a surface that refers to the memory you pass in
     # directly, and also .get_data() doesn't work on it, and it breaks the
     # test suite and blah. This at least works, as odd as it is:
     surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
     surf.get_data()[:] = bytes
+    # Cairo uses premultiplied alpha. EWMH actually doesn't specify what it
+    # uses, but apparently the de-facto standard is non-premultiplied. (At
+    # least that's what Compiz's sources say.)
+    premultiply_argb_in_place(surf.get_data())
     return (width * height, surf)
 
 # This returns a cairo ImageSurface which contains the largest icon defined in

@@ -31,6 +31,10 @@ cdef extern from "gdk/gdkx.h":
 
 cdef extern from "Python.h":
     object PyString_FromStringAndSize(char * s, int len)
+    ctypedef int Py_ssize_t
+    int PyObject_AsWriteBuffer(object obj,
+                               void ** buffer,
+                               Py_ssize_t * buffer_len) except -1
 
 # Serious black magic happens here (I owe these guys beers):
 cdef extern from "pygobject.h":
@@ -84,6 +88,30 @@ cdef void * unwrap_boxed(box, pyclass):
     if not isinstance(box, pyclass):
         raise TypeError, ("object %r is not a %r" % (box, pyclass))
     return (<PyGBoxed *>box).boxed
+
+###################################
+# Simple speed-up code
+###################################
+
+def premultiply_argb_in_place(buf):
+    # b is a Python buffer object, containing non-premultiplied ARGB32 data in
+    # native-endian.
+    # We convert to premultiplied ARGB32 data, in-place.
+    cdef int * cbuf
+    cdef Py_ssize_t cbuf_len
+    cdef int a, r, g, b
+    assert sizeof(int) == 4
+    PyObject_AsWriteBuffer(buf, <void **>&cbuf, &cbuf_len)
+    cdef int i
+    for 0 <= i < cbuf_len / 4:
+        a = (cbuf[i] >> 24) & 0xff
+        r = (cbuf[i] >> 16) & 0xff
+        r = (r * a) / 255
+        g = (cbuf[i] >> 8) & 0xff
+        g = g * a / 255
+        b = (cbuf[i] >> 0) & 0xff
+        b = b * a / 255
+        cbuf[i] = (a << 24) | (r << 16) | (g << 8) | (b << 0)
 
 ###################################
 # Raw Xlib and GDK
