@@ -8,6 +8,7 @@
 
 import gtk
 import gobject
+import cairo
 import os
 import os.path
 import subprocess
@@ -344,7 +345,7 @@ class XpraServer(gobject.GObject):
         id = self._window_to_id[window]
         self._send(["configure-override-redirect", id, x, y, w, h])
 
-    _all_metadata = ("title", "size-hints", "class-instance")
+    _all_metadata = ("title", "size-hints", "class-instance", "icon")
 
     def _make_metadata(self, window, propname):
         assert propname in self._all_metadata
@@ -373,6 +374,14 @@ class XpraServer(gobject.GObject):
                 return {"class-instance": [x.encode("utf-8") for x in c_i]}
             else:
                 return {}
+        elif propname == "icon":
+            surf = window.get_property("icon")
+            assert surf.get_format() == cairo.FORMAT_ARGB32
+            assert surf.get_stride() == 4 * surf.get_width()
+            if surf is not None:
+                return {"icon": (surf.get_width(), surf.get_height(),
+                                 "premult_argb32", str(surf.get_data()))
+                        }
         else:
             assert False
 

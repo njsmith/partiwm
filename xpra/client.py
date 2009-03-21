@@ -110,6 +110,21 @@ class ClientWindow(gtk.Window):
             self.set_wmclass(*self._metadata.get("class-instance",
                                                  ("xpra", "Xpra")))
 
+        if "icon" in self._metadata:
+            (width, height, coding, data) = self._metadata["icon"]
+            assert coding == "premult_argb32"
+            cairo_surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+            cairo_surf.get_data()[:] = data
+            # FIXME: We round-trip through PNG. This is ridiculous, but faster
+            # than doing a bunch of alpha un-premultiplying and byte-swapping
+            # by hand in Python (better still would be to write some Pyrex,
+            # but I don't have time right now):
+            loader = gtk.gdk.PixbufLoader()
+            cairo_surf.write_to_png(loader)
+            loader.close()
+            pixbuf = loader.get_pixbuf()
+            self.set_icon(pixbuf)            
+
     def _new_backing(self, w, h):
         old_backing = self._backing
         self._backing = gtk.gdk.Pixmap(gtk.gdk.get_default_root_window(),
