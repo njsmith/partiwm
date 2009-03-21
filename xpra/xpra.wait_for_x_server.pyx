@@ -25,5 +25,5 @@ def wait_for_x_server(display_name, timeout):
         if d is not NULL:
             XCloseDisplay(d)
             return
-    raise RuntimeError, ("could not connect to server after %s seconds"
-                         % timeout)
+    raise RuntimeError("could not connect to X server after %s seconds"
+                       % timeout)
