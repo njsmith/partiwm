@@ -13,15 +13,19 @@ xpra \- viewer for remote, persistent X applications
 .SH SYNOPSIS
 .PD 0
 .HP \w'xpra\ 'u
-\fBxpra\fP \fBstart\fP \fI:DISPLAY\fP [\fB\-\-start\-child=CHILD\fP]\fB .\|.\|.\fP [\fB\-\-exit\-with\-children\fP] [\fB\-\-no\-daemon\fP]
+\fBxpra\fP \fBstart\fP \fI:DISPLAY\fP
+[\fB\-\-start\-child=CHILD\fP]\fB .\|.\|.\fP
+[\fB\-\-exit\-with\-children\fP] [\fB\-\-no\-daemon\fP]
+[\fB\-\-bind\-tcp=[HOST]:PORT\fP] 
 .HP
-\fBxpra\fP \fBattach\fP [\fI:DISPLAY\fP | \fIssh:HOST:DISPLAY\fP] [\fB\-\-remote\-xpra=CMD\fP]
+\fBxpra\fP \fBattach\fP [\fI:DISPLAY\fP | \fIssh:HOST:DISPLAY\fP | \fItcp:HOST:DISPLAY\fP] [\fB\-\-remote\-xpra=CMD\fP]
 .HP
-\fBxpra\fP \fBstop\fP [\fI:DISPLAY\fP | \fIssh:HOST:DISPLAY\fP] [\fB\-\-remote\-xpra=CMD\fP]
+\fBxpra\fP \fBstop\fP [\fI:DISPLAY\fP | \fIssh:HOST:DISPLAY\fP | \fItcp:HOST:DISPLAY\fP] [\fB\-\-remote\-xpra=CMD\fP]
 .HP
 \fBxpra\fP \fBlist\fP
 .HP
-\fBxpra\fP \fBupgrade\fP \fI:DISPLAY\fP [\fB\-\-no\-daemon\fP]
+\fBxpra\fP \fBupgrade\fP \fI:DISPLAY\fP [...any options accepted by
+\fBxpra start\fP...]
 .PD
 .\" --------------------------------------------------------------------
 .SH DESCRIPTION
@@ -36,7 +40,8 @@ applications forwarded by xpra appear on your desktop as normal
 windows managed by your window manager, rather than being all "trapped
 in a box together".  Xpra also uses a custom protocol that is
 self-tuning and relatively latency-insensitive, and thus is usable
-over worse links than standard X.
+over network connections that are too slow or unreliable for standard
+X forwarding.
 .\" --------------------------------------------------------------------
 .SH EXAMPLES
 .TP \w'xpra\ 'u
@@ -71,12 +76,12 @@ successfully.
 The idea comes from standard X.  If you have multiple X servers
 running on the same host, then there has to be some way to distinguish
 them.  X does this by assigning each server a small, unique integer
-called (confusingly) its "display".  In the common case of a desktop
-machine that has only one X server running, that server uses display
-":0" (or sometimes you'll see ":0.0", which is effectively the same).
-When an application starts under X, it needs to know how to find the
-right X server to use; it does this by checking the environment
-variable \fB$DISPLAY\fP.
+called (perhaps confusingly) its "display".  In the common case of a
+desktop machine that has only one X server running, that server uses
+display ":0" (or sometimes you'll see ":0.0", which is effectively the
+same).  When an application starts under X, it needs to know how to
+find the right X server to use; it does this by checking the
+environment variable \fB$DISPLAY\fP.
 
 Xpra faces a similar problem \(em there may be multiple xpra servers
 running on the same host, as well as well as multiple X servers.  It
@@ -88,8 +93,8 @@ the xpra server.
 
 When starting an xpra server, you must specify the name of the display
 to use.  To do this, simply pick any number you like and stick a colon
-in front of it \(em :7, :12, :3117, etc., are all valid display names.
-Just keep in mind that:
+in front of it. For instance :7, :12, and :3117 are all valid display
+names.  Just keep in mind that:
 .IP \(bu
 Every X or xpra server that is running on a single machine must use a
 different display name.  If you pick a number that is already in use
@@ -111,6 +116,13 @@ running on a machine, then you can omit the number entirely; \fBxpra
 attach\fP alone will attach to the lone xpra server on the current
 machine regardless of its number, \fBxpra attach ssh:frodo\fP will
 similarly attach to the lone xpra server on a remote machine.
+
+If the xpra server was given the \fB\-\-bind\-tcp\fP option when
+started (which is a major security risk, and not recommended!), then
+you can also connect to it using a display of the form
+\fBtcp:HOST:PORT\fP. (Notice that \fBssh:\fP takes an optional
+\fIdisplay\fP number, while \fBtcp:\fP takes a required \fIport\fP
+number.)
 .\" --------------------------------------------------------------------
 .SH SUBCOMMANDS
 .SS xpra start
@@ -171,6 +183,21 @@ By default, the xpra server puts itself into the background,
 i.e. 'daemonizes', and redirects its output to a log file.  This
 prevents that behavior (useful mostly for debugging).
 .SS Options for attach, stop
+.TP
+\fB\-\-bind\-tcp=\fP\fI[HOST]:PORT\fP
+The xpra server always listens for connections on a local Unix domain
+socket, and supports local connections with the \fB:7\fP-style display
+address, and remote connections with the \fBssh:frodo:7\fP-style
+display address. If you want, it can also listen for connections on a
+raw TCP socket. This behavior is enabled with \fB\-\-bind-\-tcp\fP. If
+the host portion is omitted, then 127.0.0.1 (localhost) will be used.
+.TP
+Using this switch is NOT RECOMMENDED, and is a major security risk!
+Xpra does not do any checking on incoming connections; anyone at all
+may connect to this port and access your desktop. Use it only if you
+have special needs (e.g., certain virtualization environments), and
+understand the consequences of your actions.
+.SS Options for start
 .TP
 \fB\-\-remote\-xpra=\fP\fICMD\fP
 When connecting to a remote server over ssh, xpra needs to be able to

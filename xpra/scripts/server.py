@@ -9,6 +9,7 @@ import os.path
 import atexit
 import signal
 import time
+import socket
 
 from xpra.wait_for_x_server import wait_for_x_server
 from xpra.dotxpra import DotXpra
@@ -121,6 +122,24 @@ fi
 """)
     return "".join(script)
 
+def create_unix_domain_socket(display_name, upgrading):
+    dotxpra = DotXpra()
+    sockpath = dotxpra.server_socket_path(display_name, upgrading)
+    listener = socket.socket(socket.AF_UNIX)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(sockpath)
+    return listener
+
+def create_tcp_socket(parser, spec):
+    if ":" not in spec:
+        parser.error("TCP port must be specified as [HOST]:PORT")
+    (host, port) = spec.split(":", 1)
+    if host == "":
+        host = "127.0.0.1"
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.bind((host, int(port)))
+    return listener
+
 def run_server(parser, opts, mode, xpra_file, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
@@ -136,9 +155,9 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
 
     assert mode in ("start", "upgrade")
     upgrading = (mode == "upgrade")
-    sockdir = DotXpra()
-    sockpath = sockdir.server_socket_path(display_name, upgrading)
-    logpath = sockpath + ".log"
+
+    dotxpra = DotXpra()
+
     # This used to be given a display-specific name, but now we give it a
     # single fixed name and if multiple servers are started then the last one
     # will clobber the rest.  This isn't great, but the tradeoff is that it
@@ -147,7 +166,7 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     # is running on the remote host.  Might need to revisit this later if
     # people run into problems or autodiscovery turns out to be less useful
     # than expected.
-    scriptpath = os.path.join(sockdir.dir(), "run-xpra")
+    scriptpath = os.path.join(dotxpra.dir(), "run-xpra")
 
     # Save the starting dir now, because we'll lose track of it when we
     # daemonize:
@@ -155,6 +174,7 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
 
     # Daemonize:
     if opts.daemon:
+        logpath = dotxpra.server_socket_path(display_name, upgrading) + ".log"
         sys.stderr.write("Entering daemon mode; "
                          + "any further errors will be reported to:\n"
                          + ("  %s\n" % logpath))
@@ -255,9 +275,14 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     if xvfb_pid is not None:
         save_pid(xvfb_pid)
 
+    sockets = []
+    sockets.append(create_unix_domain_socket(display_name, upgrading))
+    if opts.bind_tcp:
+        sockets.append(create_tcp_socket(parser, opts.bind_tcp))
+
     # This import is delayed because the module depends on gtk:
     import xpra.server
-    app = xpra.server.XpraServer(sockpath, upgrading)
+    app = xpra.server.XpraServer(upgrading, sockets)
     def cleanup_socket(self):
         print "removing socket"
         try:

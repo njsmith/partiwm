@@ -10,7 +10,6 @@ import gtk
 import gobject
 import os
 import os.path
-import socket
 import subprocess
 
 from wimpiggy.wm import Wm
@@ -200,7 +199,7 @@ class XpraServer(gobject.GObject):
         "wimpiggy-child-map-event": one_arg_signal,
         }
 
-    def __init__(self, socketpath, clobber):
+    def __init__(self, clobber, sockets):
         gobject.GObject.__init__(self)
         
         # Do this before creating the Wm object, to avoid clobbering its
@@ -209,10 +208,12 @@ class XpraServer(gobject.GObject):
         root.set_events(root.get_events() | gtk.gdk.SUBSTRUCTURE_MASK)
         add_event_receiver(root, self)
 
+        ### Create the WM object
         self._wm = Wm("Xpra", clobber)
         self._wm.connect("new-window", self._new_window_signaled)
         self._wm.connect("quit", lambda _: self.quit(True))
 
+        ### Create our window managing data structures:
         self._desktop_manager = DesktopManager()
         self._wm.get_property("toplevel").add(self._desktop_manager)
         self._desktop_manager.show_all()
@@ -222,9 +223,7 @@ class XpraServer(gobject.GObject):
         # Window id 0 is reserved for "not a window"
         self._max_window_id = 1
 
-        self._protocol = None
-        self._potential_protocols = []
-
+        ### Load in existing windows:
         for window in self._wm.get_property("windows"):
             self._add_new_window(window)
 
@@ -232,14 +231,7 @@ class XpraServer(gobject.GObject):
             if (is_override_redirect(window) and is_mapped(window)):
                 self._add_new_or_window(window)
 
-        self._socketpath = socketpath
-        self._listener = socket.socket(socket.AF_UNIX)
-        self._listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._listener.bind(self._socketpath)
-        self._listener.listen(5)
-        gobject.io_add_watch(self._listener, gobject.IO_IN,
-                             self._new_connection)
-
+        ### Set up keymap:
         self._keymap = gtk.gdk.keymap_get_default()
         self._keymap.connect("keys-changed", self._keys_changed)
         self._keys_changed()
@@ -281,8 +273,19 @@ class XpraServer(gobject.GObject):
             "alt": "Alt_L",
             }
 
+        ### Misc. state:
         self._has_focus = 0
         self._upgrading = False
+
+        ### All right, we're ready to accept customers:
+        self._protocol = None
+        self._potential_protocols = []
+        for sock in sockets:
+            self.add_listen_socket(sock)
+
+    def add_listen_socket(self, sock):
+        sock.listen(5)
+        gobject.io_add_watch(sock, gobject.IO_IN, self._new_connection, sock)
 
     def quit(self, upgrading):
         self._upgrading = upgrading
@@ -292,9 +295,9 @@ class XpraServer(gobject.GObject):
         gtk.main()
         return self._upgrading
 
-    def _new_connection(self, *args):
+    def _new_connection(self, listener, *args):
         log.info("New connection received")
-        sock, addr = self._listener.accept()
+        sock, addr = listener.accept()
         self._potential_protocols.append(Protocol(sock, self.process_packet))
         return True
 

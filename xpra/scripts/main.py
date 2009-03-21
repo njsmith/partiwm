@@ -44,6 +44,10 @@ def main(script_file, cmdline):
     parser.add_option("--no-daemon", action="store_false",
                       dest="daemon", default=True,
                       help="Don't daemonize when running as a server")
+    parser.add_option("--bind-tcp", action="store",
+                      dest="bind_tcp", default=None,
+                      metavar="[HOST]:PORT",
+                      help="Listen for connections over TCP (insecure)")
     parser.add_option("--remote-xpra", action="store",
                       dest="remote_xpra", default=None, metavar="CMD",
                       help="How to run 'xpra' on the remote host")
@@ -123,11 +127,22 @@ def client_sock(parser, opts, display_name):
                              stdin=b.fileno(), stdout=b.fileno(),
                              bufsize=0)
         return a, False
-    else:
+    elif display_name.startswith(":"):
         sockdir = DotXpra()
         sock = socket.socket(socket.AF_UNIX)
         sock.connect(sockdir.socket_path(display_name))
         return sock, True
+    elif display_name.startswith("tcp:"):
+        host_spec = display_name[4:]
+        (host, port) = host_spec.split(":", 1)
+        if host == "":
+            host = "127.0.0.1"
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((host, int(port)))
+        return sock, True
+    else:
+        parser.error("unknown format for display name")
+        
 
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
