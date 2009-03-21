@@ -110,16 +110,10 @@ class TestProp(TestWithSession):
         assert corrupted.bottom_stop_x == 0
 
     def _assert_icon_matches(self, prop, expected):
-        pixmap = p.prop_get(self.win, prop, "icon")
-        assert pixmap.get_size() == (expected.get_width(),
-                                     expected.get_height())
-        round_tripped = cairo.ImageSurface(cairo.FORMAT_ARGB32,
-                                           *pixmap.get_size())
-        round_tripped_cr = gtk.gdk.CairoContext(cairo.Context(round_tripped))
-        round_tripped_cr.set_source_pixmap(pixmap, 0, 0)
-        round_tripped_cr.set_operator(cairo.OPERATOR_SOURCE)
-        round_tripped_cr.paint()
-        assert str(round_tripped.get_data()) == str(expected.get_data())
+        surf = p.prop_get(self.win, prop, "icon")
+        assert surf.get_width() == expected.get_width()
+        assert surf.get_height() == expected.get_height()
+        assert str(surf.get_data()) == str(expected.get_data())
 
     def test_icon(self):
         LARGE_W = 49

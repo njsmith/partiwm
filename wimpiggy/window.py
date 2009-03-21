@@ -371,8 +371,11 @@ class WindowModel(BaseWindowModel):
                        "Icon title (unicode or None)", "",
                        gobject.PARAM_READABLE),
         "icon": (gobject.TYPE_PYOBJECT,
-                 "Icon (Cairo surface)", "",
+                 "Icon (local Cairo surface)", "",
                  gobject.PARAM_READABLE),
+        "icon-pixmap": (gobject.TYPE_PYOBJECT,
+                        "Icon (server Pixmap)", "",
+                        gobject.PARAM_READABLE),
 
         "owner": (gobject.TYPE_PYOBJECT,
                   "Owner", "",
@@ -672,10 +675,25 @@ class WindowModel(BaseWindowModel):
 
     def _handle_net_wm_icon(self):
         log("_NET_WM_ICON changed on %s, re-reading", self.client_window.xid)
-        self._internal_set_property("icon",
-                                    prop_get(self.client_window,
-                                             "_NET_WM_ICON", "icon"))
-
+        surf = prop_get(self.client_window, "_NET_WM_ICON", "icon")
+        if surf is not None:
+            # FIXME: There is no Pixmap.new_for_display(), so this isn't
+            # actually display-clean.  Oh well.
+            pixmap = gtk.gdk.Pixmap(None,
+                                    surf.get_width(), surf.get_height(), 32)
+            screen = wimpiggy.lowlevel.get_display_for(pixmap).get_default_screen()
+            pixmap.set_colormap(screen.get_rgba_colormap())
+            cr = pixmap.cairo_create()
+            cr.set_source_surface(surf)
+            # Important to use SOURCE, because a newly created Pixmap can have
+            # random trash as its contents, and otherwise that will show
+            # through any alpha in the icon:
+            cr.set_operator(cairo.OPERATOR_SOURCE)
+            cr.paint()
+        else:
+            pixmap = None
+        self._internal_set_property("icon", surf)
+        self._internal_set_property("icon-pixmap", pixmap)
         log("icon is now %r", self.get_property("icon"))
     _property_handlers["_NET_WM_ICON"] = _handle_net_wm_icon
 
@@ -1092,7 +1110,7 @@ class WindowView(gtk.Widget):
         #cr.set_source_surface(tmpsrf, 0, 0)
         cr.paint()
 
-        icon = self.model.get_property("icon")
+        icon = self.model.get_property("icon-pixmap")
         if icon is not None:
             cr.set_source_pixmap(icon, 0, 0)
             cr.paint_with_alpha(0.3)

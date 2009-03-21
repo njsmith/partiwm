@@ -118,27 +118,17 @@ def _read_image(disp, stream):
         log.warn("Weird corruption in _NET_WM_ICON: %s", e)
         return None
     # Cairo wants a native-endian array here, and since the icon is
-    # transmitted as CARDINALs, that's what we get.
-    bytes_as_array = array.array("c", bytes)
-    local_surf = cairo.ImageSurface.create_for_data(bytes_as_array,
-                                                    cairo.FORMAT_ARGB32,
-                                                    width, height, 0)
-    # FIXME: There is no Pixmap.new_for_display(), so this isn't actually
-    # display-clean.  Oh well.
-    pixmap = gtk.gdk.Pixmap(None, width, height, 32)
-    screen = get_display_for(pixmap).get_default_screen()
-    pixmap.set_colormap(screen.get_rgba_colormap())
-    cr = pixmap.cairo_create()
-    cr.set_source_surface(local_surf)
-    # Important to use SOURCE, because a newly created Pixmap can have random
-    # trash as its contents, and otherwise that will show through any alpha in
-    # the icon:
-    cr.set_operator(cairo.OPERATOR_SOURCE)
-    cr.paint()
-    return (width * height, pixmap)
+    # transmitted as CARDINALs, that's what we get. It might seem more
+    # sensible to use ImageSurface.create_for_data (it did to me!) but then
+    # you end up with a surface that refers to the memory you pass in
+    # directly, and also .get_data() doesn't work on it, and it breaks the
+    # test suite and blah. This at least works, as odd as it is:
+    surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+    surf.get_data()[:] = bytes
+    return (width * height, surf)
 
-# This returns a Drawable which contains the largest icon defined in a
-# _NET_WM_ICON property.
+# This returns a cairo ImageSurface which contains the largest icon defined in
+# a _NET_WM_ICON property.
 def NetWMIcons(disp, data):
     icons = []
     stream = StringIO(data)
@@ -190,7 +180,7 @@ _prop_types = {
               unsupported, NetWMStrut, None),
     "strut-partial": (NetWMStrut, "CARDINAL", 32,
                       unsupported, NetWMStrut, None),
-    "icon": (gtk.gdk.Drawable, "CARDINAL", 32,
+    "icon": (cairo.ImageSurface, "CARDINAL", 32,
              unsupported, NetWMIcons, None),
     # For uploading ad-hoc instances of the above complex structures to the
     # server, so we can test reading them out again:
