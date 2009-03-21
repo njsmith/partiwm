@@ -376,9 +376,9 @@ class XpraServer(gobject.GObject):
                 return {}
         elif propname == "icon":
             surf = window.get_property("icon")
-            assert surf.get_format() == cairo.FORMAT_ARGB32
-            assert surf.get_stride() == 4 * surf.get_width()
             if surf is not None:
+                assert surf.get_format() == cairo.FORMAT_ARGB32
+                assert surf.get_stride() == 4 * surf.get_width()
                 return {"icon": (surf.get_width(), surf.get_height(),
                                  "premult_argb32", str(surf.get_data()))
                         }
