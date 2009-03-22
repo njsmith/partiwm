@@ -12,9 +12,7 @@ import os.path
 from wimpiggy.util import (one_arg_signal,
                            gtk_main_quit_really,
                            gtk_main_quit_on_fatal_exceptions_enable)
-from wimpiggy.prop import prop_get
 from wimpiggy.keys import grok_modifier_map
-from wimpiggy.lowlevel import add_event_receiver, remove_event_receiver
 
 from wimpiggy.log import Logger
 log = Logger()
@@ -271,18 +269,10 @@ class ClientWindow(gtk.Window):
 gobject.type_register(ClientWindow)
 
 class XpraClient(gobject.GObject):
-    __gsignals__ = {
-        "wimpiggy-property-notify-event": one_arg_signal,
-        }
-
     def __init__(self, sock):
         gobject.GObject.__init__(self)
         self._window_to_id = {}
         self._id_to_window = {}
-
-        root = gtk.gdk.get_default_root_window()
-        root.set_events(root.get_events() | gtk.gdk.PROPERTY_NOTIFY)
-        add_event_receiver(root, self)
 
         self._protocol = Protocol(sock, self.process_packet)
         ClientSource(self._protocol)
