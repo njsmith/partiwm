@@ -172,6 +172,16 @@ class TestProp(TestWithSession):
                    + "\xff\xff\xff\xff")
         self._assert_icon_matches("corrupted3", large)
 
+    def test_multiple_conversion(self):
+        x1 = wimpiggy.lowlevel.get_xatom(self.display, "X1")
+        x2 = wimpiggy.lowlevel.get_xatom(self.display, "X2")
+        x3 = wimpiggy.lowlevel.get_xatom(self.display, "X3")
+        x4 = wimpiggy.lowlevel.get_xatom(self.display, "X4")
+        p.prop_set(self.win, "_MY_MULTIPLE_TEST", "debug-CARDINAL",
+                   struct.pack("@IIII", x1, x2, x3, x4))
+        out = p.prop_get(self.win, "_MY_MULTIPLE_TEST",
+                         ["multiple-conversion"])
+        assert len(out) == 4
+        assert out == ["X1", "X2", "X3", "X4"]
         
-
     # FIXME: WMSizeHints and WMHints tests.  Stupid baroque formats...

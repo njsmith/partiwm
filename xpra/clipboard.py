@@ -3,7 +3,9 @@ import gobject
 import gtk
 
 from wimpiggy.util import n_arg_signal
-from wimpiggy.lowlevel import (get_pyatom, get_xatom,
+from wimpiggy.prop import prop_get
+from wimpiggy.error import trap
+from wimpiggy.lowlevel import (get_xatom, get_pywindow,
                                gdk_atom_objects_from_gdk_atom_array)
 
 from wimpiggy.log import Logger
@@ -154,9 +156,6 @@ class ClipboardProxy(gtk.Invisible):
         self._clipboard = gtk.Clipboard(selection=selection)
         self._have_token = False
 
-    def do_map(self):
-        return
-
     def do_selection_request_event(self, event):
         # Black magic: the superclass default handler for this signal
         # implements all the hards parts of selection handling, occasionally
@@ -190,8 +189,20 @@ class ClipboardProxy(gtk.Invisible):
         # okay.
         assert str(event.selection) == self._selection
         target = str(event.target)
-        # FIXME: MULTIPLE support
-        if target not in ("TIMESTAMP", "MULTIPLE"):
+        if target == "TIMESTAMP":
+            pass
+        elif target == "MULTIPLE":
+            targets = []
+            def get_targets():
+                win = get_pywindow(event.requestor)
+                atoms = prop_get(win, event.property, ["multiple-conversion"])
+                log("MULTIPLE clipboard atoms: %r", atoms)
+                targets += atoms[::2]
+            trap.swallow(get_targets)
+            log("MULTIPLE clipboard targets: %r", atoms)
+            for target in targets:
+                self.selection_add_target(self._selection, target, 0)
+        else:
             self.selection_add_target(self._selection, target, 0)
         gtk.Invisible.do_selection_request_event(self, event)
 

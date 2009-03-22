@@ -443,8 +443,10 @@ class PropertyOverflow(PropertyError):
 class NoSuchProperty(PropertyError):
     pass
 def XGetWindowProperty(pywindow, property, req_type):
+    # NB: Accepts req_type == 0 for AnyPropertyType
     # "64k is enough for anybody"
-    # (Except, I've found window icons that are strictly larger...)
+    # (Except, I've found window icons that are strictly larger, hence the
+    # added * 5...)
     buffer_size = 64 * 1024 * 5
     cdef Atom xactual_type
     cdef int actual_format
@@ -469,7 +471,7 @@ def XGetWindowProperty(pywindow, property, req_type):
         raise PropertyError, "no such window"
     if xactual_type == XNone:
         raise NoSuchProperty, property
-    if xreq_type != xactual_type:
+    if xreq_type and xreq_type != xactual_type:
         raise BadPropertyType, xactual_type
     # This should only occur for bad property types:
     assert not (bytes_after and not nitems)

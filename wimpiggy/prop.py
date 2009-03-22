@@ -146,6 +146,9 @@ def NetWMIcons(disp, data):
     icons.sort()
     return icons[-1][1]
 
+def _get_atom(disp, d):
+    return str(get_pyatom(disp, struct.unpack("@I", d)[0]))
+
 _prop_types = {
     # Python type, X type Atom, format, serializer, deserializer, list
     # terminator
@@ -162,7 +165,7 @@ _prop_types = {
                "\0"),
     "atom": (str, "ATOM", 32,
              lambda disp, a: struct.pack("@I", get_xatom(disp, a)),
-             lambda disp, d: str(get_pyatom(disp, struct.unpack("@I", d)[0])),
+              _get_atom,
              ""),
     "u32": ((int, long), "CARDINAL", 32,
             lambda disp, c: struct.pack("@I", c),
@@ -192,6 +195,12 @@ _prop_types = {
                        lambda disp, c: c,
                        lambda disp, d: d,
                        None),
+    # For fetching the extra information on a MULTIPLE clipboard conversion
+    # request. The exciting thing about MULTIPLE is that it's not actually
+    # specified what 'type' one should use; you just fetch with
+    # AnyPropertyType and assume that what you get is a bunch of pairs of
+    # atoms.
+    "multiple-conversion": (str, 0, 32, unsupported, _get_atom, None),
     }
 
 def _prop_encode(disp, type, value):
