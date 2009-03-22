@@ -386,6 +386,8 @@ class XpraServer(gobject.GObject):
                 return {"icon": (surf.get_width(), surf.get_height(),
                                  "premult_argb32", str(surf.get_data()))
                         }
+            else:
+                return {}
         else:
             assert False
 
