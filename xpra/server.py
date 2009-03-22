@@ -16,7 +16,7 @@ import subprocess
 from wimpiggy.wm import Wm
 from wimpiggy.util import (LameStruct,
                            one_arg_signal,
-                           gtk_main_quit_really
+                           gtk_main_quit_really,
                            gtk_main_quit_on_fatal_exceptions_enable)
 from wimpiggy.lowlevel import (get_rectangle_from_region,
                                xtest_fake_key,
