@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+# This file is part of Parti.
+# Copyright (C) 2008, 2009 Nathaniel Smith <njs@pobox.com>
+# Parti is released under the terms of the GNU GPL v2, or, at your option, any
+# later version. See the file COPYING for details.
+
 # NOTE (FIXME): This setup.py file will not work on its own; you have to run
 #   $ python make-constants-pxi.py wimpiggy/lowlevel/constants.txt wimpiggy/lowlevel/constants.pxi
 # before using this setup.py, and again if you change

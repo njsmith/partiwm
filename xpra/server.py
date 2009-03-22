@@ -1,9 +1,12 @@
+# This file is part of Parti.
+# Copyright (C) 2008 Nathaniel Smith <njs@pobox.com>
+# Parti is released under the terms of the GNU GPL v2, or, at your option, any
+# later version. See the file COPYING for details.
+
 # Todo:
 #   cursors
-#   copy/paste (dnd?)
 #   xsync resize stuff
 #   shape?
-#   icons
 #   any other interesting metadata? _NET_WM_TYPE, WM_TRANSIENT_FOR, etc.?
 
 import gtk

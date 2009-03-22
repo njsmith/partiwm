@@ -1,3 +1,8 @@
+# This file is part of Parti.
+# Copyright (C) 2008, 2009 Nathaniel Smith <njs@pobox.com>
+# Parti is released under the terms of the GNU GPL v2, or, at your option, any
+# later version. See the file COPYING for details.
+
 # Monolithic file containing simple Pyrex wrappers for otherwise unexposed
 # GDK, GTK, and X11 primitives, plus utility functions for writing same.
 # Really this should be split up, but I haven't figured out how Pyrex's

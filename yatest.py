@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+# Copyright (C) 2008, 2009 Nathaniel Smith <njs@pobox.com>
+# This program is released under the terms of the GNU GPL v2, or, at your
+# option, any later version. See the file COPYING for details.
+
 # Yet Another Test framework
 #
 # Basically does test scanning like nose or py.test (but simpler), and then

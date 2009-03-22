@@ -1,3 +1,8 @@
+# This file is part of Parti.
+# Copyright (C) 2008, 2009 Nathaniel Smith <njs@pobox.com>
+# Parti is released under the terms of the GNU GPL v2, or, at your option, any
+# later version. See the file COPYING for details.
+
 # Goal: make it as easy and efficient as possible to manage the X errors that
 # a WM is inevitably susceptible to.  (E.g., if a window goes away while we
 # are working on it.)  On the one hand, we want to parcel operations into as
