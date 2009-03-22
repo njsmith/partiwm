@@ -28,6 +28,9 @@ Xpra:
 Wimpiggy:
   -- Assume that EWMH-style icons have non-premultiplied alpha.
 
+Other:
+  -- Add copyright comments to all source files.
+
 v0.0.5 (2008-11-02)
 ===================
 
