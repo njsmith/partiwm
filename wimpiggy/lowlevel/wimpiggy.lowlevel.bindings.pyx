@@ -9,7 +9,7 @@ import gobject
 import gtk
 import gtk.gdk
 
-from wimpiggy.util import dump_exc, LameStruct
+from wimpiggy.util import dump_exc, LameStruct, gtk_main_quit_really
 from wimpiggy.error import trap, XError
 
 from wimpiggy.log import Logger
@@ -1321,6 +1321,9 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                 #   http://www.mail-archive.com/pygr-dev@googlegroups.com/msg00142.html
                 #   http://lists.partiwm.org/pipermail/parti-discuss/2009-January/000071.html
                 _route_event(pyev, *my_events[int(e.type)])
+    except (KeyboardInterrupt, SystemExit):
+        log("exiting on KeyboardInterrupt/SystemExit")
+        gtk_main_quit_really()
     except:
         log.warn("Unhandled exception in x_event_filter:", exc_info=True)
     return GDK_FILTER_CONTINUE
