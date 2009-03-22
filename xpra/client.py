@@ -14,6 +14,7 @@ log = Logger()
 
 from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
+from xpra.clipboard import ClipboardProtocolHelper
 
 import xpra
 default_capabilities = {"deflate": 3,
@@ -284,6 +285,8 @@ class XpraClient(gobject.GObject):
         self._keymap.connect("keys-changed", self._keys_changed)
         self._keys_changed()
 
+        self._clipboard_helper = ClipboardProtocolHelper(self.send)
+
         self._focused = None
 
     def run(self):
@@ -319,6 +322,7 @@ class XpraClient(gobject.GObject):
         if capabilities.get("__prerelease_version") != xpra.__version__:
             log.error("sorry, I only know how to talk to v%s servers",
                       xpra.__version__)
+        self._clipboard_helper.send_all_tokens()
 
     def _process_new_common(self, packet, override_redirect):
         (_, id, x, y, w, h, metadata) = packet
@@ -369,11 +373,16 @@ class XpraClient(gobject.GObject):
         "window-metadata": _process_window_metadata,
         "configure-override-redirect": _process_configure_override_redirect,
         "lost-window": _process_lost_window,
+        # "clipboard-*" packets are handled by a special case below.
         Protocol.CONNECTION_LOST: _process_connection_lost,
         }
     
     def process_packet(self, proto, packet):
         packet_type = packet[0]
-        self._packet_handlers[packet_type](self, packet)
+        if (isinstance(packet_type, str)
+            and packet_type.startswith("clipboard-")):
+            self._clipboard_helper.process_clipboard_packet(packet)
+        else:
+            self._packet_handlers[packet_type](self, packet)
 
 gobject.type_register(XpraClient)

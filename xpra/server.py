@@ -31,6 +31,7 @@ log = Logger()
 import xpra
 from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
+from xpra.clipboard import ClipboardProtocolHelper
 
 class DesktopManager(gtk.Widget):
     def __init__(self):
@@ -274,6 +275,9 @@ class XpraServer(gobject.GObject):
             "alt": "Alt_L",
             }
 
+        ### Clipboard handling:
+        self._clipboard_helper = ClipboardProtocolHelper(self._send)
+
         ### Misc. state:
         self._has_focus = 0
         self._upgrading = False
@@ -455,7 +459,6 @@ class XpraServer(gobject.GObject):
         metadata = self._make_metadata(window, pspec.name)
         self._send(["window-metadata", id, metadata])
 
-
     def _lost_window(self, window, wm_exiting):
         id = self._window_to_id[window]
         self._send(["lost-window", id])
@@ -599,11 +602,16 @@ class XpraServer(gobject.GObject):
         "pointer-position": _process_pointer_position,
         "close-window": _process_close_window,
         "shutdown-server": _process_shutdown_server,
+        # "clipboard-*" packets are handled below:
         Protocol.CONNECTION_LOST: _process_connection_lost,
         }
 
     def process_packet(self, proto, packet):
         packet_type = packet[0]
-        self._packet_handlers[packet_type](self, proto, packet)
+        if (isinstance(packet_type, str)
+            and packet_type.startswith("clipboard-")):
+            self._clipboard_helper.process_clipboard_packet(packet)
+        else:
+            self._packet_handlers[packet_type](self, proto, packet)
 
 gobject.type_register(XpraServer)

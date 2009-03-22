@@ -35,6 +35,9 @@ cdef extern from "Python.h":
     int PyObject_AsWriteBuffer(object obj,
                                void ** buffer,
                                Py_ssize_t * buffer_len) except -1
+    int PyObject_AsReadBuffer(object obj,
+                              void ** buffer,
+                              Py_ssize_t * buffer_len) except -1
 
 # Serious black magic happens here (I owe these guys beers):
 cdef extern from "pygobject.h":
@@ -371,6 +374,23 @@ def get_pyatom(display_source, xatom):
     cdef cGdkDisplay * disp
     disp = get_raw_display_for(display_source)
     return str(PyGdkAtom_New(gdk_x11_xatom_to_atom_for_display(disp, xatom)))
+
+def gdk_atom_objects_from_gdk_atom_array(atom_string):
+    # gdk_property_get auto-converts ATOM and ATOM_PAIR properties from a
+    # string of marshalled X atoms to an array of GDK atoms. GDK atoms and X
+    # atoms are both basically numeric values, but they are often *different*
+    # numeric values. The GTK+ clipboard code uses gdk_property_get. To
+    # interpret atoms when dealing with the clipboard, therefore, we need to
+    # be able to take an array of GDK atom objects (integers) and figure out
+    # what they mean.
+    cdef GdkAtom * array
+    cdef Py_ssize_t array_len_bytes
+    PyObject_AsReadBuffer(atom_string, <void **>&array, &array_len_bytes)
+    array_len = array_len_bytes / sizeof(GdkAtom)
+    objects = []
+    for i in xrange(array_len):
+        objects.append(PyGdkAtom_New(array[i]))
+    return objects
 
 # Property handling:
 
