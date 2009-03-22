@@ -4,7 +4,9 @@ import cairo
 import os
 import os.path
 
-from wimpiggy.util import one_arg_signal, gtk_main_quit_really
+from wimpiggy.util import (one_arg_signal,
+                           gtk_main_quit_really,
+                           gtk_main_quit_on_fatal_exceptions_enable)
 from wimpiggy.prop import prop_get
 from wimpiggy.keys import grok_modifier_map
 from wimpiggy.lowlevel import add_event_receiver, remove_event_receiver
@@ -290,6 +292,7 @@ class XpraClient(gobject.GObject):
         self._focused = None
 
     def run(self):
+        gtk_main_quit_on_fatal_exceptions_enable()
         gtk.main()
 
     def _keys_changed(self, *args):

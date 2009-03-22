@@ -81,3 +81,16 @@ def gtk_main_quit_really():
     import gtk
     for i in xrange(gtk.main_level()):
         gtk.main_quit()
+
+# If a user hits control-C, and we are currently executing Python code below
+# the main loop, then the exception will get swallowed up. (If we're just
+# idling in the main loop, then it will pass the exception along, but it won't
+# propagate it from Python code. Sigh.) But sys.excepthook will still get
+# called with such exceptions.
+def gtk_main_quit_on_fatal_exceptions_enable():
+    oldhook = sys.excepthook
+    def gtk_main_quit_on_fatal_exception(type, val, tb):
+        if issubclass(type, (KeyboardInterrupt, SystemExit)):
+            gtk_main_quit_really()
+        return oldhook(type, val, tb)
+    sys.excepthook = gtk_main_quit_on_fatal_exception
