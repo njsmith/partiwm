@@ -1,3 +1,33 @@
+v0.0.6 (2009-03-22)
+===================
+
+Xpra:
+  New features:
+    -- Clipboard sharing (with full X semantics).
+    -- Icon support.
+    -- Support for raw TCP sockets. (This is horrendously insecure in
+       most contexts, but provided for certain use cases -- like some
+       virtualization environments -- where the network is wholly
+       trusted and ssh tunneling creates too much overhead. The
+       built-in ssh tunneling support is still the recommended
+       approach.) (Thanks to Antoine Martin.)
+
+  Bug fixes:
+    -- Xvfb doesn't support mouse wheels, so they still don't work in
+       xpra. But now xpra doesn't crash if you try.
+    -- Running FSF Emacs under xpra no longer creates an infinite loop.
+    -- The directory that xpra was launched from is now correctly
+       saved in ~/.xpra/run-xpra.
+    -- Work around PyGtk weirdness that caused the server and client
+       to sometimes ignore control-C.
+    -- The client correctly notices keyboard layout changes.
+    -- The client no longer crashes on keymaps in which unnamed keys
+       are bound to modifiers.
+    -- Workarounds are included for several buggy versions of Pyrex.
+
+Wimpiggy:
+  -- Assume that EWMH-style icons have non-premultiplied alpha.
+
 v0.0.5 (2008-11-02)
 ===================
 
