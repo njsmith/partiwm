@@ -91,6 +91,7 @@ def gtk_main_quit_on_fatal_exceptions_enable():
     oldhook = sys.excepthook
     def gtk_main_quit_on_fatal_exception(type, val, tb):
         if issubclass(type, (KeyboardInterrupt, SystemExit)):
+            print "Shutting down main-loop"
             gtk_main_quit_really()
         return oldhook(type, val, tb)
     sys.excepthook = gtk_main_quit_on_fatal_exception
