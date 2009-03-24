@@ -22,8 +22,7 @@ from xpra.keys import mask_to_names
 from xpra.clipboard import ClipboardProtocolHelper
 
 import xpra
-default_capabilities = {"deflate": 3,
-                        "__prerelease_version": xpra.__version__}
+default_capabilities = {"__prerelease_version": xpra.__version__}
 
 class ClientSource(object):
     def __init__(self, protocol):
@@ -269,13 +268,16 @@ class ClientWindow(gtk.Window):
 gobject.type_register(ClientWindow)
 
 class XpraClient(gobject.GObject):
-    def __init__(self, sock):
+    def __init__(self, sock, compression_level):
         gobject.GObject.__init__(self)
         self._window_to_id = {}
         self._id_to_window = {}
 
         self._protocol = Protocol(sock, self.process_packet)
         ClientSource(self._protocol)
+        capabilities_request = dict(default_capabilities)
+        if compression_level:
+            capabilities_request["deflate"] = compression_level
         self.send(["hello", default_capabilities])
 
         self._keymap = gtk.gdk.keymap_get_default()

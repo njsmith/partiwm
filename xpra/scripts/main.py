@@ -53,6 +53,12 @@ def main(script_file, cmdline):
                       dest="bind_tcp", default=None,
                       metavar="[HOST]:PORT",
                       help="Listen for connections over TCP (insecure)")
+    parser.add_option("-z", "--compress", action="store",
+                      dest="compression_level", type="int", default=3,
+                      metavar="LEVEL",
+                      help="How hard to work on compressing data."
+                      + " 0 to disable compression,"
+                      + "9 for maximal (slowest) compression. Default: 3.")
     parser.add_option("--remote-xpra", action="store",
                       dest="remote_xpra", default=None, metavar="CMD",
                       help="How to run 'xpra' on the remote host")
@@ -152,7 +158,9 @@ def client_sock(parser, opts, display_name):
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
     sock, local = client_sock(parser, opts, pick_display(parser, extra_args))
-    app = XpraClient(sock)
+    if opts.compression_level < 0 or opts.compression_level > 9:
+        parser.error("Compression level must be between 0 and 9 inclusive.")
+    app = XpraClient(sock, opts.compression_level)
     sys.stdout.write("Attached\n")
     app.run()
 

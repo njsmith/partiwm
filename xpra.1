@@ -18,9 +18,12 @@ xpra \- viewer for remote, persistent X applications
 [\fB\-\-exit\-with\-children\fP] [\fB\-\-no\-daemon\fP]
 [\fB\-\-bind\-tcp=[HOST]:PORT\fP] 
 .HP
-\fBxpra\fP \fBattach\fP [\fI:DISPLAY\fP | \fIssh:HOST:DISPLAY\fP | \fItcp:HOST:DISPLAY\fP] [\fB\-\-remote\-xpra=CMD\fP]
+\fBxpra\fP \fBattach\fP
+[\fI:DISPLAY\fP | \fIssh:HOST:DISPLAY\fP | \fItcp:HOST:PORT\fP]
+[\fB\-zLEVEL | \-\-compress=LEVEL\fP]
+[\fB\-\-remote\-xpra=CMD\fP]
 .HP
-\fBxpra\fP \fBstop\fP [\fI:DISPLAY\fP | \fIssh:HOST:DISPLAY\fP | \fItcp:HOST:DISPLAY\fP] [\fB\-\-remote\-xpra=CMD\fP]
+\fBxpra\fP \fBstop\fP [\fI:DISPLAY\fP | \fIssh:HOST:DISPLAY\fP | \fItcp:HOST:PORT\fP] [\fB\-\-remote\-xpra=CMD\fP]
 .HP
 \fBxpra\fP \fBlist\fP
 .HP
@@ -182,7 +185,6 @@ automatically terminate itself when the last of them has exited.
 By default, the xpra server puts itself into the background,
 i.e. 'daemonizes', and redirects its output to a log file.  This
 prevents that behavior (useful mostly for debugging).
-.SS Options for attach, stop
 .TP
 \fB\-\-bind\-tcp=\fP\fI[HOST]:PORT\fP
 The xpra server always listens for connections on a local Unix domain
@@ -191,13 +193,24 @@ address, and remote connections with the \fBssh:frodo:7\fP-style
 display address. If you want, it can also listen for connections on a
 raw TCP socket. This behavior is enabled with \fB\-\-bind-\-tcp\fP. If
 the host portion is omitted, then 127.0.0.1 (localhost) will be used.
-.TP
+
 Using this switch is NOT RECOMMENDED, and is a major security risk!
 Xpra does not do any checking on incoming connections; anyone at all
 may connect to this port and access your desktop. Use it only if you
 have special needs (e.g., certain virtualization environments), and
 understand the consequences of your actions.
-.SS Options for start
+.SS Options for attach, stop
+.TP
+\fB-z\fP\fILEVEL\fP, \fB\-\-compress=\fP\fILEVEL\fP
+Select the level of compression xpra will use when transmitting data
+over the network. Higher levels of compression transmit less data over
+the network, but use more CPU power. Valid options are between 0
+(meaning no compression) and 9, inclusive. Higher levels take
+progressively more CPU while giving diminishing returns in terms of
+actual compression achieved; the default is 3, which gives a
+reasonable trade-off in general. Over local 100Mbs+ networks the CPU
+can easily become the bottleneck on xpra's speed, and \fB\-z0\fP is
+therefore recommended.
 .TP
 \fB\-\-remote\-xpra=\fP\fICMD\fP
 When connecting to a remote server over ssh, xpra needs to be able to
