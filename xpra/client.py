@@ -278,7 +278,7 @@ class XpraClient(gobject.GObject):
         capabilities_request = dict(default_capabilities)
         if compression_level:
             capabilities_request["deflate"] = compression_level
-        self.send(["hello", default_capabilities])
+        self.send(["hello", capabilities_request])
 
         self._keymap = gtk.gdk.keymap_get_default()
         self._keymap.connect("keys-changed", self._keys_changed)
