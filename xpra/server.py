@@ -216,6 +216,10 @@ class XpraServer(gobject.GObject):
         root.set_events(root.get_events() | gtk.gdk.SUBSTRUCTURE_MASK)
         add_event_receiver(root, self)
 
+        # This must happen early, before loading in windows at least:
+        self._protocol = None
+        self._potential_protocols = []
+
         ### Create the WM object
         self._wm = Wm("Xpra", clobber)
         self._wm.connect("new-window", self._new_window_signaled)
@@ -289,8 +293,6 @@ class XpraServer(gobject.GObject):
         self._upgrading = False
 
         ### All right, we're ready to accept customers:
-        self._protocol = None
-        self._potential_protocols = []
         for sock in sockets:
             self.add_listen_socket(sock)
 
