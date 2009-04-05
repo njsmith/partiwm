@@ -420,10 +420,8 @@ class TestClientMessageAndXSelectInputStuff(TestLowlevel, MockEventReceiver):
         assert event.window is win
         assert event.message_type == "WM_PROTOCOLS"
         assert event.format == 32
-        assert event.data[0] == l.get_xatom(win, "WM_TAKE_FOCUS")
-        # It gets sign-extended on 64-bit systems:
-        assert event.data[1] & 0xffffffff == 0xff000000
-        assert event.data[2:] == (0, 0, 0)
+        assert event.data == (l.get_xatom(win, "WM_TAKE_FOCUS"),
+                              0xff000000, 0, 0, 0)
 
 # myGetSelectionOwner gets tested in test_selection.py
 

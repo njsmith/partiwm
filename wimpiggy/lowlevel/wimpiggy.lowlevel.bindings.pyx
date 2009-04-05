@@ -1273,7 +1273,9 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                         return GDK_FILTER_CONTINUE
                     pieces = []
                     for i in xrange(5):
-                        pieces.append(int(e.xclient.data.l[i]))
+                        # Mask with 0xffffffff to prevent sign-extension on
+                        # architectures where Python's int is 64-bits.
+                        pieces.append(int(e.xclient.data.l[i]) & 0xffffffff)
                     pyev.data = tuple(pieces)
                 elif e.type == MapNotify:
                     log("MapNotify event received")
