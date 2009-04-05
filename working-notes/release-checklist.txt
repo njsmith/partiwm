@@ -11,6 +11,8 @@
 
 3) Double-check setup.py
 
+3.5) Make sure that 'xpra upgrade' works.
+
 4) python setup.py sdist
 
 5) Unpack dist/parti-all-<whatever>
