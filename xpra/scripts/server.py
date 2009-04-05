@@ -184,7 +184,7 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
                          + ("  %s\n" % logpath))
         # Do some work up front, so any errors don't get lost.
         if os.path.exists(logpath):
-            os.unlink(logpath)
+            os.rename(logpath, logpath + ".old")
         logfd = os.open(logpath, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0666)
         assert logfd > 2
         os.chdir("/")
