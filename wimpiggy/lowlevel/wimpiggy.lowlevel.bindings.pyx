@@ -166,7 +166,7 @@ cdef extern from *:
     union payload_for_XClientMessageEvent:
         char b[20]
         short s[10]
-        long l[5]
+        unsigned long l[5]
     ctypedef struct XClientMessageEvent:
         Atom message_type
         int format
