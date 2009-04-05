@@ -406,6 +406,25 @@ class TestClientMessageAndXSelectInputStuff(TestLowlevel, MockEventReceiver):
         assert event.data == (l.get_xatom(win, "WM_TAKE_FOCUS"),
                               1234, 0, 0, 0)
 
+    def test_send_wm_take_focus_large_time(self):
+        self.evs = []
+        win = self.window()
+        l.add_event_receiver(win, self)
+        gtk.gdk.flush()
+
+        l.send_wm_take_focus(win, 0xff000000)
+        gtk.main()
+        assert len(self.evs) == 1
+        event = self.evs[0]
+        assert event is not None
+        assert event.window is win
+        assert event.message_type == "WM_PROTOCOLS"
+        assert event.format == 32
+        assert event.data[0] == l.get_xatom(win, "WM_TAKE_FOCUS")
+        # It gets sign-extended on 64-bit systems:
+        assert event.data[1] & 0xffffffff == 0xff000000
+        assert event.data[2:] == (0, 0, 0)
+
 # myGetSelectionOwner gets tested in test_selection.py
 
 class TestSendConfigureNotify(TestLowlevel):

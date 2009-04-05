@@ -105,9 +105,9 @@ def premultiply_argb_in_place(buf):
     # b is a Python buffer object, containing non-premultiplied ARGB32 data in
     # native-endian.
     # We convert to premultiplied ARGB32 data, in-place.
-    cdef int * cbuf
+    cdef unsigned int * cbuf
     cdef Py_ssize_t cbuf_len
-    cdef int a, r, g, b
+    cdef unsigned int a, r, g, b
     assert sizeof(int) == 4
     PyObject_AsWriteBuffer(buf, <void **>&cbuf, &cbuf_len)
     cdef int i
@@ -233,9 +233,9 @@ cdef extern from *:
         XKeyEvent xkey
         
     Status XSendEvent(Display *, Window target, Bool propagate,
-                      long event_mask, XEvent * event)
+                      unsigned long event_mask, XEvent * event)
 
-    int XSelectInput(Display * display, Window w, long event_mask)
+    int XSelectInput(Display * display, Window w, unsigned long event_mask)
 
     int cXChangeProperty "XChangeProperty" \
         (Display *, Window w, Atom property,
@@ -258,7 +258,7 @@ cdef extern from *:
         int x, y, width, height, border_width
         Bool override_redirect
         int map_state
-        long your_event_mask
+        unsigned long your_event_mask
     Status XGetWindowAttributes(Display * display, Window w,
                                 XWindowAttributes * attributes)
     
