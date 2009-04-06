@@ -36,6 +36,7 @@ class ManagerSelection(gobject.GObject):
         gobject.GObject.__init__(self)
         self.atom = selection
         self.clipboard = gtk.Clipboard(display, selection)
+        self._xwindow = None
 
     def _owner(self):
         return myGetSelectionOwner(self.clipboard, self.atom)
@@ -83,12 +84,12 @@ class ManagerSelection(gobject.GObject):
         # Calculate the X atom for this selection:
         selection_xatom = get_xatom(self.clipboard, self.atom)
         # Ask X what window we used:
-        owner_window = myGetSelectionOwner(self.clipboard, self.atom)
+        self._xwindow = myGetSelectionOwner(self.clipboard, self.atom)
         
         root = self.clipboard.get_display().get_default_screen().get_root_window()
         sendClientMessage(root, False, const["StructureNotifyMask"],
                           "MANAGER",
-                          ts_num, selection_xatom, owner_window, 0, 0)
+                          ts_num, selection_xatom, self._xwindow, 0, 0)
 
         if old_owner != const["XNone"] and when is self.FORCE:
             # Block in a recursive mainloop until the previous owner has
@@ -117,6 +118,12 @@ class ManagerSelection(gobject.GObject):
         outdata.set("INTEGER", 32, pack("@ii", 2, 0))
 
     def _clear(self, clipboard, userdata):
+        self._xwindow = None
         self.emit("selection-lost")
+
+    def window(self):
+        if self._xwindow is None:
+            return None
+        return get_pywindow(self.clipboard, self._xwindow)
 
 gobject.type_register(ManagerSelection)

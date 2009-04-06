@@ -20,6 +20,7 @@ log = Logger()
 from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
 from xpra.clipboard import ClipboardProtocolHelper
+from xpra.xsettings import XSettingsWatcher
 
 import xpra
 default_capabilities = {"__prerelease_version": xpra.__version__}
@@ -284,6 +285,8 @@ class XpraClient(gobject.GObject):
         self._keymap.connect("keys-changed", self._keys_changed)
         self._keys_changed()
 
+        self._xsettings_watcher = None
+
         self._clipboard_helper = ClipboardProtocolHelper(self.send)
 
         self._focused = None
@@ -315,6 +318,11 @@ class XpraClient(gobject.GObject):
     def send_mouse_position(self, packet):
         self._protocol.source.queue_mouse_position_packet(packet)
 
+    def _handle_xsettings_changed(self, *args):
+        blob = self._xsettings_watcher.get_settings_blob()
+        if blob is not None:
+            self.send(["server-settings", {"xsettings-blob": blob}])
+
     def _process_hello(self, packet):
         (_, capabilities) = packet
         if "deflate" in capabilities:
@@ -323,6 +331,10 @@ class XpraClient(gobject.GObject):
             log.error("sorry, I only know how to talk to v%s servers",
                       xpra.__version__)
         self._clipboard_helper.send_all_tokens()
+        self._xsettings_watcher = XSettingsWatcher()
+        self._xsettings_watcher.connect("xsettings-changed",
+                                        self._handle_xsettings_changed)
+        self._handle_xsettings_changed()
 
     def _process_new_common(self, packet, override_redirect):
         (_, id, x, y, w, h, metadata) = packet

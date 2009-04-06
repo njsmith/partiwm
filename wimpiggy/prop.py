@@ -194,6 +194,10 @@ _prop_types = {
                       unsupported, NetWMStrut, None),
     "icon": (cairo.ImageSurface, "CARDINAL", 32,
              unsupported, NetWMIcons, None),
+    "xsettings-settings": (str, "_XSETTINGS_SETTINGS", 8,
+                           lambda disp, d: d,
+                           lambda disp, d: d,
+                           None),
     # For uploading ad-hoc instances of the above complex structures to the
     # server, so we can test reading them out again:
     "debug-CARDINAL": (str, "CARDINAL", 32,

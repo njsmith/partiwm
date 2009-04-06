@@ -38,6 +38,7 @@ import xpra
 from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
 from xpra.clipboard import ClipboardProtocolHelper
+from xpra.xsettings import XSettingsManager
 
 class DesktopManager(gtk.Widget):
     def __init__(self):
@@ -289,6 +290,8 @@ class XpraServer(gobject.GObject):
         self._clipboard_helper = ClipboardProtocolHelper(self._send)
 
         ### Misc. state:
+        self._settings = {}
+        self._xsettings_manager = None
         self._has_focus = 0
         self._upgrading = False
 
@@ -520,6 +523,15 @@ class XpraServer(gobject.GObject):
                 self._desktop_manager.hide_window(window)
                 self._send_new_window_packet(window)
 
+    def _process_server_settings(self, proto, packet):
+        (_, settings) = packet
+        old_settings = dict(self._settings)
+        self._settings.update(settings)
+        for k, v in settings.iteritems():
+            if k not in old_settings or v != old_settings[k]:
+                if k == "xsettings-blob":
+                    self._xsettings_manager = XSettingsManager(v)
+
     def _process_map_window(self, proto, packet):
         (_, id, x, y, width, height) = packet
         window = self._id_to_window[id]
@@ -603,6 +615,7 @@ class XpraServer(gobject.GObject):
 
     _packet_handlers = {
         "hello": _process_hello,
+        "server-settings": _process_server_settings,
         "map-window": _process_map_window,
         "unmap-window": _process_unmap_window,
         "move-window": _process_move_window,
