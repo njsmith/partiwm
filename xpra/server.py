@@ -27,6 +27,7 @@ from wimpiggy.lowlevel import (get_rectangle_from_region,
                                is_override_redirect, is_mapped,
                                add_event_receiver,
                                get_children)
+from wimpiggy.prop import prop_set
 from wimpiggy.window import OverrideRedirectWindowModel, Unmanageable
 from wimpiggy.keys import grok_modifier_map
 from wimpiggy.error import XError, trap
@@ -529,8 +530,19 @@ class XpraServer(gobject.GObject):
         self._settings.update(settings)
         for k, v in settings.iteritems():
             if k not in old_settings or v != old_settings[k]:
+                def root_set(p):
+                    prop_set(gtk.gdk.get_default_root_window(),
+                             p, "latin1", v.decode("utf-8"))
                 if k == "xsettings-blob":
                     self._xsettings_manager = XSettingsManager(v)
+                elif k == "resource-manager":
+                    root_set("RESOURCE_MANAGER")
+                elif k == "pulse-cookie":
+                    root_set("PULSE_COOKIE")
+                elif k == "pulse-id":
+                    root_set("PULSE_ID")
+                elif k == "pulse-server":
+                    root_set("PULSE_SERVER")
 
     def _process_map_window(self, proto, packet):
         (_, id, x, y, width, height) = packet

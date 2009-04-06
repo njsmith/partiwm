@@ -21,6 +21,8 @@ from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
 from xpra.clipboard import ClipboardProtocolHelper
 from xpra.xsettings import XSettingsWatcher
+from xpra.root_props import RootPropWatcher
+from wimpiggy.prop import prop_get
 
 import xpra
 default_capabilities = {"__prerelease_version": xpra.__version__}
@@ -286,6 +288,7 @@ class XpraClient(gobject.GObject):
         self._keys_changed()
 
         self._xsettings_watcher = None
+        self._root_props_watcher = None
 
         self._clipboard_helper = ClipboardProtocolHelper(self.send)
 
@@ -323,6 +326,20 @@ class XpraClient(gobject.GObject):
         if blob is not None:
             self.send(["server-settings", {"xsettings-blob": blob}])
 
+    ROOT_PROPS = {
+        "RESOURCE_MANAGER": "resource-manager",
+        "PULSE_COOKIE": "pulse-cookie",
+        "PULSE_ID": "pulse-id",
+        "PULSE_SERVER": "pulse-server",
+        }
+    
+    def _handle_root_prop_changed(self, obj, prop):
+        assert prop in self.ROOT_PROPS
+        v = prop_get(gtk.gdk.get_default_root_window(),
+                     prop, "latin1")
+        self.send(["server-settings",
+                   {self.ROOT_PROPS[prop]: v.encode("utf-8")}])
+
     def _process_hello(self, packet):
         (_, capabilities) = packet
         if "deflate" in capabilities:
@@ -335,6 +352,11 @@ class XpraClient(gobject.GObject):
         self._xsettings_watcher.connect("xsettings-changed",
                                         self._handle_xsettings_changed)
         self._handle_xsettings_changed()
+        self._root_props_watcher = RootPropWatcher(self.ROOT_PROPS.keys())
+        self._root_props_watcher.connect("root-prop-changed",
+                                        self._handle_root_prop_changed)
+        for prop in self.ROOT_PROPS:
+            self._handle_root_prop_changed(None, prop)
 
     def _process_new_common(self, packet, override_redirect):
         (_, id, x, y, w, h, metadata) = packet
