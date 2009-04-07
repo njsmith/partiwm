@@ -337,8 +337,9 @@ class XpraClient(gobject.GObject):
         assert prop in self.ROOT_PROPS
         v = prop_get(gtk.gdk.get_default_root_window(),
                      prop, "latin1")
-        self.send(["server-settings",
-                   {self.ROOT_PROPS[prop]: v.encode("utf-8")}])
+        if v is not None:
+            self.send(["server-settings",
+                       {self.ROOT_PROPS[prop]: v.encode("utf-8")}])
 
     def _process_hello(self, packet):
         (_, capabilities) = packet
