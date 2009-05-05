@@ -192,13 +192,16 @@ socket, and supports local connections with the \fB:7\fP-style display
 address, and remote connections with the \fBssh:frodo:7\fP-style
 display address. If you want, it can also listen for connections on a
 raw TCP socket. This behavior is enabled with \fB\-\-bind-\-tcp\fP. If
-the host portion is omitted, then 127.0.0.1 (localhost) will be used.
+the host portion is omitted, then 127.0.0.1 (localhost) will be
+used. If you wish to accept connections on all interfaces, pass
+0.0.0.0 for the host portion.
 
-Using this switch is NOT RECOMMENDED, and is a major security risk!
-Xpra does not do any checking on incoming connections; anyone at all
-may connect to this port and access your desktop. Use it only if you
-have special needs (e.g., certain virtualization environments), and
-understand the consequences of your actions.
+Using this switch is NOT RECOMMENDED, and is a major security risk
+(especially when passing 0.0.0.0)!  Xpra does not do any checking on
+incoming connections; anyone at all may connect to this port and
+access your xpra desktop. Use it only if you have special needs (e.g.,
+certain virtualization environments), and understand the consequences
+of your actions.
 .SS Options for attach, stop
 .TP
 \fB-z\fP\fILEVEL\fP, \fB\-\-compress=\fP\fILEVEL\fP
