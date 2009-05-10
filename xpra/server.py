@@ -14,6 +14,7 @@ import gobject
 import cairo
 import os
 import os.path
+import sys
 import subprocess
 
 from wimpiggy.wm import Wm
