@@ -21,9 +21,10 @@ xpra \- viewer for remote, persistent X applications
 \fBxpra\fP \fBattach\fP
 [\fI:DISPLAY\fP | \fIssh:HOST:DISPLAY\fP | \fItcp:HOST:PORT\fP]
 [\fB\-zLEVEL | \-\-compress=LEVEL\fP]
-[\fB\-\-remote\-xpra=CMD\fP]
+[\fB\-\-ssh=CMD\fP] [\fB\-\-remote\-xpra=CMD\fP]
 .HP
-\fBxpra\fP \fBstop\fP [\fI:DISPLAY\fP | \fIssh:HOST:DISPLAY\fP | \fItcp:HOST:PORT\fP] [\fB\-\-remote\-xpra=CMD\fP]
+\fBxpra\fP \fBstop\fP [\fI:DISPLAY\fP | \fIssh:HOST:DISPLAY\fP |
+\fItcp:HOST:PORT\fP] [\fB\-\-ssh=CMD\fP] [\fB\-\-remote\-xpra=CMD\fP]
 .HP
 \fBxpra\fP \fBlist\fP
 .HP
@@ -214,6 +215,27 @@ actual compression achieved; the default is 3, which gives a
 reasonable trade-off in general. Over local 100Mbs+ networks the CPU
 can easily become the bottleneck on xpra's speed, and \fB\-z0\fP is
 therefore recommended.
+.TP
+\fB\-\-ssh=\fP\fICMD\fP
+When you use an \fBssh:\fP address to connect to a remote display,
+xpra runs \fBssh\fP(1) to make the underlying connection. By default,
+it does this by running the command "ssh". If your ssh program is in
+an unusual location, has an unusual name, or you want to pass special
+options to change ssh's behavior, then you can use the \fB\-\-ssh\fP
+switch to tell xpra how to run ssh. For example, if you want to use
+arcfour encryption, then you should run
+
+.\" I'm sure this is completely the wrong thing to do here, but it
+.\" produces fine output in the terminal, at least:
+.RS
+.RS
+\fBxpra attach \-\-ssh="ssh -c arcfour" ssh:frodo:7\fP
+
+.RE
+(\fINote:\fP don't bother to enable ssh compression; this
+is redundant with xpra's own compression, and will just waste your
+CPU. See also xpra's \fB\-\-compress\fP switch.)
+.RE
 .TP
 \fB\-\-remote\-xpra=\fP\fICMD\fP
 When connecting to a remote server over ssh, xpra needs to be able to

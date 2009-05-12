@@ -59,6 +59,9 @@ def main(script_file, cmdline):
                       help="How hard to work on compressing data."
                       + " 0 to disable compression,"
                       + "9 for maximal (slowest) compression. Default: 3.")
+    parser.add_option("--ssh", action="store",
+                      dest="ssh", default=None, metavar="CMD",
+                      help="How to run 'xpra' on the remote host")
     parser.add_option("--remote-xpra", action="store",
                       dest="remote_xpra", default=None, metavar="CMD",
                       help="How to run 'xpra' on the remote host")
@@ -128,12 +131,16 @@ def client_sock(parser, opts, display_name):
             host = sshspec
             display_args = []
         (a, b) = socket.socketpair()
+        if opts.ssh is not None:
+            ssh = opts.ssh.split()
+        else:
+            ssh = ["ssh"]
         if opts.remote_xpra is not None:
             remote_xpra = opts.remote_xpra.split()
         else:
             remote_xpra = ["$HOME/.xpra/run-xpra"]
         
-        p = subprocess.Popen(["ssh", host, "-e", "none"]
+        p = subprocess.Popen(ssh + [host, "-e", "none"]
                              + remote_xpra + ["_proxy"] + display_args,
                              stdin=b.fileno(), stdout=b.fileno(),
                              bufsize=0)
