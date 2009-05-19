@@ -168,7 +168,7 @@ def run_client(parser, opts, extra_args):
     if opts.compression_level < 0 or opts.compression_level > 9:
         parser.error("Compression level must be between 0 and 9 inclusive.")
     app = XpraClient(sock, opts.compression_level)
-    sys.stdout.write("Attached\n")
+    sys.stdout.write("Attached (press Control-C to detach)\n")
     app.run()
 
 def run_proxy(parser, opts, extra_args):
