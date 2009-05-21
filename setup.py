@@ -22,9 +22,13 @@ from Pyrex.Compiler.Version import version as pyrex_version_string
 pyrex_version = [int(part) for part in pyrex_version_string.split(".")]
 # This was when the 'for 0 < i < 10:' syntax as added, bump upwards as
 # necessary:
-if pyrex_version < [0, 9, 7]:
+NEEDED_PYREX = (0, 9, 7)
+if tuple(pyrex_version) < NEEDED_PYREX:
     sys.exit("ERROR: Your version of Pyrex is too old to build this package\n"
-             "Please upgrade to Pyrex 0.9.7+")
+             "You have version %s\n"
+             "Please upgrade to Pyrex %s or better"
+             % (pyrex_version_string,
+                ".".join([str(part) for part in NEEDED_PYREX])))
 
 # Tweaked from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/502261
 def pkgconfig(*packages, **kw):
