@@ -281,6 +281,8 @@ class XpraClient(gobject.GObject):
         capabilities_request = dict(default_capabilities)
         if compression_level:
             capabilities_request["deflate"] = compression_level
+        root_w, root_h = gtk.gdk.get_default_root_window().get_size()
+        capabilities_request["desktop_size"] = [root_w, root_h]
         self.send(["hello", capabilities_request])
 
         self._keymap = gtk.gdk.keymap_get_default()
@@ -348,6 +350,18 @@ class XpraClient(gobject.GObject):
         if capabilities.get("__prerelease_version") != xpra.__version__:
             log.error("sorry, I only know how to talk to v%s servers",
                       xpra.__version__)
+            gtk.main_quit()
+            return
+        if "desktop_size" in capabilities:
+            avail_w, avail_h = capabilities["desktop_size"]
+            root_w, root_h = gtk.gdk.get_default_root_window().get_size()
+            if (avail_w, avail_h) < (root_w, root_h):
+                log.warn("Server's virtual screen is too small -- "
+                         "(server: %sx%s vs. client: %sx%s)\n"
+                         "You may see strange behavior.\n"
+                         "Please complain to "
+                         "parti-discuss@partiwm.org"
+                         % (avail_w, avail_h, root_w, root_h))
         self._clipboard_helper.send_all_tokens()
         self._xsettings_watcher = XSettingsWatcher()
         self._xsettings_watcher.connect("xsettings-changed",

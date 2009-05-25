@@ -492,6 +492,11 @@ class XpraServer(gobject.GObject):
         for cap in ("deflate", "__prerelease_version"):
             if cap in client_capabilities:
                 capabilities[cap] = client_capabilities[cap]
+        if "desktop_size" in client_capabilities:
+            client_w, client_h = client_capabilities["desktop_size"]
+            (root_w, root_h) = gtk.gdk.get_default_root_window().get_size()
+            capabilities["desktop_size"] = [min(client_w, root_w),
+                                            min(client_h, root_h)]
         return capabilities
 
     def _process_hello(self, proto, packet):
