@@ -116,15 +116,16 @@ Note 1: If running and displaying apps on two different machines, then
 Note 2: If you're on a 64-bit Redhat-ish distro (one with multilib
   support), then you may need to replace 'lib' with 'lib64' above.
 
-On the machine where you will run the apps:
+On the machine where you will run the apps (usually, a remote machine):
   install/bin/xpra start :13
 
-On the machine where you want the apps to display:
+On the machine where you want the apps to display (usually, your local machine):
   install/bin/xpra attach ssh:<remote box>:13
 or if displaying on the same machine for testing, just:
   install/bin/xpra attach :13
 
-Start some apps:
+Then on the machine where you ran 'xpra start' (usually, the remote
+machine), start some apps:
   export DISPLAY=:13
   emacs
 
