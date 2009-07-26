@@ -1,5 +1,5 @@
 # This file is part of Parti.
-# Copyright (C) 2008, 2009 Nathaniel Smith <njs@pobox.com>
+# Copyright (C) 2008 Nathaniel Smith <njs@pobox.com>
 # Parti is released under the terms of the GNU GPL v2, or, at your option, any
 # later version. See the file COPYING for details.
 
@@ -87,7 +87,8 @@ def main(script_file, cmdline):
     mode = args.pop(0)
     if mode in ("start", "upgrade"):
         nox()
-        run_server_somewhere(parser, options, mode, script_file, args, cmdline)
+        from xpra.scripts.server import run_server
+        run_server(parser, options, mode, script_file, args)
     elif mode == "attach":
         run_client(parser, options, args)
     elif mode == "stop":
@@ -187,28 +188,6 @@ def connect(display_desc):
         return sock
     else:
         assert False, "unsupported display type in connect"
-
-# Either forward our command line to a remote xpra to execute there (as a
-# convenience, so 'xpra start ssh:somewhere:13' works), or else run the actual
-# server code:
-def run_server_somewhere(parser, opts, mode, script_file, extra_args, cmdline):
-    if len(extra_args) != 1:
-        parser.error("'%s' takes exactly one argument" % mode)
-    display_desc = parse_display_name(parser, opts, extra_args[0])
-    if display_desc["type"] == "ssh":
-        # Forward our command off to the remote xpra:
-        if display_desc["display"] is None:
-            parser.error("'%s' requires you specify a numeric display, "
-                         "like ssh:%s:42" % (mode, display_desc["host"]))
-        cmdline[cmdline.index(extra_args[0])] = display_desc["display"]
-        sys.exit(subprocess.call(display_desc["full_remote_xpra"]
-                                 + cmdline[1:]))
-    elif display_desc["type"] == "tcp":
-        parser.error("Cannot %s a remote server over tcp" % mode)
-    else:
-        assert display_desc["type"] == "unix-domain"
-        from xpra.scripts.server import run_local_server
-        run_local_server(parser, opts, mode, script_file, display_desc)
 
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient

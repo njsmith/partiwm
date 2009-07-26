@@ -1,5 +1,5 @@
 # This file is part of Parti.
-# Copyright (C) 2008, 2009 Nathaniel Smith <njs@pobox.com>
+# Copyright (C) 2008 Nathaniel Smith <njs@pobox.com>
 # Parti is released under the terms of the GNU GPL v2, or, at your option, any
 # later version. See the file COPYING for details.
 
@@ -144,9 +144,10 @@ def create_tcp_socket(parser, spec):
     listener.bind((host, int(port)))
     return listener
 
-def run_local_server(parser, opts, mode, xpra_file, display_desc):
-    assert display_desc["type"] == "unix-domain"
-    display_name = display_desc["display"]
+def run_server(parser, opts, mode, xpra_file, extra_args):
+    if len(extra_args) != 1:
+        parser.error("need exactly 1 extra argument")
+    display_name = extra_args.pop(0)
 
     if opts.exit_with_children and not opts.children:
         print "--exit-with-children specified without any children to spawn; exiting immediately"
