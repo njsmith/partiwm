@@ -1,5 +1,5 @@
 # This file is part of Parti.
-# Copyright (C) 2008 Nathaniel Smith <njs@pobox.com>
+# Copyright (C) 2008, 2009 Nathaniel Smith <njs@pobox.com>
 # Parti is released under the terms of the GNU GPL v2, or, at your option, any
 # later version. See the file COPYING for details.
 
@@ -144,10 +144,9 @@ def create_tcp_socket(parser, spec):
     listener.bind((host, int(port)))
     return listener
 
-def run_server(parser, opts, mode, xpra_file, extra_args):
-    if len(extra_args) != 1:
-        parser.error("need exactly 1 extra argument")
-    display_name = extra_args.pop(0)
+def run_local_server(parser, opts, mode, xpra_file, display_desc):
+    assert display_desc["type"] == "unix-domain"
+    display = display_desc["display"]
 
     if opts.exit_with_children and not opts.children:
         print "--exit-with-children specified without any children to spawn; exiting immediately"
@@ -178,7 +177,7 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
 
     # Daemonize:
     if opts.daemon:
-        logpath = dotxpra.server_socket_path(display_name, upgrading) + ".log"
+        logpath = dotxpra.server_socket_path(display, upgrading) + ".log"
         sys.stderr.write("Entering daemon mode; "
                          + "any further errors will be reported to:\n"
                          + ("  %s\n" % logpath))
@@ -227,15 +226,15 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     os.chmod(scriptpath, 0777 & ~umask)
 
     # Do this after writing out the shell script:
-    os.environ["DISPLAY"] = display_name
+    os.environ["DISPLAY"] = display
 
     if not upgrading:
         # We need to set up a new server environment
         xauthority = os.environ.get("XAUTHORITY",
                                     os.path.expanduser("~/.Xauthority"))
         try:
-            xvfb = subprocess.Popen(["Xvfb-for-Xpra-%s" % display_name,
-                                     display_name,
+            xvfb = subprocess.Popen(["Xvfb-for-Xpra-%s" % display,
+                                     display,
                                      "-auth", xauthority,
                                      "+extension", "Composite",
                                      # Biggest easily available monitors are
@@ -248,17 +247,17 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
         raw_cookie = os.urandom(16)
         baked_cookie = raw_cookie.encode("hex")
         try:
-            assert not subprocess.call(["xauth", "add", display_name,
+            assert not subprocess.call(["xauth", "add", display,
                                         "MIT-MAGIC-COOKIE-1", baked_cookie])
         except OSError, e:
             sys.stderr.write("Error running xauth: %s\n" % e)
 
     # Whether we spawned our server or not, it is now running -- or at least
     # starting.  First wait for it to start up:
-    wait_for_x_server(display_name, 3) # 3s timeout
+    wait_for_x_server(display, 3) # 3s timeout
     # Now we can safely load gtk and connect:
     import gtk
-    display = gtk.gdk.Display(display_name)
+    display = gtk.gdk.Display(display)
     manager = gtk.gdk.display_manager_get()
     default_display = manager.get_default_display()
     if default_display is not None:
@@ -282,7 +281,7 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
         save_pid(xvfb_pid)
 
     sockets = []
-    sockets.append(create_unix_domain_socket(display_name, upgrading))
+    sockets.append(create_unix_domain_socket(display, upgrading))
     if opts.bind_tcp:
         sockets.append(create_tcp_socket(parser, opts.bind_tcp))
 
