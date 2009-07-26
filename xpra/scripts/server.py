@@ -146,7 +146,7 @@ def create_tcp_socket(parser, spec):
 
 def run_local_server(parser, opts, mode, xpra_file, display_desc):
     assert display_desc["type"] == "unix-domain"
-    display = display_desc["display"]
+    display_name = display_desc["display"]
 
     if opts.exit_with_children and not opts.children:
         print "--exit-with-children specified without any children to spawn; exiting immediately"
@@ -177,7 +177,7 @@ def run_local_server(parser, opts, mode, xpra_file, display_desc):
 
     # Daemonize:
     if opts.daemon:
-        logpath = dotxpra.server_socket_path(display, upgrading) + ".log"
+        logpath = dotxpra.server_socket_path(display_name, upgrading) + ".log"
         sys.stderr.write("Entering daemon mode; "
                          + "any further errors will be reported to:\n"
                          + ("  %s\n" % logpath))
@@ -226,15 +226,15 @@ def run_local_server(parser, opts, mode, xpra_file, display_desc):
     os.chmod(scriptpath, 0777 & ~umask)
 
     # Do this after writing out the shell script:
-    os.environ["DISPLAY"] = display
+    os.environ["DISPLAY"] = display_name
 
     if not upgrading:
         # We need to set up a new server environment
         xauthority = os.environ.get("XAUTHORITY",
                                     os.path.expanduser("~/.Xauthority"))
         try:
-            xvfb = subprocess.Popen(["Xvfb-for-Xpra-%s" % display,
-                                     display,
+            xvfb = subprocess.Popen(["Xvfb-for-Xpra-%s" % display_name,
+                                     display_name,
                                      "-auth", xauthority,
                                      "+extension", "Composite",
                                      # Biggest easily available monitors are
@@ -247,17 +247,17 @@ def run_local_server(parser, opts, mode, xpra_file, display_desc):
         raw_cookie = os.urandom(16)
         baked_cookie = raw_cookie.encode("hex")
         try:
-            assert not subprocess.call(["xauth", "add", display,
+            assert not subprocess.call(["xauth", "add", display_name,
                                         "MIT-MAGIC-COOKIE-1", baked_cookie])
         except OSError, e:
             sys.stderr.write("Error running xauth: %s\n" % e)
 
     # Whether we spawned our server or not, it is now running -- or at least
     # starting.  First wait for it to start up:
-    wait_for_x_server(display, 3) # 3s timeout
+    wait_for_x_server(display_name, 3) # 3s timeout
     # Now we can safely load gtk and connect:
     import gtk
-    display = gtk.gdk.Display(display)
+    display = gtk.gdk.Display(display_name)
     manager = gtk.gdk.display_manager_get()
     default_display = manager.get_default_display()
     if default_display is not None:
@@ -281,7 +281,7 @@ def run_local_server(parser, opts, mode, xpra_file, display_desc):
         save_pid(xvfb_pid)
 
     sockets = []
-    sockets.append(create_unix_domain_socket(display, upgrading))
+    sockets.append(create_unix_domain_socket(display_name, upgrading))
     if opts.bind_tcp:
         sockets.append(create_tcp_socket(parser, opts.bind_tcp))
 

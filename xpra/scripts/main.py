@@ -206,9 +206,9 @@ def run_server_somewhere(parser, opts, mode, script_file, extra_args, cmdline):
     elif display_desc["type"] == "tcp":
         parser.error("Cannot %s a remote server over tcp" % mode)
     else:
-        assert display_desc["type"] == "local"
+        assert display_desc["type"] == "unix-domain"
         from xpra.scripts.server import run_local_server
-        run_local_server(parser, opts, mode, xpra_file, display_desc)
+        run_local_server(parser, opts, mode, script_file, display_desc)
 
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
