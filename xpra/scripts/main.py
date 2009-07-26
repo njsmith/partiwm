@@ -102,7 +102,54 @@ def main(script_file, cmdline):
     else:
         parser.error("invalid mode '%s'" % mode)
 
-def pick_display(parser, extra_args):
+def parse_display_name(parser, opts, display_name):
+    if display_name.startswith("ssh:"):
+        desc = {
+            "type": "ssh",
+            "local": False
+            }
+        sshspec = display_name[len("ssh:"):]
+        if ":" in sshspec:
+            (desc["host"], desc["display"]) = sshspec.split(":", 1)
+            desc["display"] = ":" + desc["display"]
+            desc["display_as_args"] = [desc["display"]]
+        else:
+            desc["host"] = sshspec
+            desc["display"] = None
+            desc["display_as_args"] = []
+        if opts.ssh is not None:
+            desc["ssh"] = opts.ssh.split()
+        else:
+            desc["ssh"] = ["ssh"]
+        desc["full_ssh"] = desc["ssh"] + [desc["host"], "-e", "none"]
+        if opts.remote_xpra is not None:
+            desc["remote_xpra"] = opts.remote_xpra.split()
+        else:
+            desc["remote_xpra"] = ["$HOME/.xpra/run-xpra"]
+        desc["full_remote_xpra"] = desc["full_ssh"] + desc["remote_xpra"]
+        return desc
+    elif display_name.startswith(":"):
+        desc = {
+            "type": "unix-domain",
+            "local": True,
+            "display": display_name,
+            }
+        return desc
+    elif display_name.startswith("tcp:"):
+        desc = {
+            "type": "tcp",
+            "local": False,
+            }
+        host_spec = display_name[4:]
+        (desc["host"], port_str) = host_spec.split(":", 1)
+        desc["port"] = int(port_str)
+        if desc["host"] == "":
+            desc["host"] = "127.0.0.1"
+        return desc
+    else:
+        parser.error("unknown format for display name")
+
+def pick_display(parser, opts, extra_args):
     if len(extra_args) == 0:
         # Pick a default server
         sockdir = DotXpra()
@@ -113,58 +160,38 @@ def pick_display(parser, extra_args):
         if len(live_servers) == 0:
             parser.error("cannot find a live server to connect to")
         elif len(live_servers) == 1:
-            return live_servers[0]
+            return parse_display_name(parser, opts, live_servers[0])
         else:
             parser.error("there are multiple servers running, please specify")
     elif len(extra_args) == 1:
-        return extra_args[0]
+        return parse_display_name(parser, opts, extra_args[0])
     else:
         parser.error("too many arguments")
 
-def client_sock(parser, opts, display_name):
-    if display_name.startswith("ssh:"):
-        sshspec = display_name[len("ssh:"):]
-        if ":" in sshspec:
-            (host, display) = sshspec.split(":", 1)
-            display_args = [":" + display]
-        else:
-            host = sshspec
-            display_args = []
+def connect(display_desc):
+    if display_desc["type"] == "ssh":
         (a, b) = socket.socketpair()
-        if opts.ssh is not None:
-            ssh = opts.ssh.split()
-        else:
-            ssh = ["ssh"]
-        if opts.remote_xpra is not None:
-            remote_xpra = opts.remote_xpra.split()
-        else:
-            remote_xpra = ["$HOME/.xpra/run-xpra"]
-        
-        p = subprocess.Popen(ssh + [host, "-e", "none"]
-                             + remote_xpra + ["_proxy"] + display_args,
+        p = subprocess.Popen(display_desc["full_remote_xpra"]
+                             + ["_proxy"]
+                             + display_desc["display_as_args"],
                              stdin=b.fileno(), stdout=b.fileno(),
                              bufsize=0)
-        return a, False
-    elif display_name.startswith(":"):
+        return a
+    elif display_desc["type"] == "unix-domain":
         sockdir = DotXpra()
         sock = socket.socket(socket.AF_UNIX)
-        sock.connect(sockdir.socket_path(display_name))
-        return sock, True
-    elif display_name.startswith("tcp:"):
-        host_spec = display_name[4:]
-        (host, port) = host_spec.split(":", 1)
-        if host == "":
-            host = "127.0.0.1"
+        sock.connect(sockdir.socket_path(display_desc["display"]))
+        return sock
+    elif display_desc["type"] == "tcp":
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((host, int(port)))
-        return sock, True
+        sock.connect((display_desc["host"], display_desc["port"]))
+        return sock
     else:
-        parser.error("unknown format for display name")
-        
+        assert False, "unsupported display type in connect"
 
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
-    sock, local = client_sock(parser, opts, pick_display(parser, extra_args))
+    sock = connect(pick_display(parser, opts, extra_args))
     if opts.compression_level < 0 or opts.compression_level > 9:
         parser.error("Compression level must be between 0 and 9 inclusive.")
     app = XpraClient(sock, opts.compression_level)
@@ -173,18 +200,18 @@ def run_client(parser, opts, extra_args):
 
 def run_proxy(parser, opts, extra_args):
     from xpra.proxy import XpraProxy
-    app = XpraProxy(0, 1, client_sock(parser, opts, pick_display(parser, extra_args))[0])
+    app = XpraProxy(0, 1, connect(pick_display(parser, opts, extra_args)))
     app.run()
 
 def run_stop(parser, opts, extra_args):
     magic_string = bencode(["hello", []]) + bencode(["shutdown-server"])
 
-    display_name = pick_display(parser, extra_args)
-    sock, local = client_sock(parser, opts, display_name)
+    display_desc = pick_display(parser, opts, extra_args)
+    sock = connect(display_desc)
     sock.sendall(magic_string)
     while sock.recv(4096):
         pass
-    if local:
+    if display_desc["local"]:
         sockdir = DotXpra()
         for i in xrange(6):
             final_state = sockdir.server_state(display_name)
