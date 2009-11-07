@@ -5,3 +5,4 @@
 ^MANIFEST$
 ^dist
 ^xpra/xpra.wait_for_x_server.c$
+__init__\.pyc$
