@@ -146,8 +146,7 @@ class TestProp(TestWithSession):
 
         icon_bytes = small_dat + large_dat + small_dat
 
-        p.prop_set(self.win, "_NET_WM_ICON", "debug-CARDINAL",
-                   small_dat + large_dat + small_dat)
+        p.prop_set(self.win, "_NET_WM_ICON", "debug-CARDINAL", icon_bytes)
         self._assert_icon_matches("_NET_WM_ICON", large)
 
         # Corrupted icons:

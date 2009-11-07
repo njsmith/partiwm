@@ -42,6 +42,7 @@ class DotXpra(object):
         if not os.path.exists(path):
             return self.DEAD
         sock = socket.socket(socket.AF_UNIX)
+        sock.settimeout(5)
         try:
             sock.connect(path)
         except socket.error, e:

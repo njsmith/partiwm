@@ -154,7 +154,7 @@ class Runner(object):
                              % (module_name, e))
             return
         for comp in module_name.split(".")[1:]:
-           mod = getattr(mod, comp) 
+            mod = getattr(mod, comp) 
         if not self.thing_looks_testy(module_name, mod):
             return
 
@@ -240,7 +240,7 @@ class Runner(object):
             details = inspect_traceback(exc_info[2])
         except SystemExit, KeyboardInterrupt:
             raise
-        except Exception, e:
+        except Exception:
             details = ("(failed to extract details;\n"
                        + "nose.inspect.inspect_traceback threw exception\n"
                        + "(maybe because the error was in pyrex code):\n"

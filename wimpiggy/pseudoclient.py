@@ -4,8 +4,6 @@
 # later version. See the file COPYING for details.
 
 import gtk
-import gtk.gdk
-import wimpiggy.lowlevel
 
 class PseudoclientWindow(gtk.Window):
     """A gtk.Window that acts like an ordinary client.

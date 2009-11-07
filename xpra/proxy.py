@@ -5,9 +5,6 @@
 
 import gobject
 import os
-import socket
-
-import sys
 
 from wimpiggy.log import Logger
 log = Logger()

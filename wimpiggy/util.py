@@ -5,7 +5,6 @@
 
 import traceback
 import sys
-import types
 import gobject
 
 class AutoPropGObjectMixin(object):

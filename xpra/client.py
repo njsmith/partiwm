@@ -6,11 +6,8 @@
 import gtk
 import gobject
 import cairo
-import os
-import os.path
 
-from wimpiggy.util import (one_arg_signal,
-                           gtk_main_quit_really,
+from wimpiggy.util import (gtk_main_quit_really,
                            gtk_main_quit_on_fatal_exceptions_enable)
 from wimpiggy.keys import grok_modifier_map
 

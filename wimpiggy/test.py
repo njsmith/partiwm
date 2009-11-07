@@ -3,7 +3,6 @@
 # Parti is released under the terms of the GNU GPL v2, or, at your option, any
 # later version. See the file COPYING for details.
 
-import unittest
 import subprocess
 import sys
 import os
@@ -42,7 +41,6 @@ def assert_emits(f, obj, signal, slot=None):
         "signal_was_emitted": False,
         "slot_exc": None,
         }
-    signal_was_emitted = False
     def real_slot(*args, **kwargs):
         backchannel["signal_was_emitted"] = True
         if slot is not None:

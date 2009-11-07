@@ -18,7 +18,7 @@ import os
 from socket import gethostname
 import wimpiggy.lowlevel
 from wimpiggy.util import (AutoPropGObjectMixin,
-                           one_arg_signal, n_arg_signal,
+                           one_arg_signal,
                            non_none_list_accumulator)
 from wimpiggy.error import *
 from wimpiggy.prop import prop_get, prop_set
@@ -712,7 +712,7 @@ class WindowModel(BaseWindowModel):
                                   "WM_CLASS", "latin1")
         if class_instance:
             try:
-                (c, i, fluff) = class_instance.split("\0")
+                (c, i, _) = class_instance.split("\0")
             except ValueError:
                 log.warn("Malformed WM_CLASS, ignoring")
             else:

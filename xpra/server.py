@@ -12,8 +12,6 @@
 import gtk
 import gobject
 import cairo
-import os
-import os.path
 import sys
 import subprocess
 
@@ -31,7 +29,7 @@ from wimpiggy.lowlevel import (get_rectangle_from_region,
 from wimpiggy.prop import prop_set
 from wimpiggy.window import OverrideRedirectWindowModel, Unmanageable
 from wimpiggy.keys import grok_modifier_map
-from wimpiggy.error import XError, trap
+from wimpiggy.error import *
 
 from wimpiggy.log import Logger
 log = Logger()
@@ -352,7 +350,7 @@ class XpraServer(gobject.GObject):
     def _add_new_or_window(self, raw_window):
         try:
             window = OverrideRedirectWindowModel(raw_window)
-        except Unmanageable, e:
+        except Unmanageable:
             return
         self._add_new_window_common(window)
         window.connect("notify::geometry", self._or_window_geometry_changed)
@@ -603,7 +601,7 @@ class XpraServer(gobject.GObject):
             trap.call_unsynced(xtest_fake_button,
                                gtk.gdk.display_get_default(),
                                button, depressed)
-        except XError, e:
+        except XError:
             log.warn("Failed to pass on (un)press of mouse button %s"
                      + " (perhaps your Xvfb does not support mousewheels?)",
                      button)

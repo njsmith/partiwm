@@ -16,6 +16,7 @@ xpra \- viewer for remote, persistent X applications
 \fBxpra\fP \fBstart\fP \fI:DISPLAY\fP
 [\fB\-\-start\-child=CHILD\fP]\fB .\|.\|.\fP
 [\fB\-\-exit\-with\-children\fP] [\fB\-\-no\-daemon\fP]
+[\fB\-\-xvfb=CMD\fP]
 [\fB\-\-bind\-tcp=[HOST]:PORT\fP] 
 .HP
 \fBxpra\fP \fBattach\fP
@@ -186,6 +187,13 @@ automatically terminate itself when the last of them has exited.
 By default, the xpra server puts itself into the background,
 i.e. 'daemonizes', and redirects its output to a log file.  This
 prevents that behavior (useful mostly for debugging).
+.TP
+\fB\-\-xvfb\fP\fICMD\fP
+When starting the server, xpra starts a virtual X server to run the
+clients on. By default, this is 'Xvfb'. If your Xvfb is installed in a
+funny location, or you want to use some other virtual X server, then
+this switch allows you to specify how to run your preferred X server
+executable.
 .TP
 \fB\-\-bind\-tcp=\fP\fI[HOST]:PORT\fP
 The xpra server always listens for connections on a local Unix domain

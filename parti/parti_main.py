@@ -14,7 +14,6 @@ from wimpiggy.util import gtk_main_quit_really
 from parti.world_organizer import WorldOrganizer
 
 from parti.tray import TraySet
-from parti.trays.simpletab import SimpleTabTray
 
 from parti.addons.ipython_embed import spawn_repl_window
 
@@ -35,6 +34,7 @@ class Parti(object):
         self._world_organizer.show_all()
 
         # FIXME: be less stupid
+        #from parti.trays.simpletab import SimpleTabTray
         #self._trays.new(u"default", SimpleTabTray)
         from parti.trays.compositetest import CompositeTest
         self._trays.new(u"default", CompositeTest)

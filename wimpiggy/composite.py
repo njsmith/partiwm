@@ -4,7 +4,6 @@
 # later version. See the file COPYING for details.
 
 import gobject
-import gtk
 from wimpiggy.util import one_arg_signal, AutoPropGObjectMixin
 from wimpiggy.error import *
 from wimpiggy.lowlevel import (xcomposite_redirect_window,

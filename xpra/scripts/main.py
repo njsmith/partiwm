@@ -49,6 +49,9 @@ def main(script_file, cmdline):
     parser.add_option("--no-daemon", action="store_false",
                       dest="daemon", default=True,
                       help="Don't daemonize when running as a server")
+    parser.add_option("--xvfb", action="store",
+                      dest="xvfb", default="Xvfb", metavar="CMD",
+                      help="How to run the headless X server (default: '%default')")
     parser.add_option("--bind-tcp", action="store",
                       dest="bind_tcp", default=None,
                       metavar="[HOST]:PORT",
@@ -58,13 +61,14 @@ def main(script_file, cmdline):
                       metavar="LEVEL",
                       help="How hard to work on compressing data."
                       + " 0 to disable compression,"
-                      + "9 for maximal (slowest) compression. Default: 3.")
+                      + "9 for maximal (slowest) compression. Default: %default.")
     parser.add_option("--ssh", action="store",
-                      dest="ssh", default=None, metavar="CMD",
-                      help="How to run 'xpra' on the remote host")
+                      dest="ssh", default="ssh", metavar="CMD",
+                      help="How to run ssh (default: '%default')")
     parser.add_option("--remote-xpra", action="store",
-                      dest="remote_xpra", default=None, metavar="CMD",
-                      help="How to run 'xpra' on the remote host")
+                      dest="remote_xpra", default="$HOME/.xpra/run-xpra",
+                      metavar="CMD",
+                      help="How to run xpra on the remote host (default: '%default')")
     parser.add_option("-d", "--debug", action="store",
                       dest="debug", default=None, metavar="FILTER1,FILTER2,...",
                       help="List of categories to enable debugging for (or \"all\")")
@@ -117,15 +121,9 @@ def parse_display_name(parser, opts, display_name):
             desc["host"] = sshspec
             desc["display"] = None
             desc["display_as_args"] = []
-        if opts.ssh is not None:
-            desc["ssh"] = opts.ssh.split()
-        else:
-            desc["ssh"] = ["ssh"]
+        desc["ssh"] = opts.ssh.split()
         desc["full_ssh"] = desc["ssh"] + [desc["host"], "-e", "none"]
-        if opts.remote_xpra is not None:
-            desc["remote_xpra"] = opts.remote_xpra.split()
-        else:
-            desc["remote_xpra"] = ["$HOME/.xpra/run-xpra"]
+        desc["remote_xpra"] = opts.remote_xpra.split()
         desc["full_remote_xpra"] = desc["full_ssh"] + desc["remote_xpra"]
         return desc
     elif display_name.startswith(":"):
@@ -171,11 +169,11 @@ def pick_display(parser, opts, extra_args):
 def connect(display_desc):
     if display_desc["type"] == "ssh":
         (a, b) = socket.socketpair()
-        p = subprocess.Popen(display_desc["full_remote_xpra"]
-                             + ["_proxy"]
-                             + display_desc["display_as_args"],
-                             stdin=b.fileno(), stdout=b.fileno(),
-                             bufsize=0)
+        subprocess.Popen(display_desc["full_remote_xpra"]
+                         + ["_proxy"]
+                         + display_desc["display_as_args"],
+                         stdin=b.fileno(), stdout=b.fileno(),
+                         bufsize=0)
         return a
     elif display_desc["type"] == "unix-domain":
         sockdir = DotXpra()

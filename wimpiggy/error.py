@@ -26,9 +26,11 @@
 # super-fast connections to the X server, everything running on fast
 # computers... does being this careful to avoid sync's actually matter?)
 
+__all__ = ["XError", "trap"]
+
 import sys
 
-import gtk.gdk as _gdk
+import gtk.gdk
 
 from wimpiggy.log import Logger
 log = Logger()
@@ -57,16 +59,16 @@ class _ErrorManager(object):
 
     def _enter(self):
         assert self.depth >= 0
-        _gdk.error_trap_push()
+        gtk.gdk.error_trap_push()
         self.depth += 1
 
     def _exit(self, need_sync):
         assert self.depth >= 0
         self.depth -= 1
         if self.depth == 0 and need_sync:
-            _gdk.flush()
+            gtk.gdk.flush()
         # This is a Xlib error constant (Success == 0)
-        error = _gdk.error_trap_pop()
+        error = gtk.gdk.error_trap_pop()
         if error:
             if error in _exc_for_error:
                 raise _exc_for_error[error](error)
@@ -111,7 +113,7 @@ class _ErrorManager(object):
     def swallow_synced(self, fun, *args, **kwargs):
         try:
             self.call_synced(fun, *args, **kwargs)
-        except XError:
+        except XError, e:
             log("Ignoring X error: %s", e)
             pass
         return None

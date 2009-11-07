@@ -11,7 +11,6 @@
 import gobject
 import gtk
 from struct import pack, unpack
-import time
 
 from wimpiggy.util import no_arg_signal, one_arg_signal
 from wimpiggy.lowlevel import (get_xatom, get_pywindow, sendClientMessage,
@@ -101,7 +100,7 @@ class ManagerSelection(gobject.GObject):
             try:
                 window = trap.call(getwin)
                 log("got window")
-            except XError, e:
+            except XError:
                 log("Previous owner is already gone, not blocking")
             else:
                 log("Waiting for previous owner to exit...")
