@@ -94,7 +94,10 @@ def main(script_file, cmdline):
         from xpra.scripts.server import run_server
         run_server(parser, options, mode, script_file, args)
     elif mode == "attach":
-        run_client(parser, options, args)
+        try:
+            run_client(parser, options, args)
+        except KeyboardInterrupt:
+            print "Exiting on keyboard interrupt"
     elif mode == "stop":
         nox()
         run_stop(parser, options, args)
