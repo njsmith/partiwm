@@ -5,6 +5,7 @@
 
 import os
 import os.path
+import glob
 import socket
 import errno
 import stat
@@ -19,6 +20,7 @@ class DotXpra(object):
         self._dir = dir
         if not os.path.exists(self._dir):
             os.mkdir(dir, 0700)
+        self._prefix = "%s-" % (socket.gethostname(),)
 
     def dir(self):
         return self._dir
@@ -28,11 +30,14 @@ class DotXpra(object):
             local_display_name = ":" + local_display_name
         if "." in local_display_name:
             local_display_name = local_display_name[:local_display_name.rindex(".")]
+        assert local_display_name.startswith(":")
+        for char in local_display_name[1:]:
+            assert char in "0123456789"
         return local_display_name
 
     def socket_path(self, local_display_name):
         local_display_name = self._normalize_local_display_name(local_display_name)
-        return os.path.join(self._dir, local_display_name)
+        return os.path.join(self._dir, self._prefix + local_display_name[1:])
 
     LIVE = "LIVE"
     DEAD = "DEAD"
@@ -67,10 +72,11 @@ class DotXpra(object):
 
     def sockets(self):
         results = []
-        potential_socket_leafs = os.listdir(self._dir)
-        for leaf in potential_socket_leafs:
-            full = os.path.join(self._dir, leaf)
-            if stat.S_ISSOCK(os.stat(full).st_mode):
-                state = self.server_state(leaf)
-                results.append((state, leaf))
+        base = os.path.join(self._dir, self._prefix)
+        potential_sockets = glob.glob(base + "*")
+        for path in potential_sockets:
+            if stat.S_ISSOCK(os.stat(path).st_mode):
+                local_display = ":" + path[len(base):]
+                state = self.server_state(local_display)
+                results.append((state, local_display))
         return results
