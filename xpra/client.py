@@ -87,10 +87,13 @@ class ClientWindow(gtk.Window):
     def update_metadata(self, metadata):
         self._metadata.update(metadata)
         
-        self.set_title(u"%s (via xpra)"
-                       % self._metadata.get("title",
-                                            "<untitled window>"
-                                            ).decode("utf-8"))
+        title_main = self._metadata.get("title", "<untitled window>").decode("utf-8")
+        if "client-machine" in self._metadata:
+            title_addendum = ("on %s, "
+                              % (self._metadata["client-machine"].decode("utf-8"),))
+        else:
+            title_addendum = ""
+        self.set_title(u"%s (%svia xpra)" % (title_main, title_addendum))
 
         if "size-constraints" in self._metadata:
             size_metadata = self._metadata["size-constraints"]

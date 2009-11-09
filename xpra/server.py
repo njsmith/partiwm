@@ -361,8 +361,12 @@ class XpraServer(gobject.GObject):
         id = self._window_to_id[window]
         self._send(["configure-override-redirect", id, x, y, w, h])
 
-    _all_metadata = ("title", "size-hints", "class-instance", "icon")
+    # These are the names of WindowModel properties that, when they change,
+    # trigger updates in the xpra window metadata:
+    _all_metadata = ("title", "size-hints", "class-instance", "icon", "client-machine")
 
+    # Takes the name of a WindowModel property, and returns a dictionary of
+    # xpra window metadata values that depend on that property:
     def _make_metadata(self, window, propname):
         assert propname in self._all_metadata
         if propname == "title":
@@ -400,6 +404,13 @@ class XpraServer(gobject.GObject):
                         }
             else:
                 return {}
+        elif propname == "client-machine":
+            client_machine = window.get_property("client-machine")
+            if client_machine is not None:
+                return {"client-machine": client_machine.encode("utf-8")}
+            else:
+                return {}
+                
         else:
             assert False
 
