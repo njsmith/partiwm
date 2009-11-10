@@ -97,7 +97,7 @@ def main(script_file, cmdline):
         try:
             run_client(parser, options, args)
         except KeyboardInterrupt:
-            print "Exiting on keyboard interrupt"
+            sys.stdout.write("Exiting on keyboard interrupt\n")
     elif mode == "stop":
         nox()
         run_stop(parser, options, args)
@@ -192,7 +192,10 @@ def connect(display_desc):
 
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
-    sock = connect(pick_display(parser, opts, extra_args))
+    try:
+        sock = connect(pick_display(parser, opts, extra_args))
+    except socket.error, e:
+        sys.exit("Connection failed: %s\n" % (display_desc,))
     if opts.compression_level < 0 or opts.compression_level > 9:
         parser.error("Compression level must be between 0 and 9 inclusive.")
     app = XpraClient(sock, opts.compression_level)
