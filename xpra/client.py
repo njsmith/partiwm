@@ -158,7 +158,6 @@ class ClientWindow(gtk.Window):
 
     def draw(self, x, y, width, height, rgb_data):
         assert len(rgb_data) == width * height * 3
-        (my_width, my_height) = self.window.get_size()
         gc = self._backing.new_gc()
         self._backing.draw_rgb_image(gc, x, y, width, height,
                                      gtk.gdk.RGB_DITHER_NONE, rgb_data)
