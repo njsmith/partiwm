@@ -12,7 +12,6 @@ import os
 import os.path
 import atexit
 import signal
-import time
 import socket
 
 from xpra.wait_for_x_server import wait_for_x_server
