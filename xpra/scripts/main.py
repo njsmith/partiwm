@@ -218,20 +218,20 @@ def run_stop(parser, opts, extra_args):
     if display_desc["local"]:
         sockdir = DotXpra()
         for i in xrange(6):
-            final_state = sockdir.server_state(display_name)
+            final_state = sockdir.server_state(display_desc["display"])
             if final_state is DotXpra.LIVE:
                 time.sleep(0.5)
             else:
                 break
         if final_state is DotXpra.DEAD:
-            print "xpra at %s has exited." % display_name
+            print "xpra at %s has exited." % display_desc["display"]
             sys.exit(0)
         elif final_state is DotXpra.UNKNOWN:
             print ("How odd... I'm not sure what's going on with xpra at %s"
-                   % display_name)
+                   % display_desc["display"])
             sys.exit(1)
         elif final_state is DotXpra.LIVE:
-            print "Failed to shutdown xpra at %s" % display_name
+            print "Failed to shutdown xpra at %s" % display_desc["display"]
             sys.exit(1)
         else:
             assert False
