@@ -3,7 +3,9 @@
 # Parti is released under the terms of the GNU GPL v2, or, at your option, any
 # later version. See the file COPYING for details.
 
-# DO NOT IMPORT GTK HERE: see http://partiwm.org/ticket/34
+# DO NOT IMPORT GTK HERE: see
+#  http://lists.partiwm.org/pipermail/parti-discuss/2008-September/000041.html
+#  http://lists.partiwm.org/pipermail/parti-discuss/2008-September/000042.html
 # (also do not import anything that imports gtk)
 import gobject
 import subprocess
@@ -143,6 +145,22 @@ def create_tcp_socket(parser, spec):
     listener.bind((host, int(port)))
     return listener
 
+def close_all_fds(exceptions=[]):
+    fd_dirs = ["/dev/fd", "/proc/self/fd"]
+    for fd_dir in fd_dirs:
+        if os.path.exists(fd_dir):
+            for fd_str in os.listdir(fd_dir):
+                try:
+                    fd = int(fd_str)
+                    if fd not in exceptions:
+                        os.close(fd)
+                except OSError:
+                    # This exception happens inevitably, because the fd used
+                    # by listdir() is already closed.
+                    pass
+            return
+    print "Uh-oh, can't close fds, please port me to your system..."
+
 def run_server(parser, opts, mode, xpra_file, extra_args):
     if len(extra_args) != 1:
         parser.error("need exactly 1 extra argument")
@@ -193,18 +211,7 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
         os.setsid()
         if os.fork():
             os._exit(0)
-        if os.path.exists("/proc/self/fd"):
-            for fd_str in os.listdir("/proc/self/fd"):
-                try:
-                    fd = int(fd_str)
-                    if fd != logfd:
-                        os.close(fd)
-                except OSError:
-                    # This exception happens inevitably, because the fd used
-                    # by listdir() is already closed.
-                    pass
-        else:
-            print "Uh-oh, can't close fds, please port me to your system..."
+        close_all_fds(exceptions=[logfd])
         fd0 = os.open("/dev/null", os.O_RDONLY)
         if fd0 != 0:
             os.dup2(fd0, 0)
