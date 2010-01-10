@@ -190,12 +190,15 @@ def connect(display_desc):
     else:
         assert False, "unsupported display type in connect"
 
+def connect_or_fail(display_desc):
+    try:
+        connect(display_desc)
+    except socket.error, e:
+        sys.exit("Connection failed: %s" % (e,))
+
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
-    try:
-        sock = connect(pick_display(parser, opts, extra_args))
-    except socket.error, e:
-        sys.exit("Connection failed: %s\n" % (display_desc,))
+    connect_or_fail(pick_display(parser, opts, extra_args))
     if opts.compression_level < 0 or opts.compression_level > 9:
         parser.error("Compression level must be between 0 and 9 inclusive.")
     app = XpraClient(sock, opts.compression_level)
@@ -204,14 +207,14 @@ def run_client(parser, opts, extra_args):
 
 def run_proxy(parser, opts, extra_args):
     from xpra.proxy import XpraProxy
-    app = XpraProxy(0, 1, connect(pick_display(parser, opts, extra_args)))
+    app = XpraProxy(0, 1, connect_or_fail(pick_display(parser, opts, extra_args)))
     app.run()
 
 def run_stop(parser, opts, extra_args):
     magic_string = bencode(["hello", []]) + bencode(["shutdown-server"])
 
     display_desc = pick_display(parser, opts, extra_args)
-    sock = connect(display_desc)
+    sock = connect_or_fail(display_desc)
     sock.sendall(magic_string)
     while sock.recv(4096):
         pass
