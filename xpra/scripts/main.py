@@ -192,13 +192,13 @@ def connect(display_desc):
 
 def connect_or_fail(display_desc):
     try:
-        connect(display_desc)
+        return connect(display_desc)
     except socket.error, e:
         sys.exit("Connection failed: %s" % (e,))
 
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
-    connect_or_fail(pick_display(parser, opts, extra_args))
+    sock = connect_or_fail(pick_display(parser, opts, extra_args))
     if opts.compression_level < 0 or opts.compression_level > 9:
         parser.error("Compression level must be between 0 and 9 inclusive.")
     app = XpraClient(sock, opts.compression_level)
