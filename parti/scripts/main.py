@@ -14,6 +14,9 @@ def main(cmdline):
     parser.add_option("--replace", action="store_true",
                       dest="replace", default=False,
                       help="Replace any running window manager with Parti")
+    parser.add_option("-t", "--tray",
+                      dest="tray", default="CompositeTest",
+                      help="Set default tray type")
     (options, args) = parser.parse_args(cmdline[1:])
 
     # This means, if an exception propagates to the gtk mainloop, then pass it
@@ -22,7 +25,7 @@ def main(cmdline):
     os.environ["PYGTK_FATAL_EXCEPTIONS"] = "1"
 
     try:
-        p = parti.parti_main.Parti(options.replace)
+        p = parti.parti_main.Parti(options)
         p.main()
     except:
         if "_PARTI_PDB" in os.environ:

@@ -20,8 +20,8 @@ from parti.addons.ipython_embed import spawn_repl_window
 from parti.bus import PartiDBusService
 
 class Parti(object):
-    def __init__(self, replace_other_wm):
-        self._wm = Wm("Parti", replace_other_wm)
+    def __init__(self, options):
+        self._wm = Wm("Parti", options.replace)
         self._wm.connect("new-window", self._new_window_signaled)
         self._wm.connect("quit", self._wm_quit)
 
@@ -33,11 +33,12 @@ class Parti(object):
         self._wm.get_property("toplevel").add(self._world_organizer)
         self._world_organizer.show_all()
 
-        # FIXME: be less stupid
-        #from parti.trays.simpletab import SimpleTabTray
-        #self._trays.new(u"default", SimpleTabTray)
-        from parti.trays.compositetest import CompositeTest
-        self._trays.new(u"default", CompositeTest)
+        ltray = options.tray.lower()
+        # __import__ returns topmost module and getattr will not get sub-modules not imported
+        # thus (using these two functions) the module path must be specified twice
+        dynmodule = getattr(getattr(__import__('parti.trays.' + ltray), 'trays'), ltray)
+        dynclass = getattr(dynmodule, options.tray + "Tray")
+        self._trays.new(u"default", dynclass)
 
         self._root_hotkeys = HotkeyManager(gtk.gdk.get_default_root_window())
         self._root_hotkeys.add_hotkeys({"<shift><alt>r": "repl"})

@@ -7,9 +7,9 @@ import gtk
 import parti.tray
 from wimpiggy.window import WindowView
 
-class CompositeTest(parti.tray.Tray, gtk.HPaned):
+class CompositeTestTray(parti.tray.Tray, gtk.HPaned):
     def __init__(self, trayset, tag):
-        super(CompositeTest, self).__init__(trayset, tag)
+        super(CompositeTestTray, self).__init__(trayset, tag)
         self.windows = []
         # Hack to start the spacer in the middle of the window
         self.set_position(gtk.gdk.screen_width() / 2)
