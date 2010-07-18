@@ -138,7 +138,7 @@ class Protocol(object):
             self._process_packet(packet)
             if not had_deflate and (self._decompressor is not None):
                 # deflate was just enabled: so decompress the unprocessed data
-                self._read_buf = self._decompressor.decompress(unprocessed)
+                unprocessed = self._decompressor.decompress(unprocessed)
             self._read_decoder = IncrBDecode(unprocessed)
 
     def _process_packet(self, decoded):
