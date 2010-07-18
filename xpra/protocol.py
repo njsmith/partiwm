@@ -6,8 +6,9 @@
 import gobject
 import socket # for socket.error
 import zlib
+import struct
 
-from xpra.bencode import bencode, bdecode
+from xpra.bencode import bencode, IncrBDecode
 
 from wimpiggy.log import Logger
 log = Logger()
@@ -33,7 +34,7 @@ class Protocol(object):
         self._accept_packets = False
         self._closed = False
         self._write_armed = False
-        self._read_buf = ""
+        self._read_decoder = IncrBDecode()
         self._write_buf = ""
         self._compressor = None
         self._decompressor = None
@@ -69,7 +70,10 @@ class Protocol(object):
         packet, self._source_has_more = self.source.next_packet()
         if packet is not None:
             log("sending %s", dump_packet(packet), type="raw.send")
-            data = bencode(packet)
+            data_payload = bencode(packet)
+            data_header = struct.pack(">I", len(data_payload))
+            #data = data_header + data_payload
+            data = data_payload
             if self._compressor is not None:
                 self._write_buf += self._compressor.compress(data)
                 self._write_buf += self._compressor.flush(zlib.Z_SYNC_FLUSH)
@@ -120,23 +124,24 @@ class Protocol(object):
             return False
         if self._decompressor is not None:
             buf = self._decompressor.decompress(buf)
-        self._read_buf += buf
+        self._read_decoder.add(buf)
         while True:
             had_deflate = (self._decompressor is not None)
-            consumed = self._consume_packet(self._read_buf)
-            self._read_buf = self._read_buf[consumed:]
-            if not had_deflate and (self._decompressor is not None):
-                # deflate was just enabled: so decompress the data currently
-                # waiting in the read buffer
-                self._read_buf = self._decompressor.decompress(self._read_buf)
-            if consumed == 0:
+            # try:
+            #     result = self._read_decoder.process()
+            # except:
+            #     import sys; import pdb; pdb.post_mortem(sys.exc_info()[-1])
+            result = self._read_decoder.process()
+            if result is None:
                 break
+            packet, unprocessed = result
+            self._process_packet(packet)
+            if not had_deflate and (self._decompressor is not None):
+                # deflate was just enabled: so decompress the unprocessed data
+                self._read_buf = self._decompressor.decompress(unprocessed)
+            self._read_decoder = IncrBDecode(unprocessed)
 
-    def _consume_packet(self, data):
-        try:
-            decoded, consumed = bdecode(data)
-        except ValueError:
-            return 0
+    def _process_packet(self, decoded):
         try:
             log("got %s", dump_packet(decoded), type="raw.receive")
             self._process_packet_cb(self, decoded)
@@ -146,7 +151,6 @@ class Protocol(object):
             log.warn("Unhandled error while processing packet from peer",
                      exc_info=True)
             # Ignore and continue, maybe things will work out anyway
-        return consumed
 
     def enable_deflate(self, level):
         assert self._compressor is None and self._decompressor is None
