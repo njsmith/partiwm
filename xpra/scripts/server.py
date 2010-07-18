@@ -57,7 +57,7 @@ class ChildReaper(object):
         if (self._children_pids
             and self._exit_with_children
             and self._children_pids.issubset(self._dead_pids)):
-            print "all children have exited and --survive-children was not specified, exiting"
+            print "all children have exited and --exit-with-children was specified, exiting"
             self._app.quit(False)
 
     def __call__(self, signum, frame):
