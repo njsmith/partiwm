@@ -196,13 +196,16 @@ def connect_or_fail(display_desc):
     except socket.error, e:
         sys.exit("Connection failed: %s" % (e,))
 
+def handshake_complete_msg(*args):
+    sys.stdout.write("Attached (press Control-C to detach)\n")
+
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
     sock = connect_or_fail(pick_display(parser, opts, extra_args))
     if opts.compression_level < 0 or opts.compression_level > 9:
         parser.error("Compression level must be between 0 and 9 inclusive.")
     app = XpraClient(sock, opts.compression_level)
-    sys.stdout.write("Attached (press Control-C to detach)\n")
+    app.connect("handshake-complete", handshake_complete_msg)
     app.run()
 
 def run_proxy(parser, opts, extra_args):

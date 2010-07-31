@@ -7,7 +7,8 @@ import gtk
 import gobject
 import cairo
 
-from wimpiggy.util import (gtk_main_quit_really,
+from wimpiggy.util import (no_arg_signal,
+                           gtk_main_quit_really,
                            gtk_main_quit_on_fatal_exceptions_enable)
 from wimpiggy.keys import grok_modifier_map
 
@@ -270,6 +271,10 @@ class ClientWindow(gtk.Window):
 gobject.type_register(ClientWindow)
 
 class XpraClient(gobject.GObject):
+    __gsignals__ = {
+        "handshake-complete": no_arg_signal,
+        }
+
     def __init__(self, sock, compression_level):
         gobject.GObject.__init__(self)
         self._window_to_id = {}
@@ -371,6 +376,7 @@ class XpraClient(gobject.GObject):
                                         self._handle_root_prop_changed)
         for prop in self.ROOT_PROPS:
             self._handle_root_prop_changed(None, prop)
+        self.emit("handshake-complete")
 
     def _process_new_common(self, packet, override_redirect):
         (_, id, x, y, w, h, metadata) = packet
