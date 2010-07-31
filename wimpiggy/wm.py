@@ -6,7 +6,13 @@
 import gtk
 import gobject
 
-from sets import ImmutableSet
+# Maintain compatibility with old versions of Python, while avoiding a
+# deprecation warning on new versions:
+import sys
+if sys.version_info < (2, 6):
+    from sets import ImmutableSet
+else:
+    ImmutableSet = frozenset
 
 from wimpiggy.error import *
 import wimpiggy.selection

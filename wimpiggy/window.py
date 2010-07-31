@@ -8,7 +8,13 @@
 Most of the gunk required to be a valid window manager (reparenting, synthetic
 events, mucking about with properties, etc. etc.) is wrapped up in here."""
 
-import sets
+# Maintain compatibility with old versions of Python, while avoiding a
+# deprecation warning on new versions:
+import sys
+if sys.version_info < (2, 6):
+    from sets import ImmutableSet
+else:
+    ImmutableSet = frozenset
 import gobject
 import gtk
 import gtk.gdk
@@ -775,9 +781,9 @@ class WindowModel(BaseWindowModel):
         net_wm_state = prop_get(self.client_window,
                                 "_NET_WM_STATE", ["atom"])
         if net_wm_state:
-            self._internal_set_property("state", sets.ImmutableSet(net_wm_state))
+            self._internal_set_property("state", ImmutableSet(net_wm_state))
         else:
-            self._internal_set_property("state", sets.ImmutableSet())
+            self._internal_set_property("state", ImmutableSet())
 
         for mutable in ["WM_HINTS", "WM_NORMAL_HINTS",
                         "WM_NAME", "_NET_WM_NAME",
