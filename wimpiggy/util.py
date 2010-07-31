@@ -77,14 +77,32 @@ def non_none_list_accumulator(ihint, return_accu, handler_return):
 # gtk.main().  Useful when you really just want to quit, and don't want to
 # care if you're inside a recursive mainloop.
 def gtk_main_quit_really():
-    # We import gtk inside here, rather than at the top of the file, because
-    # importing gtk has the side-effect of trying to connect to the X server
-    # (and this process may block, may cause us to later be killed if the X
-    # server goes away, etc.), and we don't want to impose that on every user
-    # of wimpiggy.util.
-    import gtk
-    for i in xrange(gtk.main_level()):
+    # We used to call gtk.main_quit() repeatedly, but this doesn't actually
+    # work -- gtk.main_quit() always marks the *current* level of main loop
+    # for destruction, so it's actually idempotent. We have to call
+    # gtk.main_quit once, and then return to the main loop, and then call it
+    # again, and then return to the main loop, etc. So we use a trick: We
+    # register a function that gtk should call 'forever' (i.e., as long as the
+    # main loop is running!)
+    def gtk_main_quit_forever():
+        # We import gtk inside here, rather than at the top of the file,
+        # because importing gtk has the side-effect of trying to connect to
+        # the X server (and this process may block, may cause us to later be
+        # killed if the X server goes away, etc.), and we don't want to impose
+        # that on every user of wimpiggy.util.
+        import gtk
+        print "death (%s)" % gtk.main_level()
         gtk.main_quit()
+        # So long as there are more nested main loops, re-register ourselves
+        # to be called again:
+        if gtk.main_level() > 1:
+            return True
+        else:
+            # But when we've just quit the outermost main loop, then
+            # unregister ourselves so that it's possible to start the
+            # main-loop again if desired:
+            return False
+    gobject.timeout_add(0, gtk_main_quit_forever)
 
 # If a user hits control-C, and we are currently executing Python code below
 # the main loop, then the exception will get swallowed up. (If we're just
