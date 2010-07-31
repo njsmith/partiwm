@@ -91,7 +91,6 @@ def gtk_main_quit_really():
         # killed if the X server goes away, etc.), and we don't want to impose
         # that on every user of wimpiggy.util.
         import gtk
-        print "death (%s)" % gtk.main_level()
         gtk.main_quit()
         # So long as there are more nested main loops, re-register ourselves
         # to be called again:
