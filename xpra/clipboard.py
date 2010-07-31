@@ -16,6 +16,8 @@ from wimpiggy.lowlevel import (get_xatom, get_pywindow,
 from wimpiggy.log import Logger
 log = Logger()
 
+from xpra.nested_main import NestedMainLoop
+
 class ClipboardProtocolHelper(object):
     def __init__(self, send_packet_cb):
         self.send = send_packet_cb
@@ -129,9 +131,12 @@ class ClipboardProtocolHelper(object):
         self._clipboard_got_contents(request_id, None, None, None)
 
     def _clipboard_got_contents(self, request_id, type, format, data):
-        cb = self._clipboard_outstanding_requests[request_id]
-        del self._clipboard_outstanding_requests[request_id]
-        cb(type, format, data)
+        if request_id in self._clipboard_outstanding_requests:
+            cb = self._clipboard_outstanding_requests[request_id]
+            del self._clipboard_outstanding_requests[request_id]
+            cb(type, format, data)
+        else:
+            log("got unexpected response to clipboard request %s", request_id)
 
     _packet_handlers = {
         "clipboard-token": _process_clipboard_token,
@@ -220,17 +225,17 @@ class ClipboardProxy(gtk.Invisible):
         assert self._selection == str(selection_data.selection)
         target = str(selection_data.target)
         result = {"type": None, "format": None, "data": None}
+        loop = NestedMainLoop()
         def cb(type, format, data):
-            result["type"] = type
-            result["format"] = format
-            result["data"] = data
-            gtk.main_quit()
+            loop.done({"type": type, "format": format, "data": data})
         self.emit("get-clipboard-from-remote", self._selection, target, cb)
-        gtk.main()
-        if result["type"]:
+        result = loop.main(1 * 1000, 30 * 1000)
+        if result is not None and result["type"] is not None:
             selection_data.set(result["type"],
                                result["format"],
                                result["data"])
+        else:
+            log("remote selection fetch timed out")
 
     def do_selection_clear_event(self, event):
         # Someone else on our side has the selection
