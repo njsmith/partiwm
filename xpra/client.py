@@ -17,7 +17,7 @@ log = Logger()
 
 from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
-from xpra.clipboard import ClipboardProtocolHelper
+from xpra.platform import ClipboardProtocolHelper
 from xpra.xsettings import XSettingsWatcher
 from xpra.root_props import RootPropWatcher
 

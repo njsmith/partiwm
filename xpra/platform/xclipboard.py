@@ -149,8 +149,6 @@ class ClipboardProtocolHelper(object):
         "clipboard-token": _process_clipboard_token,
         "clipboard-request": _process_clipboard_request,
         "clipboard-contents": _process_clipboard_contents,
-        "clipboard-contents": _process_clipboard_contents,
-        "clipboard-contents": _process_clipboard_contents,
         "clipboard-contents-none": _process_clipboard_contents_none,
         }
     

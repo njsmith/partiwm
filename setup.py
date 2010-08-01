@@ -17,8 +17,6 @@ from distutils.core import setup
 from distutils.extension import Extension
 import commands, os, sys
 
-from xpra.platform import XPRA_LOCAL_SERVERS_SUPPORTED
-
 # Tweaked from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/502261
 def pkgconfig(*packages, **kw):
     flag_map = {'-I': 'include_dirs',
@@ -37,7 +35,8 @@ def pkgconfig(*packages, **kw):
             kw[k] = list(set(v))
     return kw
 
-if XPRA_LOCAL_SERVERS_SUPPORTED:
+# Make sure to keep this in sync with the tests in xpra/platform/__init__.py:
+if os.name == "posix":
     from Cython.Distutils import build_ext
     from Cython.Compiler.Version import version as cython_version_string
     cython_version = [int(part) for part in cython_version_string.split(".")]

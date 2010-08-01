@@ -9,3 +9,5 @@ def spawn_with_channel_socket(cmd):
     subprocess.Popen(cmd, stdin=b.fileno(), stdout=b.fileno(), bufsize=0)
     b.close()
     return gobject.IOChannel(a.fileno()), a
+
+from xpra.platform.xclipboard import ClipboardProtocolHelper
