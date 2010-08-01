@@ -10,13 +10,12 @@ import cairo
 from wimpiggy.util import (no_arg_signal,
                            gtk_main_quit_really,
                            gtk_main_quit_on_fatal_exceptions_enable)
-from wimpiggy.keys import grok_modifier_map
 
 from wimpiggy.log import Logger
 log = Logger()
 
 from xpra.protocol import Protocol
-from xpra.keys import mask_to_names
+from xpra.keys import mask_to_names, grok_modifier_map
 from xpra.platform import ClipboardProtocolHelper, ClientExtras
 
 import xpra
