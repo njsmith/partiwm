@@ -1,5 +1,9 @@
 XPRA_LOCAL_SERVERS_SUPPORTED = False
+import os
+os.environ["PLINK_PROTOCOL"] = "ssh"
 DEFAULT_SSH_CMD = "plink"
+GOT_PASSWORD_PROMPT_SUGGESTION = \
+   'Perhaps you need to set up Pageant, or (less secure) pass --ssh="plink -pw YOUR-PASSWORD" to xpra?\n'
 
 def grok_modifier_map(display_source):
     modifier_map = {

@@ -24,6 +24,7 @@ def dump_packet(packet):
 
 class Protocol(object):
     CONNECTION_LOST = object()
+    GIBBERISH = object()
 
     # Taking both a channel and a socket (which are two python objects both
     # representing the same underlying OS object) is a little silly, but:
@@ -92,6 +93,7 @@ class Protocol(object):
                 self._write_buf += data
 
     def _socket_ready(self, source, flags):
+        log("_socket_ready")
         if flags & gobject.IO_IN:
             self._socket_readable()
         if flags & gobject.IO_OUT:
@@ -101,12 +103,14 @@ class Protocol(object):
         return True
 
     def _connection_lost(self):
+        log("_connection_lost")
         if not self._closed:
             self._accept_packets = False
             self._process_packet_cb(self, [Protocol.CONNECTION_LOST])
             self.close()
 
     def _socket_writeable(self):
+        log("_socket_writeable")
         if not self._write_buf:
             # Underflow: refill buffer from source.
             # We can't get into this function at all unless either _write_buf
@@ -124,6 +128,7 @@ class Protocol(object):
             self._update_watch()
 
     def _socket_readable(self):
+        log("_socket_readable")
         try:
             buf = self._sock.recv(4096)
         except socket.error:
@@ -142,7 +147,15 @@ class Protocol(object):
             #     result = self._read_decoder.process()
             # except:
             #     import sys; import pdb; pdb.post_mortem(sys.exc_info()[-1])
-            result = self._read_decoder.process()
+            try:
+                result = self._read_decoder.process()
+            except ValueError:
+                # Peek at the data we got, in case we can make sense of it:
+                self._process_packet([Protocol.GIBBERISH,
+                                      self._read_decoder.unprocessed()])
+                # Then hang up:
+                self._connection_lost()
+                return
             if result is None:
                 break
             packet, unprocessed = result

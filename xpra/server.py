@@ -37,8 +37,8 @@ log = Logger()
 import xpra
 from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
-from xpra.clipboard import ClipboardProtocolHelper
-from xpra.xsettings import XSettingsManager
+from xpra.platform.xclipboard import ClipboardProtocolHelper
+from xpra.platform.xsettings import XSettingsManager
 
 class DesktopManager(gtk.Widget):
     def __init__(self):
@@ -315,7 +315,9 @@ class XpraServer(gobject.GObject):
     def _new_connection(self, listener, *args):
         log.info("New connection received")
         sock, addr = listener.accept()
-        self._potential_protocols.append(Protocol(sock, self.process_packet))
+        channel = gobject.IOChannel(sock.fileno())
+        self._potential_protocols.append(Protocol(channel, sock,
+                                                  self.process_packet))
         return True
 
     def _keys_changed(self, *args):
@@ -628,6 +630,10 @@ class XpraServer(gobject.GObject):
         window = self._id_to_window[id]
         window.request_close()
 
+    def _process_shutdown_server(self, proto, packet):
+        log.info("Shutting down in response to request")
+        self.quit(False)
+
     def _process_connection_lost(self, proto, packet):
         log.info("Connection lost")
         proto.close()
@@ -636,9 +642,8 @@ class XpraServer(gobject.GObject):
         if proto is self._protocol:
             self._protocol = None
 
-    def _process_shutdown_server(self, proto, packet):
-        log.info("Shutting down in response to request")
-        self.quit(False)
+    def _process_gibberish(self, packet):
+        log.info("Received uninterpretable nonsense: %s", repr(packet))
 
     _packet_handlers = {
         "hello": _process_hello,
@@ -655,6 +660,7 @@ class XpraServer(gobject.GObject):
         "shutdown-server": _process_shutdown_server,
         # "clipboard-*" packets are handled below:
         Protocol.CONNECTION_LOST: _process_connection_lost,
+        Protocol.GIBBERISH: _process_gibberish,
         }
 
     def process_packet(self, proto, packet):

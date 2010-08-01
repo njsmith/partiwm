@@ -17,6 +17,7 @@ from xpra.bencode import bencode
 from xpra.dotxpra import DotXpra
 from xpra.platform import (XPRA_LOCAL_SERVERS_SUPPORTED,
                            DEFAULT_SSH_CMD,
+                           GOT_PASSWORD_PROMPT_SUGGESTION,
                            spawn_with_channel_socket)
 
 def nox():
@@ -217,6 +218,16 @@ def connect_or_fail(display_desc):
 def handshake_complete_msg(*args):
     sys.stdout.write("Attached (press Control-C to detach)\n")
 
+def got_gibberish_msg(obj, data):
+    if "assword" in data:
+        sys.stdout.write("Your ssh program appears to be asking for a password.\n"
+                         + GOT_PASSWORD_PROMPT_SUGGESTION)
+        sys.stdout.flush()
+    if "login" in data:
+        sys.stdout.write("Your ssh program appears to be asking for a username.\n"
+                         "Perhaps try using something like 'ssh:USER@host:display'?\n")
+        sys.stdout.flush()
+
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
     channel, sock = connect_or_fail(pick_display(parser, opts, extra_args))
@@ -224,6 +235,7 @@ def run_client(parser, opts, extra_args):
         parser.error("Compression level must be between 0 and 9 inclusive.")
     app = XpraClient(channel, sock, opts.compression_level)
     app.connect("handshake-complete", handshake_complete_msg)
+    app.connect("received-gibberish", got_gibberish_msg)
     app.run()
 
 def run_proxy(parser, opts, extra_args):

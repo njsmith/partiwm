@@ -39,6 +39,9 @@ class IncrBDecode(object):
         if self._result is not None:
             return self._result, self._buf[self._offset:]
 
+    def unprocessed(self):
+        return self._buf
+
     def _transition(self, state):
         self._state = state
         self._state()

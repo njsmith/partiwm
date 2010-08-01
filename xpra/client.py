@@ -7,7 +7,7 @@ import gtk
 import gobject
 import cairo
 
-from wimpiggy.util import (no_arg_signal,
+from wimpiggy.util import (n_arg_signal,
                            gtk_main_quit_really,
                            gtk_main_quit_on_fatal_exceptions_enable)
 
@@ -268,7 +268,8 @@ gobject.type_register(ClientWindow)
 
 class XpraClient(gobject.GObject):
     __gsignals__ = {
-        "handshake-complete": no_arg_signal,
+        "handshake-complete": n_arg_signal(0),
+        "received-gibberish": n_arg_signal(1),
         }
 
     def __init__(self, channel, sock, compression_level):
@@ -389,6 +390,10 @@ class XpraClient(gobject.GObject):
         log.error("Connection lost")
         gtk_main_quit_really()
 
+    def _process_gibberish(self, packet):
+        [_, data] = packet
+        self.emit("received-gibberish", data)
+
     _packet_handlers = {
         "hello": _process_hello,
         "new-window": _process_new_window,
@@ -399,6 +404,7 @@ class XpraClient(gobject.GObject):
         "lost-window": _process_lost_window,
         # "clipboard-*" packets are handled by a special case below.
         Protocol.CONNECTION_LOST: _process_connection_lost,
+        Protocol.GIBBERISH: _process_gibberish,
         }
     
     def process_packet(self, proto, packet):

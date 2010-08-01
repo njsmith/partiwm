@@ -2,6 +2,7 @@
 
 XPRA_LOCAL_SERVERS_SUPPORTED = True
 DEFAULT_SSH_CMD = "ssh"
+GOT_PASSWORD_PROMPT_SUGGESTION = "Perhaps you need to set up your ssh agent?\n"
 
 from wimpiggy.keys import grok_modifier_map
 
@@ -27,7 +28,7 @@ class ClientExtras(object):
         self._xsettings_watcher.connect("xsettings-changed",
                                         self._handle_xsettings_changed)
         self._handle_xsettings_changed()
-        self._root_props_watcher = RootPropWatcher(self.ROOT_PROPS.keys())
+        self._root_props_watcher = XRootPropWatcher(self.ROOT_PROPS.keys())
         self._root_props_watcher.connect("root-prop-changed",
                                         self._handle_root_prop_changed)
         self._root_props_watcher.notify_all()
