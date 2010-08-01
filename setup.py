@@ -84,12 +84,12 @@ setup(
     data_files = [("share/man/man1", ["xpra.1"])],
     ext_modules=[ 
       Extension("wimpiggy.lowlevel.bindings",
-                ["wimpiggy/lowlevel/wimpiggy.lowlevel.bindings.pyx"],
+                ["wimpiggy/lowlevel/bindings.pyx"],
                 **pkgconfig("pygobject-2.0", "gdk-x11-2.0", "gtk+-x11-2.0",
                             "xtst", "xfixes", "xcomposite", "xdamage")
                 ),
       Extension("xpra.wait_for_x_server",
-                ["xpra/xpra.wait_for_x_server.pyx"],
+                ["xpra/wait_for_x_server.pyx"],
                 **pkgconfig("x11")
                 ),
       ],
