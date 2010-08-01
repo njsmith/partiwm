@@ -43,11 +43,22 @@ class ClipboardProtocolHelper(object):
         if selection in self._clipboard_proxies:
             self._clipboard_proxies[selection].got_token()
 
-    def _get_clipboard_from_remote_handler(self, proxy, selection, target, cb):
+    def _get_clipboard_from_remote_handler(self, proxy, selection, target):
         request_id = self._clipboard_request_counter
         self._clipboard_request_counter += 1
-        self._clipboard_outstanding_requests[request_id] = cb
+        loop = NestedMainLoop()
+        self._clipboard_outstanding_requests[request_id] = loop
         self.send(["clipboard-request", request_id, selection, target])
+        result = loop.main(1 * 1000, 2 * 1000)
+        del self._clipboard_outstanding_requests[request_id]
+        return result
+
+    def _clipboard_got_contents(self, request_id, type, format, data):
+        if request_id in self._clipboard_outstanding_requests:
+            loop = self._clipboard_outstanding_requests[request_id]
+            loop.done({"type": type, "format": format, "data": data})
+        else:
+            log("got unexpected response to clipboard request %s", request_id)
 
     def _send_clipboard_token_handler(self, proxy, selection):
         self.send(["clipboard-token", selection])
@@ -130,14 +141,6 @@ class ClipboardProtocolHelper(object):
         (_, request_id, selection) = packet
         self._clipboard_got_contents(request_id, None, None, None)
 
-    def _clipboard_got_contents(self, request_id, type, format, data):
-        if request_id in self._clipboard_outstanding_requests:
-            cb = self._clipboard_outstanding_requests[request_id]
-            del self._clipboard_outstanding_requests[request_id]
-            cb(type, format, data)
-        else:
-            log("got unexpected response to clipboard request %s", request_id)
-
     _packet_handlers = {
         "clipboard-token": _process_clipboard_token,
         "clipboard-request": _process_clipboard_request,
@@ -154,7 +157,7 @@ class ClipboardProtocolHelper(object):
 class ClipboardProxy(gtk.Invisible):
     __gsignals__ = {
         # arguments: (selection, target, callback)
-        "get-clipboard-from-remote": n_arg_signal(3),
+        "get-clipboard-from-remote": n_arg_signal(2),
         # arguments: (selection,)
         "send-clipboard-token": n_arg_signal(1),
         }
@@ -224,12 +227,7 @@ class ClipboardProxy(gtk.Invisible):
         # main loop.
         assert self._selection == str(selection_data.selection)
         target = str(selection_data.target)
-        result = {"type": None, "format": None, "data": None}
-        loop = NestedMainLoop()
-        def cb(type, format, data):
-            loop.done({"type": type, "format": format, "data": data})
-        self.emit("get-clipboard-from-remote", self._selection, target, cb)
-        result = loop.main(1 * 1000, 30 * 1000)
+        result = self.emit("get-clipboard-from-remote", self._selection, target)
         if result is not None and result["type"] is not None:
             selection_data.set(result["type"],
                                result["format"],
