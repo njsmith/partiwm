@@ -825,7 +825,7 @@ class WindowModel(BaseWindowModel):
         curr = set(self.get_property("state"))
         if state_name not in curr:
             curr.add(state_name)
-            self._internal_set_property("state", sets.ImmutableSet(curr))
+            self._internal_set_property("state", ImmutableSet(curr))
             if state_name in self._state_properties_reversed:
                 self.notify(self._state_properties_reversed[state_name])
 
@@ -833,7 +833,7 @@ class WindowModel(BaseWindowModel):
         curr = set(self.get_property("state"))
         if state_name in curr:
             curr.discard(state_name)
-            self._internal_set_property("state", sets.ImmutableSet(curr))
+            self._internal_set_property("state", ImmutableSet(curr))
             if state_name in self._state_properties_reversed:
                 self.notify(self._state_properties_reversed[state_name])
 
