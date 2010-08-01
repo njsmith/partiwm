@@ -126,8 +126,11 @@ On the machine where you will run the apps (usually, a remote machine):
 
 On the machine where you want the apps to display (usually, your local machine):
   install/bin/xpra attach ssh:<remote box>:13
-or if displaying on the same machine for testing, just:
+or if displaying on the same machine for testing, then just:
   install/bin/xpra attach :13
+(But make sure that you haven't set DISPLAY= in the terminal where you
+run 'xpra attach', because then xpra will try to display your apps
+inside itself!)
 
 Then on the machine where you ran 'xpra start' (usually, the remote
 machine), start some apps:
