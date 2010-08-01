@@ -7,7 +7,7 @@ from wimpiggy.prop import prop_get
 from wimpiggy.log import Logger
 log = Logger()
 
-class RootPropWatcher(gobject.GObject):
+class XRootPropWatcher(gobject.GObject):
     __gsignals__ = {
         "root-prop-changed": n_arg_signal(2),
 
@@ -33,4 +33,4 @@ class RootPropWatcher(gobject.GObject):
         for prop in self._props:
             self._notify(prop)
 
-gobject.type_register(RootPropWatcher)
+gobject.type_register(XRootPropWatcher)

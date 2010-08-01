@@ -1,7 +1,7 @@
 from wimpiggy.test import *
 import gtk
 
-from xpra.xsettings import XSettingsManager, XSettingsWatcher
+from xpra.platform.xsettings import XSettingsManager, XSettingsWatcher
 
 class TestXSettings(TestWithSession):
     def test_basic_set_get(self):

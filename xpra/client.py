@@ -17,9 +17,7 @@ log = Logger()
 
 from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
-from xpra.platform import ClipboardProtocolHelper
-from xpra.xsettings import XSettingsWatcher
-from xpra.root_props import RootPropWatcher
+from xpra.platform import ClipboardProtocolHelper, ClientExtras
 
 import xpra
 default_capabilities = {"__prerelease_version": xpra.__version__}
@@ -295,7 +293,9 @@ class XpraClient(gobject.GObject):
         self._xsettings_watcher = None
         self._root_props_watcher = None
 
+        # FIXME: these should perhaps be merged.
         self._clipboard_helper = ClipboardProtocolHelper(self.send)
+        self._client_extras = ClientExtras(self.send)
 
         self._focused = None
 
@@ -326,24 +326,6 @@ class XpraClient(gobject.GObject):
     def send_mouse_position(self, packet):
         self._protocol.source.queue_mouse_position_packet(packet)
 
-    def _handle_xsettings_changed(self, *args):
-        blob = self._xsettings_watcher.get_settings_blob()
-        if blob is not None:
-            self.send(["server-settings", {"xsettings-blob": blob}])
-
-    ROOT_PROPS = {
-        "RESOURCE_MANAGER": "resource-manager",
-        "PULSE_COOKIE": "pulse-cookie",
-        "PULSE_ID": "pulse-id",
-        "PULSE_SERVER": "pulse-server",
-        }
-    
-    def _handle_root_prop_changed(self, obj, prop, value):
-        assert prop in self.ROOT_PROPS
-        if value is not None:
-            self.send(["server-settings",
-                       {self.ROOT_PROPS[prop]: value.encode("utf-8")}])
-
     def _process_hello(self, packet):
         (_, capabilities) = packet
         if "deflate" in capabilities:
@@ -364,14 +346,7 @@ class XpraClient(gobject.GObject):
                          "parti-discuss@partiwm.org"
                          % (avail_w, avail_h, root_w, root_h))
         self._clipboard_helper.send_all_tokens()
-        self._xsettings_watcher = XSettingsWatcher()
-        self._xsettings_watcher.connect("xsettings-changed",
-                                        self._handle_xsettings_changed)
-        self._handle_xsettings_changed()
-        self._root_props_watcher = RootPropWatcher(self.ROOT_PROPS.keys())
-        self._root_props_watcher.connect("root-prop-changed",
-                                        self._handle_root_prop_changed)
-        self._root_props_watcher.notify_all()
+        self._client_extras.handshake_complete(capabilities)
         self.emit("handshake-complete")
 
     def _process_new_common(self, packet, override_redirect):
