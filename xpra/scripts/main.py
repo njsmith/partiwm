@@ -141,7 +141,7 @@ def parse_display_name(parser, opts, display_name):
             desc["display"] = None
             desc["display_as_args"] = []
         desc["ssh"] = opts.ssh.split()
-        desc["full_ssh"] = desc["ssh"] + [desc["host"], "-e", "none"]
+        desc["full_ssh"] = desc["ssh"] + ["-T", desc["host"]]
         desc["remote_xpra"] = opts.remote_xpra.split()
         desc["full_remote_xpra"] = desc["full_ssh"] + desc["remote_xpra"]
         return desc
