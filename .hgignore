@@ -1,8 +1,9 @@
 ^build
 ^install
-^wimpiggy/lowlevel/wimpiggy.lowlevel.bindings.c$
+^wimpiggy/lowlevel/bindings.c$
 ^wimpiggy/lowlevel/constants.pxi$
 ^MANIFEST$
 ^dist
-^xpra/xpra.wait_for_x_server.c$
+^xpra/wait_for_x_server.c$
 __init__\.pyc$
+~$
