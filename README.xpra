@@ -95,16 +95,16 @@ Download the latest version from
 Make sure you have the dependencies, at least:
   development packages for python-gtk, and all dependencies
   Xvfb
-  pyrex (version 0.9.7 at least, check with 'pyrexc --version')
+  cython (version 0.9.7 at least, check with 'cython --version')
 On Debian-based OSes, I think it's:
   # aptitude install libx11-dev libxtst-dev libxcomposite-dev \
-    libxdamage-dev python-gobject-dev python-gtk2-dev xvfb python-pyrex
+    libxdamage-dev python-gobject-dev python-gtk2-dev xvfb python-cython
 And a mailing list report suggests the following for Fedora:
-  # yum install xorg-x11-server-Xvfb Pyrex libX11-devel \
+  # yum install xorg-x11-server-Xvfb Cython libX11-devel \
     libXtst-devel libXcomposite-devel libXdamage-devel pygobject2-devel \
     pygtk2-devel gtk2-devel
 And for MacPorts, apparently you should
-  - Install: python26 py26-pyrex py26-gtk py26-gobject py26-nose
+  - Install: python26 py26-cython py26-gtk py26-gobject py26-nose
     xorg-libXdamage xorg-libXcomposite xorg-libXtst xorg-libXfixes
     python_select
   - And then: Use python_select to make sure python26 is selected.

@@ -235,7 +235,7 @@ class Runner(object):
     def string_for_traceback(self, exc_info):
         tb = "".join(traceback.format_exception(*exc_info))
         # nose's inspect_traceback blows up when run on exceptions thrown out
-        # of Pyrex.  FIXME: file nose bug
+        # of Cython.  FIXME: file nose bug
         try:
             details = inspect_traceback(exc_info[2])
         except SystemExit, KeyboardInterrupt:
@@ -243,7 +243,7 @@ class Runner(object):
         except Exception:
             details = ("(failed to extract details;\n"
                        + "nose.inspect.inspect_traceback threw exception\n"
-                       + "(maybe because the error was in pyrex code):\n"
+                       + "(maybe because the error was in cython code):\n"
                        + traceback.format_exc()
                        + ")")
         return "%s\nDetails of failing source code:\n%s" % (tb, details)

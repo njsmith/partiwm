@@ -938,6 +938,12 @@ def myGetSelectionOwner(display_source, pyatom):
     return XGetSelectionOwner(get_xdisplay_for(display_source),
                               get_xatom(display_source, pyatom))
 
+cdef long cast_to_long(i):
+    if i < 0:
+        return <long>i
+    else:
+        return <long><unsigned long>i
+
 def sendClientMessage(target, propagate, event_mask,
                       message_type, data0, data1, data2, data3, data4):
     # data0 etc. are passed through get_xatom, so they can be integers, which
@@ -954,11 +960,11 @@ def sendClientMessage(target, propagate, event_mask,
     e.xany.window = w
     e.xclient.message_type = get_xatom(target, message_type)
     e.xclient.format = 32
-    e.xclient.data.l[0] = get_xatom(target, data0)
-    e.xclient.data.l[1] = get_xatom(target, data1)
-    e.xclient.data.l[2] = get_xatom(target, data2)
-    e.xclient.data.l[3] = get_xatom(target, data3)
-    e.xclient.data.l[4] = get_xatom(target, data4)
+    e.xclient.data.l[0] = cast_to_long(get_xatom(target, data0))
+    e.xclient.data.l[1] = cast_to_long(get_xatom(target, data1))
+    e.xclient.data.l[2] = cast_to_long(get_xatom(target, data2))
+    e.xclient.data.l[3] = cast_to_long(get_xatom(target, data3))
+    e.xclient.data.l[4] = cast_to_long(get_xatom(target, data4))
     cdef Status s
     s = XSendEvent(display, w, propagate, event_mask, &e)
     if s == 0:

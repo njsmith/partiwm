@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of Parti.
-# Copyright (C) 2008, 2009 Nathaniel Smith <njs@pobox.com>
+# Copyright (C) 2008, 2009, 2010 Nathaniel Smith <njs@pobox.com>
 # Parti is released under the terms of the GNU GPL v2, or, at your option, any
 # later version. See the file COPYING for details.
 
@@ -10,25 +10,25 @@
 # before using this setup.py, and again if you change
 # wimpiggy/lowlevel/constants.txt.
 
-# FIXME: Pyrex.Distutils.build_ext leaves crud in the source directory.  (So
+# FIXME: Cython.Distutils.build_ext leaves crud in the source directory.  (So
 # does the make-constants-pxi.py hack.)
 
 from distutils.core import setup
 from distutils.extension import Extension
-from Pyrex.Distutils import build_ext
+from Cython.Distutils import build_ext
 import commands, os, sys
 
-from Pyrex.Compiler.Version import version as pyrex_version_string
-pyrex_version = [int(part) for part in pyrex_version_string.split(".")]
+from Cython.Compiler.Version import version as cython_version_string
+cython_version = [int(part) for part in cython_version_string.split(".")]
 # This was when the 'for 0 < i < 10:' syntax as added, bump upwards as
 # necessary:
-NEEDED_PYREX = (0, 9, 7)
-if tuple(pyrex_version) < NEEDED_PYREX:
-    sys.exit("ERROR: Your version of Pyrex is too old to build this package\n"
+NEEDED_CYTHON = (0, 9, 7)
+if tuple(cython_version) < NEEDED_CYTHON:
+    sys.exit("ERROR: Your version of Cython is too old to build this package\n"
              "You have version %s\n"
-             "Please upgrade to Pyrex %s or better"
-             % (pyrex_version_string,
-                ".".join([str(part) for part in NEEDED_PYREX])))
+             "Please upgrade to Cython %s or better"
+             % (cython_version_string,
+                ".".join([str(part) for part in NEEDED_CYTHON])))
 
 # Tweaked from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/502261
 def pkgconfig(*packages, **kw):
@@ -93,6 +93,6 @@ setup(
                 **pkgconfig("x11")
                 ),
       ],
-    # Turn on Pyrex-sensitivity:
+    # Turn on Cython-sensitivity:
     cmdclass = {'build_ext': build_ext}
     )

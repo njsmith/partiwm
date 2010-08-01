@@ -97,7 +97,7 @@ Running Parti requires at least:
 And an X server with support for Composite.
 
 Developing on Parti also requires:
-   pyrex
+   cython
    Xephyr
    Xvfb
 As well as development packages of all of the above (i.e., you need
@@ -115,7 +115,7 @@ needed for the REPL support).  Patches accepted.
 
 On Debian-based OSes, try:
   # aptitude install libx11-dev libxtst-dev libxcomposite-dev \
-    libxdamage-dev python-pyrex python-gobject-dev \
+    libxdamage-dev python-cython python-gobject-dev \
     python-gtk2-dev python-dbus ipython xserver-xephyr \
     xvfb python-nose python-codespeak-lib
 
