@@ -115,18 +115,22 @@ class ClipboardProtocolHelper(object):
         (_, request_id, selection, target) = packet
         if selection in self._clipboard_proxies:
             proxy = self._clipboard_proxies[selection]
-            result = proxy.get_contents(target)
-            if result:
-                type, format, data = result
-                munged = self._munge_raw_selection_to_wire(type, format, data)
-                (wire_encoding, wire_data) = munged
-                log("clipboard raw -> wire: %r -> %r",
-                    (type, format, data), munged)
-                if wire_encoding is not None:
-                    self.send(["clipboard-contents", request_id, selection,
-                               type, format, wire_encoding, wire_data])
-                    return
-        self.send(["clipboard-contents-none", request_id, selection])
+            def got_contents(type, format, data):
+                if type is not None:
+                    munged = self._munge_raw_selection_to_wire(type,
+                                                               format,
+                                                               data)
+                    (wire_encoding, wire_data) = munged
+                    log("clipboard raw -> wire: %r -> %r",
+                        (type, format, data), munged)
+                    if wire_encoding is not None:
+                        self.send(["clipboard-contents", request_id, selection,
+                                   type, format, wire_encoding, wire_data])
+                        return
+                self.send(["clipboard-contents-none", request-id, selection])
+            proxy.get_contents(target, got_contents)
+        else:
+            self.send(["clipboard-contents-none", request_id, selection])
 
     def _process_clipboard_contents(self, packet):
         (_, request_id, selection,
@@ -257,19 +261,19 @@ class ClipboardProxy(gtk.Invisible):
                      + "contents of remote clipboard")
 
     # This function is called by the xpra core when the peer has requested the
-    # contents of this clipboard.
-
-    # This function enters a recursive mainloop.  We could do it without the
-    # recursive mainloop, but I am feeling lazy.
-    def get_contents(self, target):
+    # contents of this clipboard:
+    def get_contents(self, target, cb):
         if self._have_token:
             log.warn("Our peer requested the contents of the clipboard, but "
                      + "*I* thought *they* had it... weird.")
-            return None
-        value = self._clipboard.wait_for_contents(target)
-        if value is None:
-            return None
-        else:
-            return (str(value.type), value.format, value.data)
+            cb(None, None, None)
+        def unpack(clipboard, selection_data, data):
+            if selection_data is None:
+                cb(None, None, None)
+            else:
+                cb(str(selection_data.type),
+                   selection_data.format,
+                   selection_data.data)
+        self._clipboard.request_contents(target, unpack)
             
 gobject.type_register(ClipboardProxy)
