@@ -17,7 +17,7 @@ import signal
 import socket
 
 from xpra.wait_for_x_server import wait_for_x_server
-from xpra.dotxpra import DotXpra
+from xpra.dotxpra import DotXpra, ServerSockInUse
 
 _cleanups = []
 def run_cleanups():
@@ -195,7 +195,12 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
 
     # Daemonize:
     if opts.daemon:
-        logpath = dotxpra.server_socket_path(display_name, upgrading) + ".log"
+        try:
+            logpath = dotxpra.server_socket_path(display_name, upgrading) + ".log"
+        except ServerSockInUse:
+            parser.error("You already have an xpra server running at %s\n"
+                         "  (did you want 'xpra upgrade'?)"
+                         % (display_name,))
         sys.stderr.write("Entering daemon mode; "
                          + "any further errors will be reported to:\n"
                          + ("  %s\n" % logpath))
