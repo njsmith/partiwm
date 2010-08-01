@@ -7,3 +7,5 @@
 ^xpra/wait_for_x_server.c$
 __init__\.pyc$
 ~$
+xpra/platform/win32.pyc$
+xpra/platform/posix.pyc$

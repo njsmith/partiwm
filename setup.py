@@ -15,20 +15,9 @@
 
 from distutils.core import setup
 from distutils.extension import Extension
-from Cython.Distutils import build_ext
 import commands, os, sys
 
-from Cython.Compiler.Version import version as cython_version_string
-cython_version = [int(part) for part in cython_version_string.split(".")]
-# This was when the 'for 0 < i < 10:' syntax as added, bump upwards as
-# necessary:
-NEEDED_CYTHON = (0, 9, 7)
-if tuple(cython_version) < NEEDED_CYTHON:
-    sys.exit("ERROR: Your version of Cython is too old to build this package\n"
-             "You have version %s\n"
-             "Please upgrade to Cython %s or better"
-             % (cython_version_string,
-                ".".join([str(part) for part in NEEDED_CYTHON])))
+from xpra.platform import HAVE_X
 
 # Tweaked from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/502261
 def pkgconfig(*packages, **kw):
@@ -47,6 +36,38 @@ def pkgconfig(*packages, **kw):
         for k, v in kw.iteritems(): # remove duplicates
             kw[k] = list(set(v))
     return kw
+
+if HAVE_X:
+    from Cython.Distutils import build_ext
+    from Cython.Compiler.Version import version as cython_version_string
+    cython_version = [int(part) for part in cython_version_string.split(".")]
+    # This was when the 'for 0 < i < 10:' syntax as added, bump upwards as
+    # necessary:
+    NEEDED_CYTHON = (0, 9, 7)
+    if tuple(cython_version) < NEEDED_CYTHON:
+        sys.exit("ERROR: Your version of Cython is too old to build this package\n"
+                 "You have version %s\n"
+                 "Please upgrade to Cython %s or better"
+                 % (cython_version_string,
+                    ".".join([str(part) for part in NEEDED_CYTHON])))
+
+    ext_modules = [
+      Extension("wimpiggy.lowlevel.bindings",
+                ["wimpiggy/lowlevel/bindings.pyx"],
+                **pkgconfig("pygobject-2.0", "gdk-x11-2.0", "gtk+-x11-2.0",
+                            "xtst", "xfixes", "xcomposite", "xdamage")
+                ),
+      Extension("xpra.wait_for_x_server",
+                ["xpra/wait_for_x_server.pyx"],
+                **pkgconfig("x11")
+                ),
+      ]
+
+    cmdclass = {'build_ext': build_ext}
+else:
+    ext_modules = []
+    cmdclass = {}
+
 
 import wimpiggy
 import parti
@@ -82,17 +103,6 @@ setup(
              "scripts/xpra",
              ],
     data_files = [("share/man/man1", ["xpra.1"])],
-    ext_modules=[ 
-      Extension("wimpiggy.lowlevel.bindings",
-                ["wimpiggy/lowlevel/bindings.pyx"],
-                **pkgconfig("pygobject-2.0", "gdk-x11-2.0", "gtk+-x11-2.0",
-                            "xtst", "xfixes", "xcomposite", "xdamage")
-                ),
-      Extension("xpra.wait_for_x_server",
-                ["xpra/wait_for_x_server.pyx"],
-                **pkgconfig("x11")
-                ),
-      ],
-    # Turn on Cython-sensitivity:
-    cmdclass = {'build_ext': build_ext}
+    ext_modules=ext_modules,
+    cmdclass=cmdclass,
     )
