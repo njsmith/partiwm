@@ -1,16 +1,17 @@
 import gtk
 import gobject
-from wimpiggy.util import one_arg_signal
+from wimpiggy.util import n_arg_signal
 from wimpiggy.lowlevel import add_event_receiver
+from wimpiggy.prop import prop_get
 
 from wimpiggy.log import Logger
 log = Logger()
 
 class RootPropWatcher(gobject.GObject):
     __gsignals__ = {
-        "root-prop-changed": one_arg_signal,
+        "root-prop-changed": n_arg_signal(2),
 
-        "wimpiggy-property-notify-event": one_arg_signal,
+        "wimpiggy-property-notify-event": n_arg_signal(1),
         }
 
     def __init__(self, props):
@@ -21,6 +22,15 @@ class RootPropWatcher(gobject.GObject):
 
     def do_wimpiggy_property_notify_event(self, event):
         if event.atom in self._props:
-            self.emit("root-prop-changed", event.atom)
+            self._notify(event.atom)
+
+    def _notify(self, prop):
+        v = prop_get(gtk.gdk.get_default_root_window(),
+                     prop, "latin1")
+        self.emit("root-prop-changed", prop, v)
+
+    def notify_all(self):
+        for prop in self._props:
+            self._notify(prop)
 
 gobject.type_register(RootPropWatcher)

@@ -1,5 +1,5 @@
 # This file is part of Parti.
-# Copyright (C) 2008 Nathaniel Smith <njs@pobox.com>
+# Copyright (C) 2008, 2010 Nathaniel Smith <njs@pobox.com>
 # Parti is released under the terms of the GNU GPL v2, or, at your option, any
 # later version. See the file COPYING for details.
 
@@ -20,7 +20,6 @@ from xpra.keys import mask_to_names
 from xpra.clipboard import ClipboardProtocolHelper
 from xpra.xsettings import XSettingsWatcher
 from xpra.root_props import RootPropWatcher
-from wimpiggy.prop import prop_get
 
 import xpra
 default_capabilities = {"__prerelease_version": xpra.__version__}
@@ -339,13 +338,11 @@ class XpraClient(gobject.GObject):
         "PULSE_SERVER": "pulse-server",
         }
     
-    def _handle_root_prop_changed(self, obj, prop):
+    def _handle_root_prop_changed(self, obj, prop, value):
         assert prop in self.ROOT_PROPS
-        v = prop_get(gtk.gdk.get_default_root_window(),
-                     prop, "latin1")
-        if v is not None:
+        if value is not None:
             self.send(["server-settings",
-                       {self.ROOT_PROPS[prop]: v.encode("utf-8")}])
+                       {self.ROOT_PROPS[prop]: value.encode("utf-8")}])
 
     def _process_hello(self, packet):
         (_, capabilities) = packet
@@ -374,8 +371,7 @@ class XpraClient(gobject.GObject):
         self._root_props_watcher = RootPropWatcher(self.ROOT_PROPS.keys())
         self._root_props_watcher.connect("root-prop-changed",
                                         self._handle_root_prop_changed)
-        for prop in self.ROOT_PROPS:
-            self._handle_root_prop_changed(None, prop)
+        self._root_props_watcher.notify_all()
         self.emit("handshake-complete")
 
     def _process_new_common(self, packet, override_redirect):
