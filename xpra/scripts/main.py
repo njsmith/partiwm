@@ -66,7 +66,7 @@ def main(script_file, cmdline):
                       dest="ssh", default="ssh", metavar="CMD",
                       help="How to run ssh (default: '%default')")
     parser.add_option("--remote-xpra", action="store",
-                      dest="remote_xpra", default="$HOME/.xpra/run-xpra",
+                      dest="remote_xpra", default=".xpra/run-xpra",
                       metavar="CMD",
                       help="How to run xpra on the remote host (default: '%default')")
     parser.add_option("-d", "--debug", action="store",
