@@ -40,17 +40,20 @@ def main(script_file, cmdline):
         start_str = "\t%prog start DISPLAY\n"
         list_str = "\t%prog list\n"
         upgrade_str = "\t%prog upgrade DISPLAY"
+        note_str = ""
     else:
         start_str = ""
         list_str = ""
         upgrade_str = ""
+        note_str = "(This xpra install does not support starting local servers.)"
     parser = OptionParser(version="xpra v%s" % xpra.__version__,
                           usage="".join(["\n",
                                          start_str,
                                          "\t%prog attach [DISPLAY]\n",
                                          "\t%prog stop [DISPLAY]\n",
                                          list_str,
-                                         upgrade_str]))
+                                         upgrade_str,
+                                         note_str]))
     if XPRA_LOCAL_SERVERS_SUPPORTED:
         parser.add_option("--start-child", action="append",
                           dest="children", metavar="CMD",
@@ -73,7 +76,7 @@ def main(script_file, cmdline):
                       metavar="LEVEL",
                       help="How hard to work on compressing data."
                       + " 0 to disable compression,"
-                      + "9 for maximal (slowest) compression. Default: %default.")
+                      + " 9 for maximal (slowest) compression. Default: %default.")
     parser.add_option("--ssh", action="store",
                       dest="ssh", default=DEFAULT_SSH_CMD, metavar="CMD",
                       help="How to run ssh (default: '%default')")
