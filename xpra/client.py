@@ -275,12 +275,12 @@ class XpraClient(gobject.GObject):
         "handshake-complete": no_arg_signal,
         }
 
-    def __init__(self, sock, compression_level):
+    def __init__(self, channel, sock, compression_level):
         gobject.GObject.__init__(self)
         self._window_to_id = {}
         self._id_to_window = {}
 
-        self._protocol = Protocol(sock, self.process_packet)
+        self._protocol = Protocol(channel, sock, self.process_packet)
         ClientSource(self._protocol)
         capabilities_request = dict(default_capabilities)
         if compression_level:

@@ -15,6 +15,9 @@ import logging
 import xpra
 from xpra.bencode import bencode
 from xpra.dotxpra import DotXpra
+from xpra.platform import (XPRA_LOCAL_SERVERS_SUPPORTED,
+                           DEFAULT_SSH_CMD,
+                           spawn_with_channel_socket)
 
 def nox():
     if "DISPLAY" in os.environ:
@@ -33,29 +36,38 @@ def main(script_file, cmdline):
     ##
     ## NOTE NOTE NOTE
     #################################################################
+    if XPRA_LOCAL_SERVERS_SUPPORTED:
+        start_str = "\t%prog start DISPLAY\n"
+        list_str = "\t%prog list\n"
+        upgrade_str = "\t%prog upgrade DISPLAY"
+    else:
+        start_str = ""
+        list_str = ""
+        upgrade_str = ""
     parser = OptionParser(version="xpra v%s" % xpra.__version__,
-                          usage=("\n"
-                                 + "\t%prog start DISPLAY\n"
-                                 + "\t%prog attach [DISPLAY]\n"
-                                 + "\t%prog stop [DISPLAY]\n"
-                                 + "\t%prog list\n"
-                                 + "\t%prog upgrade DISPLAY"))
-    parser.add_option("--start-child", action="append",
-                      dest="children", metavar="CMD",
-                      help="program to spawn in new server (may be repeated)")
-    parser.add_option("--exit-with-children", action="store_true",
-                      dest="exit_with_children", default=False,
-                      help="Terminate server when --start-child command(s) exit")
-    parser.add_option("--no-daemon", action="store_false",
-                      dest="daemon", default=True,
-                      help="Don't daemonize when running as a server")
-    parser.add_option("--xvfb", action="store",
-                      dest="xvfb", default="Xvfb", metavar="CMD",
-                      help="How to run the headless X server (default: '%default')")
-    parser.add_option("--bind-tcp", action="store",
-                      dest="bind_tcp", default=None,
-                      metavar="[HOST]:PORT",
-                      help="Listen for connections over TCP (insecure)")
+                          usage="".join(["\n",
+                                         start_str,
+                                         "\t%prog attach [DISPLAY]\n",
+                                         "\t%prog stop [DISPLAY]\n",
+                                         list_str,
+                                         upgrade_str]))
+    if XPRA_LOCAL_SERVERS_SUPPORTED:
+        parser.add_option("--start-child", action="append",
+                          dest="children", metavar="CMD",
+                          help="program to spawn in new server (may be repeated)")
+        parser.add_option("--exit-with-children", action="store_true",
+                          dest="exit_with_children", default=False,
+                          help="Terminate server when --start-child command(s) exit")
+        parser.add_option("--no-daemon", action="store_false",
+                          dest="daemon", default=True,
+                          help="Don't daemonize when running as a server")
+        parser.add_option("--xvfb", action="store",
+                          dest="xvfb", default="Xvfb", metavar="CMD",
+                          help="How to run the headless X server (default: '%default')")
+        parser.add_option("--bind-tcp", action="store",
+                          dest="bind_tcp", default=None,
+                          metavar="[HOST]:PORT",
+                          help="Listen for connections over TCP (insecure)")
     parser.add_option("-z", "--compress", action="store",
                       dest="compression_level", type="int", default=3,
                       metavar="LEVEL",
@@ -63,7 +75,7 @@ def main(script_file, cmdline):
                       + " 0 to disable compression,"
                       + "9 for maximal (slowest) compression. Default: %default.")
     parser.add_option("--ssh", action="store",
-                      dest="ssh", default="ssh", metavar="CMD",
+                      dest="ssh", default=DEFAULT_SSH_CMD, metavar="CMD",
                       help="How to run ssh (default: '%default')")
     parser.add_option("--remote-xpra", action="store",
                       dest="remote_xpra", default=".xpra/run-xpra",
@@ -89,7 +101,8 @@ def main(script_file, cmdline):
     logging.root.addHandler(logging.StreamHandler(sys.stderr))
 
     mode = args.pop(0)
-    if mode in ("start", "upgrade"):
+    
+    if mode in ("start", "upgrade") and XPRA_LOCAL_SERVERS_SUPPORTED:
         nox()
         from xpra.scripts.server import run_server
         run_server(parser, options, mode, script_file, args)
@@ -101,7 +114,7 @@ def main(script_file, cmdline):
     elif mode == "stop":
         nox()
         run_stop(parser, options, args)
-    elif mode == "list":
+    elif mode == "list" and XPRA_LOCAL_SERVERS_SUPPORTED:
         run_list(parser, options, args)
     elif mode == "_proxy":
         nox()
@@ -152,6 +165,8 @@ def parse_display_name(parser, opts, display_name):
 
 def pick_display(parser, opts, extra_args):
     if len(extra_args) == 0:
+        if not XPRA_LOCAL_SERVERS_SUPPORTED:
+            parser.error("need to specify a display")
         # Pick a default server
         sockdir = DotXpra()
         servers = sockdir.sockets()
@@ -171,22 +186,22 @@ def pick_display(parser, opts, extra_args):
 
 def connect(display_desc):
     if display_desc["type"] == "ssh":
-        (a, b) = socket.socketpair()
-        subprocess.Popen(display_desc["full_remote_xpra"]
-                         + ["_proxy"]
-                         + display_desc["display_as_args"],
-                         stdin=b.fileno(), stdout=b.fileno(),
-                         bufsize=0)
-        return a
-    elif display_desc["type"] == "unix-domain":
+        res = spawn_with_channel_socket(display_desc["full_remote_xpra"]
+                                      + ["_proxy"]
+                                      + display_desc["display_as_args"])
+        channel, sock = res
+        return channel, sock
+    elif XPRA_LOCAL_SERVERS_SUPPORTED and display_desc["type"] == "unix-domain":
         sockdir = DotXpra()
         sock = socket.socket(socket.AF_UNIX)
         sock.connect(sockdir.socket_path(display_desc["display"]))
-        return sock
+        return gobject.IOChannel(sock.fileno()), sock
     elif display_desc["type"] == "tcp":
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((display_desc["host"], display_desc["port"]))
-        return sock
+        # FIXME: this is not actually correct on Win32, see
+        #   https://bugzilla.gnome.org/show_bug.cgi?id=592992
+        return gobject.IOChannel(sock.fileno()), sock
     else:
         assert False, "unsupported display type in connect"
 
@@ -201,10 +216,10 @@ def handshake_complete_msg(*args):
 
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
-    sock = connect_or_fail(pick_display(parser, opts, extra_args))
+    channel, sock = connect_or_fail(pick_display(parser, opts, extra_args))
     if opts.compression_level < 0 or opts.compression_level > 9:
         parser.error("Compression level must be between 0 and 9 inclusive.")
-    app = XpraClient(sock, opts.compression_level)
+    app = XpraClient(channel, sock, opts.compression_level)
     app.connect("handshake-complete", handshake_complete_msg)
     app.run()
 

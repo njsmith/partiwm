@@ -17,7 +17,7 @@ from distutils.core import setup
 from distutils.extension import Extension
 import commands, os, sys
 
-from xpra.platform import HAVE_X
+from xpra.platform import XPRA_LOCAL_SERVERS_SUPPORTED
 
 # Tweaked from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/502261
 def pkgconfig(*packages, **kw):
@@ -37,7 +37,7 @@ def pkgconfig(*packages, **kw):
             kw[k] = list(set(v))
     return kw
 
-if HAVE_X:
+if XPRA_LOCAL_SERVERS_SUPPORTED:
     from Cython.Distutils import build_ext
     from Cython.Compiler.Version import version as cython_version_string
     cython_version = [int(part) for part in cython_version_string.split(".")]
@@ -97,7 +97,7 @@ setup(
     download_url="http://partiwm.org/static/downloads/",
     packages=["wimpiggy", "wimpiggy.lowlevel",
               "parti", "parti.trays", "parti.addons", "parti.scripts",
-              "xpra", "xpra.scripts",
+              "xpra", "xpra.scripts", "xpra.platform",
               ],
     scripts=["scripts/parti", "scripts/parti-repl",
              "scripts/xpra",

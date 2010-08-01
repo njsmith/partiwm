@@ -10,11 +10,14 @@ import socket
 import errno
 import stat
 
+from xpra.platform import XPRA_LOCAL_SERVERS_SUPPORTED
+
 class ServerSockInUse(Exception):
     pass
 
 class DotXpra(object):
     def __init__(self, dir=None):
+        assert XPRA_LOCAL_SERVERS_SUPPORTED
         if dir is None:
             dir = os.path.expanduser("~/.xpra")
         self._dir = dir

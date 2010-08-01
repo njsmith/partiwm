@@ -25,7 +25,19 @@ def dump_packet(packet):
 class Protocol(object):
     CONNECTION_LOST = object()
 
-    def __init__(self, sock, process_packet_cb):
+    # Taking both a channel and a socket (which are two python objects both
+    # representing the same underlying OS object) is a little silly, but:
+    #   1) On Win32, correctly turning a socket into a channel requires black
+    #      magic.
+    #   2) Everywhere, we have to make sure the underlying socket is not
+    #      closed until we are ready for it to be closed. The Python socket
+    #      object owns the underlying socket; the Python channel object does
+    #      not. So we need to keep a reference.
+    #   3) In general, this way we avoid depending on pygobject to handle
+    #      Win32 stuff correctly, like using the correct close syscall... I
+    #      trust Python's socket module more.
+    def __init__(self, channel, sock, process_packet_cb):
+        self._channel = channel
         self._sock = sock
         self._process_packet_cb = process_packet_cb
         # Invariant: if .source is None, then _source_has_more == False
@@ -60,8 +72,7 @@ class Protocol(object):
             flags |= gobject.IO_OUT
         if self._watch_tag is not None:
             gobject.source_remove(self._watch_tag)
-        self._watch_tag = gobject.io_add_watch(self._sock, flags,
-                                               self._socket_ready)
+        self._watch_tag = self._channel.add_watch(flags, self._socket_ready)
         self._write_armed = want_write
 
     def _flush_one_packet_into_buffer(self):
