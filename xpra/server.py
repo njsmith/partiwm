@@ -528,11 +528,6 @@ class XpraServer(gobject.GObject):
         self._protocol = proto
         ServerSource(self._protocol)
         self._send(["hello", capabilities])
-        def db():
-            self
-            import pdb; pdb.set_trace()
-            return False
-        #gobject.timeout_add(5000, db)
         if "deflate" in capabilities:
             self._protocol.enable_deflate(capabilities["deflate"])
         # We send the new-window packets sorted by id because this sorts them
