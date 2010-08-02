@@ -158,8 +158,11 @@ class ClipboardProtocolHelper(object):
 
 class ClipboardProxy(gtk.Invisible):
     __gsignals__ = {
-        # arguments: (selection, target, callback)
-        "get-clipboard-from-remote": n_arg_signal(2),
+        # arguments: (selection, target)
+        "get-clipboard-from-remote": (gobject.SIGNAL_RUN_LAST,
+                                      gobject.TYPE_PYOBJECT,
+                                      (gobject.TYPE_PYOBJECT,) * 2,
+                                      ),
         # arguments: (selection,)
         "send-clipboard-token": n_arg_signal(1),
         }
