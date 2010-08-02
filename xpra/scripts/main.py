@@ -202,8 +202,7 @@ def connect(display_desc):
     elif display_desc["type"] == "tcp":
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((display_desc["host"], display_desc["port"]))
-        # FIXME: this is not actually correct on Win32, see
-        #   https://bugzilla.gnome.org/show_bug.cgi?id=592992
+        # This doesn't work on Win32:
         return sock, sock
     else:
         assert False, "unsupported display type in connect"
