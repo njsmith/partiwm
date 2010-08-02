@@ -14,7 +14,7 @@ import gobject
 import gtk
 import gtk.gdk
 
-from wimpiggy.util import dump_exc, LameStruct, gtk_main_quit_really
+from wimpiggy.util import dump_exc, AdHocStruct, gtk_main_quit_really
 from wimpiggy.error import trap, XError
 
 from wimpiggy.log import Logger
@@ -1210,7 +1210,7 @@ def _gw(display, xwin):
 
 cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
                                     GdkEvent * gdk_event,
-                                    void * userdata):
+                                    void * userdata) with gil:
     cdef XEvent * e
     cdef XDamageNotifyEvent * damage_e
     e = <XEvent*>e_gdk
@@ -1225,7 +1225,7 @@ cdef GdkFilterReturn x_event_filter(GdkXEvent * e_gdk,
         else:
             damage_type = -1
         if e.type in my_events:
-            pyev = LameStruct()
+            pyev = AdHocStruct()
             pyev.type = e.type
             pyev.send_event = e.xany.send_event
             pyev.display = d

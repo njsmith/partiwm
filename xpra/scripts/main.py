@@ -7,7 +7,6 @@ import gobject
 import sys
 import os
 import socket
-import subprocess
 import time
 from optparse import OptionParser
 import logging
@@ -18,7 +17,7 @@ from xpra.dotxpra import DotXpra
 from xpra.platform import (XPRA_LOCAL_SERVERS_SUPPORTED,
                            DEFAULT_SSH_CMD,
                            GOT_PASSWORD_PROMPT_SUGGESTION,
-                           spawn_with_channel_socket)
+                           spawn_with_sockets)
 
 def nox():
     if "DISPLAY" in os.environ:
@@ -97,6 +96,8 @@ def main(script_file, cmdline):
     if options.debug is not None:
         categories = options.debug.split(",")
         for cat in categories:
+            if cat.startswith("-"):
+                logging.getLogger(cat[1:]).setLevel(logging.INFO)
             if cat == "all":
                 logger = logging.root
             else:
@@ -120,7 +121,7 @@ def main(script_file, cmdline):
         run_stop(parser, options, args)
     elif mode == "list" and XPRA_LOCAL_SERVERS_SUPPORTED:
         run_list(parser, options, args)
-    elif mode == "_proxy":
+    elif mode == "_proxy" and XPRA_LOCAL_SERVERS_SUPPORTED:
         nox()
         run_proxy(parser, options, args)
     else:
@@ -190,22 +191,20 @@ def pick_display(parser, opts, extra_args):
 
 def connect(display_desc):
     if display_desc["type"] == "ssh":
-        res = spawn_with_channel_socket(display_desc["full_remote_xpra"]
-                                      + ["_proxy"]
-                                      + display_desc["display_as_args"])
-        channel, sock = res
-        return channel, sock
+        return spawn_with_sockets(display_desc["full_remote_xpra"]
+                                  + ["_proxy"]
+                                  + display_desc["display_as_args"])
     elif XPRA_LOCAL_SERVERS_SUPPORTED and display_desc["type"] == "unix-domain":
         sockdir = DotXpra()
         sock = socket.socket(socket.AF_UNIX)
         sock.connect(sockdir.socket_path(display_desc["display"]))
-        return gobject.IOChannel(sock.fileno()), sock
+        return sock, sock
     elif display_desc["type"] == "tcp":
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((display_desc["host"], display_desc["port"]))
         # FIXME: this is not actually correct on Win32, see
         #   https://bugzilla.gnome.org/show_bug.cgi?id=592992
-        return gobject.IOChannel(sock.fileno()), sock
+        return sock, sock
     else:
         assert False, "unsupported display type in connect"
 
@@ -230,17 +229,18 @@ def got_gibberish_msg(obj, data):
 
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
-    channel, sock = connect_or_fail(pick_display(parser, opts, extra_args))
+    read_sock, write_sock = connect_or_fail(pick_display(parser, opts, extra_args))
     if opts.compression_level < 0 or opts.compression_level > 9:
         parser.error("Compression level must be between 0 and 9 inclusive.")
-    app = XpraClient(channel, sock, opts.compression_level)
+    app = XpraClient(read_sock, write_sock, opts.compression_level)
     app.connect("handshake-complete", handshake_complete_msg)
     app.connect("received-gibberish", got_gibberish_msg)
     app.run()
 
 def run_proxy(parser, opts, extra_args):
     from xpra.proxy import XpraProxy
-    app = XpraProxy(0, 1, connect_or_fail(pick_display(parser, opts, extra_args)))
+    read_sock, write_sock = connect_or_fail(pick_display(parser, opts, extra_args))
+    app = XpraProxy(0, 1, read_sock, write_sock)
     app.run()
 
 def run_stop(parser, opts, extra_args):

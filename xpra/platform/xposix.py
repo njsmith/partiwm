@@ -1,3 +1,8 @@
+# This file is part of Parti.
+# Copyright (C) 2010 Nathaniel Smith <njs@pobox.com>
+# Parti is released under the terms of the GNU GPL v2, or, at your option, any
+# later version. See the file COPYING for details.
+
 # Platform-specific code for Posix systems with X11 display.
 
 XPRA_LOCAL_SERVERS_SUPPORTED = True
@@ -6,14 +11,21 @@ GOT_PASSWORD_PROMPT_SUGGESTION = "Perhaps you need to set up your ssh agent?\n"
 
 from wimpiggy.keys import grok_modifier_map
 
-def spawn_with_channel_socket(cmd):
-    from socket import socketpair
+def spawn_with_sockets(cmd):
+    from socket import socketpair, SHUT_RD, SHUT_WR
     import subprocess
+    stdin_child, stdin_parent = socketpair()
+    stdout_child, stdout_parent = socketpair()
+    subprocess.Popen(cmd, stdin=stdin_child, stdout=stdout_child)
+    stdin_child.close()
+    stdout_child.close()
+    stdin_parent.shutdown(SHUT_RD)
+    stdout_parent.shutdown(SHUT_WR)
+    return stdin_parent, stdout_parent
+
+def socket_channel(sock):
     import gobject
-    (a, b) = socketpair()
-    subprocess.Popen(cmd, stdin=b.fileno(), stdout=b.fileno(), bufsize=0)
-    b.close()
-    return gobject.IOChannel(a.fileno()), a
+    return gobject.IOChannel(sock.fileno())
 
 from xpra.platform.xclipboard import ClipboardProtocolHelper
 

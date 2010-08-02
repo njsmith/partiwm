@@ -47,7 +47,7 @@ def dump_exc():
 
 # A simple little class whose instances we can stick random bags of attributes
 # on.
-class LameStruct(object):
+class AdHocStruct(object):
     def __repr__(self):
         return ("<%s object, contents: %r>"
                 % (type(self).__name__, self.__dict__))

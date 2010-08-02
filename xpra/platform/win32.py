@@ -1,3 +1,8 @@
+# This file is part of Parti.
+# Copyright (C) 2010 Nathaniel Smith <njs@pobox.com>
+# Parti is released under the terms of the GNU GPL v2, or, at your option, any
+# later version. See the file COPYING for details.
+
 XPRA_LOCAL_SERVERS_SUPPORTED = False
 import os
 os.environ["PLINK_PROTOCOL"] = "ssh"
@@ -27,7 +32,7 @@ def grok_modifier_map(display_source):
                                 | modifier_map["num"])
     return modifier_map
 
-from xpra.platform.win32pipe import spawn_with_channel_socket
+from xpra.platform.win32pipe import spawn_with_sockets, socket_channel
 
 class ClipboardProtocolHelper(object):
     def __init__(self, send_packet_cb):

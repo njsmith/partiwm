@@ -9,6 +9,7 @@ import zlib
 import struct
 
 from xpra.bencode import bencode, IncrBDecode
+from xpra.platform import socket_channel
 
 from wimpiggy.log import Logger
 log = Logger()
@@ -22,116 +23,104 @@ def repr_ellipsized(obj, limit):
 def dump_packet(packet):
     return "[" + ", ".join([repr_ellipsized(x, 50) for x in packet]) + "]"
 
+# We use two sockets to talk to the child, rather than 1 socket, or 2 pipes,
+# because on Windows:
+#   1) You can only call select() on sockets
+#   2) If you want to pass a socket as a child process's stdin/stdout, then
+#      that socket must *not* have WSA_FLAG_OVERLAPPED set.
+#   3) plink, sensibly enough given win32's limitations, uses two threads to
+#      simultaneously read and write stdin and stdout. But if stdin and stdout
+#      refer to the same socket, then this counts as "overlapped IO", which
+#      requires that WSA_FLAG_OVERLAPPED *is* set. (Thanks to Simon Tatham for
+#      helping me figure this out.)
+#   4) Also, reading and writing from the same socket is kind of a pain on
+#      win32 anyway, because you can only have one IO watch active per socket:
+#        http://faq.pygtk.org/index.py?req=all#20.20
+#      So using two sockets simplifies the IO watch code.
+# Anyway, for all thse reasons, we make two different sockets, one for stdin
+# and one for stdout. And for consistency, we do the same on POSIX.
+
 class Protocol(object):
     CONNECTION_LOST = object()
     GIBBERISH = object()
 
-    # Taking both a channel and a socket (which are two python objects both
-    # representing the same underlying OS object) is a little silly, but:
-    #   1) On Win32, correctly turning a socket into a channel requires black
-    #      magic.
-    #   2) Everywhere, we have to make sure the underlying socket is not
-    #      closed until we are ready for it to be closed. The Python socket
-    #      object owns the underlying socket; the Python channel object does
-    #      not. So we need to keep a reference.
-    #   3) In general, this way we avoid depending on pygobject to handle
-    #      Win32 stuff correctly, like using the correct close syscall... I
-    #      trust Python's socket module more.
-    def __init__(self, channel, sock, process_packet_cb):
-        self._channel = channel
-        self._sock = sock
+    def __init__(self, write_sock, read_sock, process_packet_cb):
+        # The socket objects own the underlying OS socket; so even though we
+        # mostly interact with the channel objects, we must keep references
+        # to the socket objects around to prevent the underlying sockets from
+        # getting closed.
+        self._write_sock = write_sock
+        self._write_sock.setblocking(False)
+        self._write_channel = socket_channel(write_sock)
+        self._write_channel.set_encoding(None)
+        self._write_channel.set_buffered(0)
+
+        self._read_sock = read_sock
+        self._read_sock.setblocking(False)
+        self._read_channel = socket_channel(read_sock)
+        self._read_channel.set_encoding(None)
+        self._read_channel.set_buffered(0)
+
         self._process_packet_cb = process_packet_cb
         # Invariant: if .source is None, then _source_has_more == False
         self.source = None
         self._source_has_more = False
-        self._accept_packets = False
         self._closed = False
-        self._write_armed = False
         self._read_decoder = IncrBDecode()
         self._write_buf = ""
         self._compressor = None
         self._decompressor = None
-        self._watch_tag = None
-        self._update_watch(force=True)
+        self._read_watch_tag = self._read_channel.add_watch(gobject.IO_IN
+                                                            | gobject.IO_HUP,
+                                                            self._read_ready)
+        self._write_armed = False
+        self._write_watch_tag = None
+        self._update_write_watch(force=True)
 
     def source_has_more(self):
+        assert self.source is not None
         self._source_has_more = True
-        self._update_watch()
+        self._update_write_watch()
 
-    def _update_watch(self, force=False):
-        # It would perhaps be simpler to use two separate watches, one for
-        # reading and one for writing, but that doesn't work on Win32:
-        #   http://faq.pygtk.org/index.py?req=all#20.20
-        # Win32 also requires we watch for IO_HUP.
-        if self._closed:
+    def _update_write_watch(self, force=False):
+        want_write = bool(not self._closed
+                          and (self._write_buf or self._source_has_more))
+        log("updating watch: want_write=%s (was %s)",
+            want_write, self._write_armed)
+        if want_write == self._write_armed and not force:
             return
-        want_write = bool(self._write_buf or self._source_has_more)
-        if not force and want_write == self._write_armed:
-            return
-        flags = gobject.IO_IN | gobject.IO_HUP
+        flags = gobject.IO_HUP
         if want_write:
             flags |= gobject.IO_OUT
-        if self._watch_tag is not None:
-            gobject.source_remove(self._watch_tag)
-        self._watch_tag = self._channel.add_watch(flags, self._socket_ready)
+        if self._write_watch_tag is not None:
+            gobject.source_remove(self._write_watch_tag)
+        self._write_watch_tag = self._write_channel.add_watch(flags,
+                                                              self._write_ready)
         self._write_armed = want_write
 
-    def _flush_one_packet_into_buffer(self):
-        if not self.source:
-            return
-        packet, self._source_has_more = self.source.next_packet()
-        if packet is not None:
-            log("sending %s", dump_packet(packet), type="raw.send")
-            data_payload = bencode(packet)
-            data_header = struct.pack(">I", len(data_payload))
-            #data = data_header + data_payload
-            data = data_payload
-            if self._compressor is not None:
-                self._write_buf += self._compressor.compress(data)
-                self._write_buf += self._compressor.flush(zlib.Z_SYNC_FLUSH)
-            else:
-                self._write_buf += data
-
-    def _socket_ready(self, source, flags):
-        log("_socket_ready")
+    def _read_ready(self, source, flags):
+        log("_read_ready")
         if flags & gobject.IO_IN:
-            self._socket_readable()
-        if flags & gobject.IO_OUT:
-            self._socket_writeable()
+            self._read_some()
+        assert not (flags & gobject.IO_OUT)
         if flags & gobject.IO_HUP:
             self._connection_lost()
         return True
 
-    def _connection_lost(self):
-        log("_connection_lost")
-        if not self._closed:
-            self._accept_packets = False
-            self._process_packet_cb(self, [Protocol.CONNECTION_LOST])
-            self.close()
-
-    def _socket_writeable(self):
-        log("_socket_writeable")
-        if not self._write_buf:
-            # Underflow: refill buffer from source.
-            # We can't get into this function at all unless either _write_buf
-            # is non-empty, or _source_has_more == True, because of the guard
-            # in _update_watch.
-            assert self._source_has_more
-            self._flush_one_packet_into_buffer()
-        try:
-            sent = self._sock.send(self._write_buf)
-        except socket.error:
-            print "Error writing to socket"
+    def _write_ready(self, source, flags):
+        log("_write_ready")
+        assert not (flags & gobject.IO_IN)
+        if flags & gobject.IO_OUT:
+            self._write_some()
+        if flags & gobject.IO_HUP:
             self._connection_lost()
-        else:
-            self._write_buf = self._write_buf[sent:]
-            self._update_watch()
+        return True
 
-    def _socket_readable(self):
-        log("_socket_readable")
+    def _read_some(self):
+        log("_read_some")
         try:
-            buf = self._sock.recv(4096)
-        except socket.error:
+            buf = self._read_channel.read(4096)
+        except (socket.error, gobject.GError):
             print "Error reading from socket"
             self._connection_lost()
             return False
@@ -165,7 +154,51 @@ class Protocol(object):
                 unprocessed = self._decompressor.decompress(unprocessed)
             self._read_decoder = IncrBDecode(unprocessed)
 
+    def _write_some(self):
+        log("_write_some")
+        if not self._write_buf:
+            # Underflow: refill buffer from source.
+            # We can't get into this function at all unless either _write_buf
+            # is non-empty, or _source_has_more == True, because of the guard
+            # in _update_write_watch.
+            assert self._source_has_more
+            self._flush_one_packet_into_buffer()
+        try:
+            sent = self._write_channel.write(self._write_buf)
+            #self._write_channel.flush()
+        except (socket.error, gobject.GError):
+            print "Error writing to socket"
+            self._connection_lost()
+        else:
+            self._write_buf = self._write_buf[sent:]
+            self._update_write_watch()
+
+    def _flush_one_packet_into_buffer(self):
+        if not self.source:
+            return
+        packet, self._source_has_more = self.source.next_packet()
+        if packet is not None:
+            log("sending %s", dump_packet(packet), type="raw.send")
+            data_payload = bencode(packet)
+            data_header = struct.pack(">I", len(data_payload))
+            #data = data_header + data_payload
+            data = data_payload
+            if self._compressor is not None:
+                self._write_buf += self._compressor.compress(data)
+                self._write_buf += self._compressor.flush(zlib.Z_SYNC_FLUSH)
+            else:
+                self._write_buf += data
+
+    def _connection_lost(self):
+        log("_connection_lost")
+        if not self._closed:
+            self._process_packet_cb(self, [Protocol.CONNECTION_LOST])
+            self.close()
+
     def _process_packet(self, decoded):
+        if self._closed:
+            log.warn("stray packet received after connection was closed; ignoring")
+            return
         try:
             log("got %s", dump_packet(decoded), type="raw.receive")
             self._process_packet_cb(self, decoded)
@@ -181,15 +214,19 @@ class Protocol(object):
         # Flush everything out of the source
         while self._source_has_more:
             self._flush_one_packet_into_buffer()
-        self._update_watch()
+        self._update_write_watch()
         # Now enable compression
         self._compressor = zlib.compressobj(level)
         self._decompressor = zlib.decompressobj()
 
     def close(self):
         if not self._closed:
-            if self._watch_tag is not None:
-                gobject.source_remove(self._watch_tag)
-                self._watch_tag = None
+            if self._read_watch_tag is not None:
+                gobject.source_remove(self._read_watch_tag)
+                self._read_watch_tag = None
+            if self._write_watch_tag is not None:
+                gobject.source_remove(self._write_watch_tag)
+                self._write_watch_tag = None
             self._closed = True
-            self._sock.close()
+            self._read_sock.close()
+            self._write_sock.close()

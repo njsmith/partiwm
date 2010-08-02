@@ -1,5 +1,5 @@
 # This file is part of Parti.
-# Copyright (C) 2008 Nathaniel Smith <njs@pobox.com>
+# Copyright (C) 2008, 2010 Nathaniel Smith <njs@pobox.com>
 # Parti is released under the terms of the GNU GPL v2, or, at your option, any
 # later version. See the file COPYING for details.
 
@@ -26,8 +26,9 @@ class ChannelProxy(gobject.GObject):
         "done": (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ())
         }
 
-    def __init__(self, readfd, writefd):
+    def __init__(self, logname, readfd, writefd):
         gobject.GObject.__init__(self)
+        self._logname = logname
         self._readfd = readfd
         self._writefd = writefd
         self._tag = None
@@ -42,7 +43,7 @@ class ChannelProxy(gobject.GObject):
 
     def _set_state(self, state):
         # Set up new state
-        log("%s: state: %s -> %s", id(self), self._state, state)
+        log("%s: state: %s -> %s", self._logname, self._state, state)
         if self._state is state:
             return
         # Clear old state
@@ -63,13 +64,13 @@ class ChannelProxy(gobject.GObject):
         self._state = state
 
     def _readable(self, *args):
-        #sys.stderr.write("%s: %s readable\n" % (id(self), self._readfd))
+        #sys.stderr.write("%s: %s readable\n" % (self._logname, self._readfd))
         self._definitely_readable = True
         self._set_state(self.WRITE)
         return True
 
     def _writeable(self, *args):
-        #sys.stderr.write("%s: %s writeable\n" % (id(self), self._writefd))
+        #sys.stderr.write("%s: %s writeable\n" % (self._logname, self._writefd))
         if not self._writebuf:
             self._writebuf = os.read(self._readfd, 8192)
             if not self._writebuf and self._definitely_readable:
@@ -93,13 +94,12 @@ class ChannelProxy(gobject.GObject):
 gobject.type_register(ChannelProxy)
 
 class XpraProxy(object):
-    def __init__(self, readfd, writefd, server_conn):
-        serverfd1 = os.dup(server_conn.fileno())
-        serverfd2 = os.dup(server_conn.fileno())
-
-        self._toserver = ChannelProxy(readfd, serverfd1)
+    def __init__(self, readfd, writefd, server_read_sock, server_write_sock):
+        self._toserver = ChannelProxy("->server",
+                                      readfd, server_write_sock.fileno())
         self._toserver.connect("done", self._quit)
-        self._fromserver = ChannelProxy(serverfd2, writefd)
+        self._fromserver = ChannelProxy("<-server",
+                                        server_read_sock.fileno(), writefd)
         self._fromserver.connect("done", self._quit)
 
         self._mainloop = gobject.MainLoop()

@@ -16,7 +16,7 @@ import sys
 import subprocess
 
 from wimpiggy.wm import Wm
-from wimpiggy.util import (LameStruct,
+from wimpiggy.util import (AdHocStruct,
                            one_arg_signal,
                            gtk_main_quit_really,
                            gtk_main_quit_on_fatal_exceptions_enable)
@@ -51,7 +51,7 @@ class DesktopManager(gtk.Widget):
 
     def add_window(self, model, x, y, w, h):
         assert self.flags() & gtk.REALIZED
-        s = LameStruct()
+        s = AdHocStruct()
         s.shown = False
         s.geom = (x, y, w, h)
         s.window = None
@@ -315,8 +315,7 @@ class XpraServer(gobject.GObject):
     def _new_connection(self, listener, *args):
         log.info("New connection received")
         sock, addr = listener.accept()
-        channel = gobject.IOChannel(sock.fileno())
-        self._potential_protocols.append(Protocol(channel, sock,
+        self._potential_protocols.append(Protocol(sock, sock,
                                                   self.process_packet))
         return True
 
@@ -342,6 +341,7 @@ class XpraServer(gobject.GObject):
         window.connect("unmanaged", self._lost_window)
 
     def _add_new_window(self, window):
+        log("Discovered new ordinary window")
         self._add_new_window_common(window)
         for prop in self._window_export_properties:
             window.connect("notify::%s" % prop, self._update_metadata)
@@ -350,6 +350,7 @@ class XpraServer(gobject.GObject):
         self._send_new_window_packet(window)
 
     def _add_new_or_window(self, raw_window):
+        log("Discovered new override-redirect window")
         try:
             window = OverrideRedirectWindowModel(raw_window)
         except Unmanageable:
@@ -455,6 +456,7 @@ class XpraServer(gobject.GObject):
 
     def _send(self, packet):
         if self._protocol is not None:
+            log("Queuing packet: %s", packet)
             self._protocol.source.queue_ordinary_packet(packet)
 
     def _damage(self, window, x, y, width, height):
@@ -526,6 +528,11 @@ class XpraServer(gobject.GObject):
         self._protocol = proto
         ServerSource(self._protocol)
         self._send(["hello", capabilities])
+        def db():
+            self
+            import pdb; pdb.set_trace()
+            return False
+        #gobject.timeout_add(5000, db)
         if "deflate" in capabilities:
             self._protocol.enable_deflate(capabilities["deflate"])
         # We send the new-window packets sorted by id because this sorts them
@@ -642,8 +649,9 @@ class XpraServer(gobject.GObject):
         if proto is self._protocol:
             self._protocol = None
 
-    def _process_gibberish(self, packet):
-        log.info("Received uninterpretable nonsense: %s", repr(packet))
+    def _process_gibberish(self, proto, packet):
+        (_, data) = packet
+        log.info("Received uninterpretable nonsense: %s", repr(data))
 
     _packet_handlers = {
         "hello": _process_hello,
