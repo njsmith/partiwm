@@ -35,7 +35,6 @@ def pkgconfig(*packages, **kw):
             kw[k] = list(set(v))
     return kw
 
-# Make sure to keep this in sync with the tests in xpra/platform/__init__.py:
 if os.name == "posix":
     from Cython.Distutils import build_ext
     from Cython.Compiler.Version import version as cython_version_string
@@ -63,10 +62,13 @@ if os.name == "posix":
       ]
 
     cmdclass = {'build_ext': build_ext}
-else:
+    package_dir = {"xpra.platform": "xpra/xposix"}
+elif os.name == "nt":
     ext_modules = []
     cmdclass = {}
-
+    package_dir = {"xpra.platform": "xpra/win32"}
+else:
+    sys.exit("Sorry, I don't recognize this platform (%s)" % (os.name,))
 
 import wimpiggy
 import parti
@@ -101,7 +103,8 @@ setup(
     scripts=["scripts/parti", "scripts/parti-repl",
              "scripts/xpra",
              ],
-    data_files = [("share/man/man1", ["xpra.1"])],
+    package_dir=package_dir,
+    data_files=[("share/man/man1", ["xpra.1"])],
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     )

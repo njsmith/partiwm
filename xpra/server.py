@@ -37,8 +37,8 @@ log = Logger()
 import xpra
 from xpra.protocol import Protocol
 from xpra.keys import mask_to_names
-from xpra.platform.xclipboard import ClipboardProtocolHelper
-from xpra.platform.xsettings import XSettingsManager
+from xpra.xposix.xclipboard import ClipboardProtocolHelper
+from xpra.xposix.xsettings import XSettingsManager
 
 class DesktopManager(gtk.Widget):
     def __init__(self):

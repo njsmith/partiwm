@@ -3,12 +3,7 @@
 # Parti is released under the terms of the GNU GPL v2, or, at your option, any
 # later version. See the file COPYING for details.
 
-XPRA_LOCAL_SERVERS_SUPPORTED = False
-import os
-os.environ["PLINK_PROTOCOL"] = "ssh"
-DEFAULT_SSH_CMD = "plink"
-GOT_PASSWORD_PROMPT_SUGGESTION = \
-   'Perhaps you need to set up Pageant, or (less secure) pass --ssh="plink -pw YOUR-PASSWORD" to xpra?\n'
+# Platform-specific code for Win32 -- the parts that may import gtk.
 
 def grok_modifier_map(display_source):
     modifier_map = {
@@ -31,8 +26,6 @@ def grok_modifier_map(display_source):
                                 | modifier_map["scroll"]
                                 | modifier_map["num"])
     return modifier_map
-
-from xpra.platform.win32pipe import spawn_with_sockets, socket_channel
 
 class ClipboardProtocolHelper(object):
     def __init__(self, send_packet_cb):

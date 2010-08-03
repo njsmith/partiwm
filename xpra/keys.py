@@ -3,7 +3,7 @@
 # Parti is released under the terms of the GNU GPL v2, or, at your option, any
 # later version. See the file COPYING for details.
 
-from xpra.platform import grok_modifier_map
+from xpra.platform.gui import grok_modifier_map
 
 def mask_to_names(mask, modifier_map):
     modifiers = []
