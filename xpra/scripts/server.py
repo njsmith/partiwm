@@ -271,6 +271,7 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
     # starting.  First wait for it to start up:
     wait_for_x_server(display_name, 3) # 3s timeout
     # Now we can safely load gtk and connect:
+    assert "gtk" not in sys.modules
     import gtk
     display = gtk.gdk.Display(display_name)
     manager = gtk.gdk.display_manager_get()
@@ -333,8 +334,6 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
         child_reaper.check()
         return False # Only call once
     gobject.timeout_add(0, check_once)
-
-    assert "gtk" not in sys.modules
 
     if app.run():
         # Upgrading, so leave X server running
