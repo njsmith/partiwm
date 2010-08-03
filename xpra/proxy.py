@@ -56,8 +56,14 @@ class ChannelProxy(gobject.GObject):
             self._tag = gobject.io_add_watch(self._writefd, gobject.IO_OUT,
                                              self._writeable)
         elif state is self.DONE:
-            os.close(self._readfd)
-            os.close(self._writefd)
+            try:
+                os.close(self._readfd)
+            except (OSError, IOError):
+                pass
+            try:
+                os.close(self._writefd)
+            except (OSError, IOError):
+                pass
             self.emit("done")
         else:
             assert False

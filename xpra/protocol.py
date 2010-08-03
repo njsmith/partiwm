@@ -14,7 +14,7 @@ from xpra.platform import socket_channel
 from wimpiggy.log import Logger
 log = Logger()
 
-def repr_ellipsized(obj, limit):
+def repr_ellipsized(obj, limit=100):
     if isinstance(obj, str) and len(obj) > limit:
         return repr(obj[:limit]) + "..."
     else:
@@ -33,33 +33,91 @@ def dump_packet(packet):
 #      refer to the same socket, then this counts as "overlapped IO", which
 #      requires that WSA_FLAG_OVERLAPPED *is* set. (Thanks to Simon Tatham for
 #      helping me figure this out.)
-#   4) Also, reading and writing from the same socket is kind of a pain on
-#      win32 anyway, because you can only have one IO watch active per socket:
-#        http://faq.pygtk.org/index.py?req=all#20.20
-#      So using two sockets simplifies the IO watch code.
 # Anyway, for all thse reasons, we make two different sockets, one for stdin
 # and one for stdout. And for consistency, we do the same on POSIX.
+#
+# But, reading and writing from the same socket is kind of a pain on win32
+# because you can only have one IO watch active per socket:
+#     http://faq.pygtk.org/index.py?req=all#20.20
+# Yet, sometimes we have to have just one socket, when we're making a
+# direct connection, over TCP or Unix domain. So then we have to manage that
+# one socket consistently too.
+#
+# This class abstracts away the win32 nonsense about whether our read socket
+# and write socket are actually the same:
+class TwoChannels(object):
+    ONE = object()
+    TWO = object()
+
+    def _setup_channel(self, sock):
+        sock.setblocking(0)
+        channel = socket_channel(sock)
+        channel.set_encoding(None)
+        channel.set_buffered(0)
+        return channel
+
+    def __init__(self, write_sock, read_sock, watch_cb):
+        # The socket objects own the underlying OS socket; so even though we
+        # mostly interact with the channel objects, we must keep references
+        # to the socket objects around to prevent the underlying sockets from
+        # getting closed.
+        self._write_sock = write_sock
+        self._read_sock = read_sock
+        self._watch_cb = watch_cb
+        self._write_armed = False
+        self._write_watch_tag = None
+        if write_sock.fileno() == read_sock.fileno():
+            log("one-socket mode (socket=%s)", write_sock.fileno())
+            self._mode = self.ONE
+            self._channel = self._setup_channel(write_sock)
+        else:
+            log("two-socket mode (write=%s, read=%s)",
+                write_sock.fileno(), read_sock.fileno())
+            self._mode = self.TWO
+            self._write_channel = self._setup_channel(write_sock)
+            self._read_channel = self._setup_channel(read_sock)
+            tag = self._read_channel.add_watch(gobject.IO_IN | gobject.IO_HUP,
+                                               self._watch_cb)
+            self._read_watch_tag = tag
+        self.update_write_watch(False, force=True)
+
+    def update_write_watch(self, want_write, force=False):
+        log("update_write_watch: want_write=%s (was %s)",
+            want_write, self._write_armed)
+        if want_write != self._write_armed or force:
+            if self._mode is self.ONE:
+                flags = gobject.IO_IN | gobject.IO_HUP
+                channel = self._channel
+            else:
+                assert self._mode is self.TWO
+                flags = gobject.IO_HUP
+                channel = self._write_channel
+            if want_write:
+                flags |= gobject.IO_OUT
+            log("new write channel flags: %s", flags)
+            if self._write_watch_tag is not None:
+                gobject.source_remove(self._write_watch_tag)
+            self._write_watch_tag = channel.add_watch(flags, self._watch_cb)
+            self._write_armed = want_write
+
+    def close(self):
+        log("TwoChannels: closing")
+        self._write_sock.close()
+        try:
+            self._read_sock.close()
+        except (IOError, socket.error):
+            pass
+        gobject.source_remove(self._write_watch_tag)
+        if self._mode is self.TWO:
+            gobject.source_remove(self._read_watch_tag)
 
 class Protocol(object):
     CONNECTION_LOST = object()
     GIBBERISH = object()
 
     def __init__(self, write_sock, read_sock, process_packet_cb):
-        # The socket objects own the underlying OS socket; so even though we
-        # mostly interact with the channel objects, we must keep references
-        # to the socket objects around to prevent the underlying sockets from
-        # getting closed.
-        self._write_sock = write_sock
-        self._write_sock.setblocking(False)
-        self._write_channel = socket_channel(write_sock)
-        self._write_channel.set_encoding(None)
-        self._write_channel.set_buffered(0)
-
-        self._read_sock = read_sock
-        self._read_sock.setblocking(False)
-        self._read_channel = socket_channel(read_sock)
-        self._read_channel.set_encoding(None)
-        self._read_channel.set_buffered(0)
+        self._channels = TwoChannels(write_sock, read_sock,
+                                     self._channel_ready)
 
         self._process_packet_cb = process_packet_cb
         # Invariant: if .source is None, then _source_has_more == False
@@ -70,56 +128,31 @@ class Protocol(object):
         self._write_buf = ""
         self._compressor = None
         self._decompressor = None
-        self._read_watch_tag = self._read_channel.add_watch(gobject.IO_IN
-                                                            | gobject.IO_HUP,
-                                                            self._read_ready)
-        self._write_armed = False
-        self._write_watch_tag = None
-        self._update_write_watch(force=True)
 
     def source_has_more(self):
         assert self.source is not None
         self._source_has_more = True
         self._update_write_watch()
 
-    def _update_write_watch(self, force=False):
+    def _update_write_watch(self):
         want_write = bool(not self._closed
                           and (self._write_buf or self._source_has_more))
-        log("updating watch: want_write=%s (was %s)",
-            want_write, self._write_armed)
-        if want_write == self._write_armed and not force:
-            return
-        flags = gobject.IO_HUP
-        if want_write:
-            flags |= gobject.IO_OUT
-        if self._write_watch_tag is not None:
-            gobject.source_remove(self._write_watch_tag)
-        self._write_watch_tag = self._write_channel.add_watch(flags,
-                                                              self._write_ready)
-        self._write_armed = want_write
+        self._channels.update_write_watch(want_write)
 
-    def _read_ready(self, source, flags):
-        log("_read_ready")
+    def _channel_ready(self, channel, flags):
+        log("_channel_ready (%s)", flags)
         if flags & gobject.IO_IN:
-            self._read_some()
-        assert not (flags & gobject.IO_OUT)
-        if flags & gobject.IO_HUP:
-            self._connection_lost()
-        return True
-
-    def _write_ready(self, source, flags):
-        log("_write_ready")
-        assert not (flags & gobject.IO_IN)
+            self._read_some(channel)
         if flags & gobject.IO_OUT:
-            self._write_some()
+            self._write_some(channel)
         if flags & gobject.IO_HUP:
             self._connection_lost()
         return True
 
-    def _read_some(self):
+    def _read_some(self, channel):
         log("_read_some")
         try:
-            buf = self._read_channel.read(4096)
+            buf = channel.read(4096)
         except (socket.error, gobject.GError):
             print "Error reading from socket"
             self._connection_lost()
@@ -154,7 +187,7 @@ class Protocol(object):
                 unprocessed = self._decompressor.decompress(unprocessed)
             self._read_decoder = IncrBDecode(unprocessed)
 
-    def _write_some(self):
+    def _write_some(self, channel):
         log("_write_some")
         if not self._write_buf:
             # Underflow: refill buffer from source.
@@ -164,8 +197,8 @@ class Protocol(object):
             assert self._source_has_more
             self._flush_one_packet_into_buffer()
         try:
-            sent = self._write_channel.write(self._write_buf)
-            #self._write_channel.flush()
+            sent = channel.write(self._write_buf)
+            channel.flush()
         except (socket.error, gobject.GError):
             print "Error writing to socket"
             self._connection_lost()
@@ -221,12 +254,5 @@ class Protocol(object):
 
     def close(self):
         if not self._closed:
-            if self._read_watch_tag is not None:
-                gobject.source_remove(self._read_watch_tag)
-                self._read_watch_tag = None
-            if self._write_watch_tag is not None:
-                gobject.source_remove(self._write_watch_tag)
-                self._write_watch_tag = None
             self._closed = True
-            self._read_sock.close()
-            self._write_sock.close()
+            self._channels.close()
