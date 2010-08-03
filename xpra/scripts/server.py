@@ -334,6 +334,8 @@ def run_server(parser, opts, mode, xpra_file, extra_args):
         return False # Only call once
     gobject.timeout_add(0, check_once)
 
+    assert "gtk" not in sys.modules
+
     if app.run():
         # Upgrading, so leave X server running
         _cleanups.remove(kill_xvfb)

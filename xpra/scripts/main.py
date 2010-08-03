@@ -202,7 +202,6 @@ def connect(display_desc):
     elif display_desc["type"] == "tcp":
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((display_desc["host"], display_desc["port"]))
-        # This doesn't work on Win32:
         return sock, sock
     else:
         assert False, "unsupported display type in connect"
@@ -238,17 +237,19 @@ def run_client(parser, opts, extra_args):
 
 def run_proxy(parser, opts, extra_args):
     from xpra.proxy import XpraProxy
+    assert "gtk" not in sys.modules
     read_sock, write_sock = connect_or_fail(pick_display(parser, opts, extra_args))
     app = XpraProxy(0, 1, read_sock, write_sock)
     app.run()
 
 def run_stop(parser, opts, extra_args):
+    assert "gtk" not in sys.modules
     magic_string = bencode(["hello", []]) + bencode(["shutdown-server"])
 
     display_desc = pick_display(parser, opts, extra_args)
-    sock = connect_or_fail(display_desc)
-    sock.sendall(magic_string)
-    while sock.recv(4096):
+    write_sock, read_sock = connect_or_fail(display_desc)
+    write_sock.sendall(magic_string)
+    while read_sock.recv(4096):
         pass
     if display_desc["local"]:
         sockdir = DotXpra()
@@ -274,6 +275,7 @@ def run_stop(parser, opts, extra_args):
         print "Sent shutdown command"
 
 def run_list(parser, opts, extra_args):
+    assert "gtk" not in sys.modules
     if extra_args:
         parser.error("too many arguments for mode")
     sockdir = DotXpra()
