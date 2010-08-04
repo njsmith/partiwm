@@ -6,7 +6,6 @@
 import gobject
 import socket # for socket.error
 import zlib
-import struct
 
 from xpra.bencode import bencode, IncrBDecode
 from xpra.platform import socket_channel
@@ -152,7 +151,7 @@ class Protocol(object):
     def _read_some(self, channel):
         log("_read_some")
         try:
-            buf = channel.read(4096)
+            buf = channel.read(8192)
         except (socket.error, gobject.GError):
             print "Error reading from socket"
             self._connection_lost()
@@ -212,10 +211,7 @@ class Protocol(object):
         packet, self._source_has_more = self.source.next_packet()
         if packet is not None:
             log("sending %s", dump_packet(packet), type="raw.send")
-            data_payload = bencode(packet)
-            data_header = struct.pack(">I", len(data_payload))
-            #data = data_header + data_payload
-            data = data_payload
+            data = bencode(packet)
             if self._compressor is not None:
                 self._write_buf += self._compressor.compress(data)
                 self._write_buf += self._compressor.flush(zlib.Z_SYNC_FLUSH)
