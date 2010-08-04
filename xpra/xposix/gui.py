@@ -8,10 +8,10 @@
 
 from wimpiggy.keys import grok_modifier_map
 
-from xpra.platform.xclipboard import ClipboardProtocolHelper
+from xpra.xposix.xclipboard import ClipboardProtocolHelper
 
-from xpra.platform.xsettings import XSettingsWatcher
-from xpra.platform.xroot_props import XRootPropWatcher
+from xpra.xposix.xsettings import XSettingsWatcher
+from xpra.xposix.xroot_props import XRootPropWatcher
 class ClientExtras(object):
     def __init__(self, send_packet_cb):
         self.send = send_packet_cb
