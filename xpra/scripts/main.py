@@ -248,8 +248,8 @@ def run_client(parser, opts, extra_args):
 def run_proxy(parser, opts, extra_args):
     from xpra.proxy import XpraProxy
     assert "gtk" not in sys.modules
-    read_sock, write_sock = connect_or_fail(pick_display(parser, opts, extra_args))
-    app = XpraProxy(0, 1, read_sock, write_sock)
+    server_conn = connect_or_fail(pick_display(parser, opts, extra_args))
+    app = XpraProxy(TwoFileConnection(sys.stdin, sys.stdout), server_conn)
     app.run()
 
 def run_stop(parser, opts, extra_args):

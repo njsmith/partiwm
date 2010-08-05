@@ -1,22 +1,9 @@
-# oh god it's threads
-
-# This *almost* works.
-#   -- On unix, switching to using os.read/os.write on the sockets (or pipes
-#      or whatever) would work.
-#   -- On windows, we need either
-#      -- a single bidirectional pipe that supports overlapped IO (i.e., one
-#         thread reading and one thread writing at the same time). Ordinary
-#         TCP connections should qualify.
-#      -- or two unidirectional pipes. Also doable.
-#      -- And, we need os.read/os.write to work on them. I don't think this is
-#         true for sockets. But if we call open_osfhandle on the sockets then
-#         maybe it'll work?
-#         -- Ah-hah: On win32, socket.makefile calls open_osfhandle.
-
 # This file is part of Parti.
 # Copyright (C) 2008, 2009, 2010 Nathaniel Smith <njs@pobox.com>
 # Parti is released under the terms of the GNU GPL v2, or, at your option, any
 # later version. See the file COPYING for details.
+
+# oh god it's threads
 
 import gobject
 gobject.threads_init()
