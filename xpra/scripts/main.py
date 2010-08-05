@@ -10,6 +10,7 @@ import socket
 import time
 from optparse import OptionParser
 import logging
+from subprocess import Popen, PIPE
 
 import xpra
 from xpra.bencode import bencode
@@ -18,6 +19,7 @@ from xpra.platform import (XPRA_LOCAL_SERVERS_SUPPORTED,
                            DEFAULT_SSH_CMD,
                            GOT_PASSWORD_PROMPT_SUGGESTION,
                            spawn_with_sockets)
+from xpra.thread_protocol import TwoFileConnection, SocketConnection
 
 def nox():
     if "DISPLAY" in os.environ:
@@ -189,28 +191,36 @@ def pick_display(parser, opts, extra_args):
     else:
         parser.error("too many arguments")
 
-def connect(display_desc):
+def _socket_connect(sock, target):
+    try:
+        sock.connect(target)
+    except socket.error, e:
+        sys.exit("Connection failed: %s" % (e,))
+    return SocketConnection(sock)
+
+def connect_or_fail(display_desc):
     if display_desc["type"] == "ssh":
-        return spawn_with_sockets(display_desc["full_remote_xpra"]
-                                  + ["_proxy"]
-                                  + display_desc["display_as_args"])
+        cmd = (display_desc["full_remote_xpra"]
+               + ["_proxy"] + display_desc["display_as_args"])
+        try:
+            child = Popen(cmd, stdin=PIPE, stdout=PIPE)
+        except OSError, e:
+            sys.exit("Error running ssh program '%s': %s" % (cmd[0], e))
+        return TwoFileConnection(child.stdin, child.stdout)
+
     elif XPRA_LOCAL_SERVERS_SUPPORTED and display_desc["type"] == "unix-domain":
         sockdir = DotXpra()
         sock = socket.socket(socket.AF_UNIX)
-        sock.connect(sockdir.socket_path(display_desc["display"]))
-        return sock, sock
+        return _socket_connect(sock,
+                               sockdir.socket_path(display_desc["display"]))
+
     elif display_desc["type"] == "tcp":
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((display_desc["host"], display_desc["port"]))
-        return sock, sock
+        return _socket_connect(sock,
+                               (display_desc["host"], display_desc["port"]))
+
     else:
         assert False, "unsupported display type in connect"
-
-def connect_or_fail(display_desc):
-    try:
-        return connect(display_desc)
-    except socket.error, e:
-        sys.exit("Connection failed: %s" % (e,))
 
 def handshake_complete_msg(*args):
     sys.stdout.write("Attached (press Control-C to detach)\n")
@@ -227,10 +237,10 @@ def got_gibberish_msg(obj, data):
 
 def run_client(parser, opts, extra_args):
     from xpra.client import XpraClient
-    read_sock, write_sock = connect_or_fail(pick_display(parser, opts, extra_args))
+    conn = connect_or_fail(pick_display(parser, opts, extra_args))
     if opts.compression_level < 0 or opts.compression_level > 9:
         parser.error("Compression level must be between 0 and 9 inclusive.")
-    app = XpraClient(read_sock, write_sock, opts.compression_level)
+    app = XpraClient(conn, opts.compression_level)
     app.connect("handshake-complete", handshake_complete_msg)
     app.connect("received-gibberish", got_gibberish_msg)
     app.run()
@@ -247,9 +257,10 @@ def run_stop(parser, opts, extra_args):
     magic_string = bencode(["hello", []]) + bencode(["shutdown-server"])
 
     display_desc = pick_display(parser, opts, extra_args)
-    write_sock, read_sock = connect_or_fail(display_desc)
-    write_sock.sendall(magic_string)
-    while read_sock.recv(4096):
+    conn = connect_or_fail(display_desc)
+    while magic_string:
+        magic_string = magic_string[conn.write(magic_string):]
+    while conn.read(4096):
         pass
     if display_desc["local"]:
         sockdir = DotXpra()

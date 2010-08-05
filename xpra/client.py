@@ -14,7 +14,7 @@ from wimpiggy.util import (n_arg_signal,
 from wimpiggy.log import Logger
 log = Logger()
 
-from xpra.protocol import Protocol
+from xpra.thread_protocol import Protocol
 from xpra.keys import mask_to_names, grok_modifier_map
 from xpra.platform.gui import ClipboardProtocolHelper, ClientExtras
 
@@ -272,12 +272,12 @@ class XpraClient(gobject.GObject):
         "received-gibberish": n_arg_signal(1),
         }
 
-    def __init__(self, read_sock, write_sock, compression_level):
+    def __init__(self, conn, compression_level):
         gobject.GObject.__init__(self)
         self._window_to_id = {}
         self._id_to_window = {}
 
-        self._protocol = Protocol(read_sock, write_sock, self.process_packet)
+        self._protocol = Protocol(conn, self.process_packet)
         ClientSource(self._protocol)
         capabilities_request = dict(default_capabilities)
         if compression_level:

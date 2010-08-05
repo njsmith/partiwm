@@ -11,5 +11,3 @@ os.environ["PLINK_PROTOCOL"] = "ssh"
 DEFAULT_SSH_CMD = "plink"
 GOT_PASSWORD_PROMPT_SUGGESTION = \
    'Perhaps you need to set up Pageant, or (less secure) use --ssh="plink -pw YOUR-PASSWORD"?\n'
-
-from xpra.platform.win32pipe import spawn_with_sockets, socket_channel
