@@ -35,7 +35,7 @@ from wimpiggy.log import Logger
 log = Logger()
 
 import xpra
-from xpra.protocol import Protocol
+from xpra.protocol import Protocol, SocketConnection
 from xpra.keys import mask_to_names
 from xpra.xposix.xclipboard import ClipboardProtocolHelper
 from xpra.xposix.xsettings import XSettingsManager
@@ -315,7 +315,7 @@ class XpraServer(gobject.GObject):
     def _new_connection(self, listener, *args):
         log.info("New connection received")
         sock, addr = listener.accept()
-        self._potential_protocols.append(Protocol(sock, sock,
+        self._potential_protocols.append(Protocol(SocketConnection(sock),
                                                   self.process_packet))
         return True
 
