@@ -104,7 +104,7 @@ class Protocol(object):
             return
         packet, self._source_has_more = self.source.next_packet()
         if packet is not None:
-            log("writeing %s", dump_packet(packet), type="raw.write")
+            log("writing %s", dump_packet(packet), type="raw.write")
             data_payload = bencode(packet)
             data = data_payload
             if self._compressor is not None:

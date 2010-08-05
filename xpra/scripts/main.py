@@ -17,8 +17,7 @@ from xpra.bencode import bencode
 from xpra.dotxpra import DotXpra
 from xpra.platform import (XPRA_LOCAL_SERVERS_SUPPORTED,
                            DEFAULT_SSH_CMD,
-                           GOT_PASSWORD_PROMPT_SUGGESTION,
-                           spawn_with_sockets)
+                           GOT_PASSWORD_PROMPT_SUGGESTION)
 from xpra.thread_protocol import TwoFileConnection, SocketConnection
 
 def nox():
@@ -249,7 +248,7 @@ def run_proxy(parser, opts, extra_args):
     from xpra.proxy import XpraProxy
     assert "gtk" not in sys.modules
     server_conn = connect_or_fail(pick_display(parser, opts, extra_args))
-    app = XpraProxy(TwoFileConnection(sys.stdin, sys.stdout), server_conn)
+    app = XpraProxy(TwoFileConnection(sys.stdout, sys.stdin), server_conn)
     app.run()
 
 def run_stop(parser, opts, extra_args):
