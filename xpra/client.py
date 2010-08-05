@@ -14,7 +14,7 @@ from wimpiggy.util import (n_arg_signal,
 from wimpiggy.log import Logger
 log = Logger()
 
-from xpra.thread_protocol import Protocol
+from xpra.protocol import Protocol
 from xpra.keys import mask_to_names, grok_modifier_map
 from xpra.platform.gui import ClipboardProtocolHelper, ClientExtras
 

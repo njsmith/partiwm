@@ -35,7 +35,7 @@ from wimpiggy.log import Logger
 log = Logger()
 
 import xpra
-from xpra.thread_protocol import Protocol, SocketConnection
+from xpra.protocol import Protocol, SocketConnection
 from xpra.keys import mask_to_names
 from xpra.xposix.xclipboard import ClipboardProtocolHelper
 from xpra.xposix.xsettings import XSettingsManager

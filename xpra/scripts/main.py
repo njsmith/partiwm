@@ -18,7 +18,7 @@ from xpra.dotxpra import DotXpra
 from xpra.platform import (XPRA_LOCAL_SERVERS_SUPPORTED,
                            DEFAULT_SSH_CMD,
                            GOT_PASSWORD_PROMPT_SUGGESTION)
-from xpra.thread_protocol import TwoFileConnection, SocketConnection
+from xpra.protocol import TwoFileConnection, SocketConnection
 
 def nox():
     if "DISPLAY" in os.environ:
