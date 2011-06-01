@@ -128,6 +128,12 @@ def _read_image(disp, stream):
     # directly, and also .get_data() doesn't work on it, and it breaks the
     # test suite and blah. This at least works, as odd as it is:
     surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+    # Someone ran into this with an old version of cairo, so might as well
+    # handle it more gracefully:
+    if not hasattr(surf, "get_data"):
+        log.warn("Your Cairo is too old! Carrying on as best I can, "
+                 "but don't expect a miracle")
+        return None
     surf.get_data()[:] = bytes
     # Cairo uses premultiplied alpha. EWMH actually doesn't specify what it
     # uses, but apparently the de-facto standard is non-premultiplied. (At
