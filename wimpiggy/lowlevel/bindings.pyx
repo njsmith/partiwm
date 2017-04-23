@@ -24,6 +24,8 @@ log = Logger("wimpiggy.lowlevel")
 # Headers, python magic
 ###################################
 
+cdef extern from "X11/Xmd.h":
+    pass
 cdef extern from "X11/Xlib.h":
     pass
 cdef extern from "X11/Xutil.h":
